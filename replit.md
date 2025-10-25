@@ -57,7 +57,24 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 - ✅ Group selection in AddRouterDialog
 - ✅ Group filtering in Routers page
 - ✅ Fixed schema initialization order bug
-- ✅ Ready for testing
+- ✅ Architect reviewed and approved
+
+**Task 4 - SNMP Fallback Support:**
+- ✅ Extended router schema with SNMP fields (enabled, community, version, port)
+- ✅ Installed net-snmp library for SNMP functionality
+- ✅ Implemented SNMP client methods in MikroTik client
+  - testSNMPConnection() - Test SNMP connectivity
+  - getInterfaceStatsViaSNMP() - Query traffic via SNMP with rate calculation
+  - getInterfaceListViaSNMP() - Get port list via SNMP
+  - getRouterInfoViaSNMP() - Get system info via SNMP
+- ✅ Automatic fallback logic when API fails (especially permission errors)
+- ✅ Updated scheduler to pass SNMP configuration
+- ✅ Updated all router test endpoints with SNMP support
+- ✅ Frontend SNMP configuration UI in AddRouterDialog
+  - Collapsible SNMP section with toggle
+  - Community string, version, and port configuration
+  - Visual feedback when SNMP is enabled
+- ✅ Ready for testing with live router
 
 ## Project Architecture
 
@@ -110,6 +127,12 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
   - Assign routers to groups during creation or editing
   - Filter routers by group on the Routers page
   - Groups cascade to null on delete (routers remain ungrouped)
+- **SNMP Fallback:** Automatic fallback when API access is denied
+  - Uses standard SNMP (SNMPv1/v2c) when MikroTik API fails
+  - Supports traffic monitoring, router info, and port status
+  - Uses 64-bit counters (IF-HC-MIB) to prevent rollover on high-throughput links
+  - Configurable community string, version, and port
+  - Seamless fallback with no user intervention required
 
 #### Traffic Monitoring (Frontend Ready)
 - Real-time traffic graphs with Recharts

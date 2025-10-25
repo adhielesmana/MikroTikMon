@@ -125,13 +125,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/routers/test", isAuthenticated, async (req: any, res) => {
     try {
-      const { ipAddress, port, username, password } = req.body;
+      const { ipAddress, port, username, password, snmpEnabled, snmpCommunity, snmpVersion, snmpPort } = req.body;
       
       const client = new MikrotikClient({
         host: ipAddress,
         port: port || 8728,
         user: username,
         password,
+        snmpEnabled: snmpEnabled || false,
+        snmpCommunity: snmpCommunity || "public",
+        snmpVersion: snmpVersion || "2c",
+        snmpPort: snmpPort || 161,
       });
       
       const success = await client.testConnection();
@@ -170,6 +174,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         port: router.port,
         user: credentials.username,
         password: credentials.password,
+        snmpEnabled: router.snmpEnabled || false,
+        snmpCommunity: router.snmpCommunity || "public",
+        snmpVersion: router.snmpVersion || "2c",
+        snmpPort: router.snmpPort || 161,
       });
       
       const success = await client.testConnection();

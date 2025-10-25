@@ -32,6 +32,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 const routerFormSchema = z.object({
   name: z.string().min(1, "Router name is required"),
@@ -40,6 +42,10 @@ const routerFormSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
   groupId: z.string().optional(),
+  snmpEnabled: z.boolean().default(false),
+  snmpCommunity: z.string().default("public"),
+  snmpVersion: z.enum(["1", "2c"]).default("2c"), // Only v1 and v2c supported (v3 requires additional auth params)
+  snmpPort: z.coerce.number().min(1).max(65535).default(161),
 });
 
 type RouterFormData = z.infer<typeof routerFormSchema>;
@@ -67,6 +73,10 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
       username: router.username,
       password: "",
       groupId: router.groupId || undefined,
+      snmpEnabled: router.snmpEnabled || false,
+      snmpCommunity: router.snmpCommunity || "public",
+      snmpVersion: (router.snmpVersion as "1" | "2c") || "2c",
+      snmpPort: router.snmpPort || 161,
     } : {
       name: "",
       ipAddress: "",
@@ -74,6 +84,10 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
       username: "admin",
       password: "",
       groupId: undefined,
+      snmpEnabled: false,
+      snmpCommunity: "public",
+      snmpVersion: "2c" as "1" | "2c",
+      snmpPort: 161,
     },
   });
 
@@ -253,6 +267,93 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
                 </FormItem>
               )}
             />
+
+            <Separator className="my-4" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-medium">SNMP Fallback</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Use SNMP when API access is denied
+                  </p>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="snmpEnabled"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-snmp-enabled"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {form.watch("snmpEnabled") && (
+                <div className="space-y-4 pl-4 border-l-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="snmpCommunity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Community String</FormLabel>
+                          <FormControl>
+                            <Input placeholder="public" {...field} data-testid="input-snmp-community" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="snmpPort"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>SNMP Port</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="161" {...field} data-testid="input-snmp-port" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="snmpVersion"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>SNMP Version</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-snmp-version">
+                              <SelectValue placeholder="Select SNMP version" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="1">SNMPv1</SelectItem>
+                            <SelectItem value="2c">SNMPv2c (Recommended)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          SNMPv2c is recommended for MikroTik routers
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
 
             <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
               <Button

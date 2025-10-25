@@ -68,6 +68,11 @@ export const routers = pgTable("routers", {
   encryptedPassword: text("encrypted_password").notNull(),
   connected: boolean("connected").notNull().default(false),
   lastConnected: timestamp("last_connected"),
+  // SNMP configuration for fallback monitoring
+  snmpEnabled: boolean("snmp_enabled").notNull().default(false),
+  snmpCommunity: varchar("snmp_community", { length: 255 }).default("public"),
+  snmpVersion: varchar("snmp_version", { length: 10 }).default("2c"), // "1", "2c", or "3"
+  snmpPort: integer("snmp_port").notNull().default(161),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -114,6 +119,10 @@ export const insertRouterSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
   groupId: z.string().optional(),
+  snmpEnabled: z.boolean().default(false),
+  snmpCommunity: z.string().default("public"),
+  snmpVersion: z.enum(["1", "2c"]).default("2c"), // Only v1 and v2c supported (v3 requires additional auth params)
+  snmpPort: z.number().min(1).max(65535).default(161),
 });
 
 export type InsertRouter = z.infer<typeof insertRouterSchema>;

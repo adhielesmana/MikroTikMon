@@ -61,6 +61,10 @@ async function pollRouterTraffic() {
           port: router.port,
           user: credentials.username,
           password: credentials.password,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || "public",
+          snmpVersion: router.snmpVersion || "2c",
+          snmpPort: router.snmpPort || 161,
         });
 
         const stats = await client.getInterfaceStats();
