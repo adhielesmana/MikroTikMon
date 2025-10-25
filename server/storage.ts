@@ -2,6 +2,7 @@
 import {
   users,
   routers,
+  routerGroups,
   monitoredPorts,
   trafficData,
   alerts,
@@ -10,6 +11,8 @@ import {
   type UpsertUser,
   type Router,
   type InsertRouter,
+  type RouterGroup,
+  type InsertRouterGroup,
   type MonitoredPort,
   type InsertMonitoredPort,
   type TrafficData,
@@ -48,6 +51,13 @@ export interface IStorage {
   deleteRouter(id: string): Promise<void>;
   updateRouterConnection(id: string, connected: boolean): Promise<void>;
   getRouterCredentials(id: string): Promise<{ username: string; password: string } | undefined>;
+
+  // Router Groups operations
+  getRouterGroups(userId: string): Promise<RouterGroup[]>;
+  getRouterGroup(id: string): Promise<RouterGroup | undefined>;
+  createRouterGroup(group: InsertRouterGroup, userId: string): Promise<RouterGroup>;
+  updateRouterGroup(id: string, data: Partial<InsertRouterGroup>): Promise<RouterGroup>;
+  deleteRouterGroup(id: string): Promise<void>;
 
   // Monitored Ports operations
   getMonitoredPorts(routerId: string): Promise<MonitoredPort[]>;
@@ -178,6 +188,40 @@ export class DatabaseStorage implements IStorage {
       username: router.username,
       password: decryptPassword(router.encryptedPassword),
     };
+  }
+
+  // Router Groups operations
+  async getRouterGroups(userId: string): Promise<RouterGroup[]> {
+    return db.select().from(routerGroups).where(eq(routerGroups.userId, userId)).orderBy(desc(routerGroups.createdAt));
+  }
+
+  async getRouterGroup(id: string): Promise<RouterGroup | undefined> {
+    const [group] = await db.select().from(routerGroups).where(eq(routerGroups.id, id));
+    return group;
+  }
+
+  async createRouterGroup(groupData: InsertRouterGroup, userId: string): Promise<RouterGroup> {
+    const [group] = await db
+      .insert(routerGroups)
+      .values({
+        ...groupData,
+        userId,
+      })
+      .returning();
+    return group;
+  }
+
+  async updateRouterGroup(id: string, data: Partial<InsertRouterGroup>): Promise<RouterGroup> {
+    const [group] = await db
+      .update(routerGroups)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(routerGroups.id, id))
+      .returning();
+    return group;
+  }
+
+  async deleteRouterGroup(id: string): Promise<void> {
+    await db.delete(routerGroups).where(eq(routerGroups.id, id));
   }
 
   // Monitored Ports operations

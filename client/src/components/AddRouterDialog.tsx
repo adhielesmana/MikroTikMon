@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   Dialog,
@@ -17,13 +17,21 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Router } from "@shared/schema";
+import type { Router, RouterGroup } from "@shared/schema";
 import { Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const routerFormSchema = z.object({
   name: z.string().min(1, "Router name is required"),
@@ -31,6 +39,7 @@ const routerFormSchema = z.object({
   port: z.coerce.number().min(1).max(65535).default(8728),
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
+  groupId: z.string().optional(),
 });
 
 type RouterFormData = z.infer<typeof routerFormSchema>;
@@ -45,6 +54,10 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
   const { toast } = useToast();
   const [testing, setTesting] = useState(false);
 
+  const { data: groups } = useQuery<RouterGroup[]>({
+    queryKey: ["/api/router-groups"],
+  });
+
   const form = useForm<RouterFormData>({
     resolver: zodResolver(routerFormSchema),
     defaultValues: router ? {
@@ -53,12 +66,14 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
       port: router.port,
       username: router.username,
       password: "",
+      groupId: router.groupId || undefined,
     } : {
       name: "",
       ipAddress: "",
       port: 8728,
       username: "admin",
       password: "",
+      groupId: undefined,
     },
   });
 
@@ -170,6 +185,41 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="groupId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Group (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-router-group">
+                        <SelectValue placeholder="No group" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">No group</SelectItem>
+                      {groups?.map((group) => (
+                        <SelectItem key={group.id} value={group.id}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-sm"
+                              style={{ backgroundColor: group.color || "#3b82f6" }}
+                            />
+                            {group.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Organize routers by location or function
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

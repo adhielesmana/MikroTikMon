@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
-import type { Router } from "@shared/schema";
+import type { Router, RouterGroup } from "@shared/schema";
 import { RouterCard } from "@/components/RouterCard";
 import { AddRouterDialog } from "@/components/AddRouterDialog";
+import { ManageGroupsDialog } from "@/components/ManageGroupsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,16 +19,33 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function Routers() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRouter, setEditingRouter] = useState<Router | undefined>();
   const [deletingRouter, setDeletingRouter] = useState<Router | undefined>();
+  const [selectedGroup, setSelectedGroup] = useState<string>("all");
   const { toast } = useToast();
 
   const { data: routers, isLoading } = useQuery<Router[]>({
     queryKey: ["/api/routers"],
   });
+
+  const { data: groups } = useQuery<RouterGroup[]>({
+    queryKey: ["/api/router-groups"],
+  });
+
+  // Filter routers by selected group
+  const filteredRouters = selectedGroup === "all" 
+    ? routers 
+    : routers?.filter(r => r.groupId === selectedGroup || (selectedGroup === "ungrouped" && !r.groupId));
 
   const deleteMutation = useMutation({
     mutationFn: async (routerId: string) => {
@@ -93,17 +111,49 @@ export default function Routers() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold mb-1" data-testid="text-routers-title">Routers</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your MikroTik router connections
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold mb-1" data-testid="text-routers-title">Routers</h1>
+            <p className="text-sm text-muted-foreground">
+              Manage your MikroTik router connections
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <ManageGroupsDialog />
+            <Button onClick={() => setDialogOpen(true)} data-testid="button-add-router">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Router
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => setDialogOpen(true)} data-testid="button-add-router">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Router
-        </Button>
+
+        {/* Group Filter */}
+        {groups && groups.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Filter by group:</span>
+            <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+              <SelectTrigger className="w-[200px]" data-testid="select-group-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Routers</SelectItem>
+                <SelectItem value="ungrouped">Ungrouped</SelectItem>
+                {groups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-sm"
+                        style={{ backgroundColor: group.color || "#3b82f6" }}
+                      />
+                      {group.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* Routers Grid */}
@@ -113,9 +163,9 @@ export default function Routers() {
             <Skeleton key={i} className="h-48" />
           ))}
         </div>
-      ) : routers && routers.length > 0 ? (
+      ) : filteredRouters && filteredRouters.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {routers.map(router => (
+          {filteredRouters.map(router => (
             <RouterCard
               key={router.id}
               router={router}

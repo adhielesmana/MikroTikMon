@@ -187,6 +187,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Router Groups routes
+  app.get("/api/router-groups", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const groups = await storage.getRouterGroups(userId);
+      res.json(groups);
+    } catch (error) {
+      console.error("Error fetching router groups:", error);
+      res.status(500).json({ message: "Failed to fetch router groups" });
+    }
+  });
+
+  app.post("/api/router-groups", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const group = await storage.createRouterGroup(req.body, userId);
+      res.json(group);
+    } catch (error: any) {
+      console.error("Error creating router group:", error);
+      if (error.message?.includes("duplicate")) {
+        res.status(400).json({ message: "A group with this name already exists" });
+      } else {
+        res.status(500).json({ message: "Failed to create router group" });
+      }
+    }
+  });
+
+  app.patch("/api/router-groups/:id", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const group = await storage.getRouterGroup(req.params.id);
+      
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      if (group.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const updated = await storage.updateRouterGroup(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating router group:", error);
+      res.status(500).json({ message: "Failed to update router group" });
+    }
+  });
+
+  app.delete("/api/router-groups/:id", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const group = await storage.getRouterGroup(req.params.id);
+      
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      if (group.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      await storage.deleteRouterGroup(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting router group:", error);
+      res.status(500).json({ message: "Failed to delete router group" });
+    }
+  });
+
   // Monitored Ports routes
   app.get("/api/routers/:id/ports", isAuthenticated, isEnabled, async (req: any, res) => {
     try {

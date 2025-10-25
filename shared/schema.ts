@@ -42,10 +42,24 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
+// Router Groups table - Organize routers by location/function
+export const routerGroups = pgTable("router_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  color: varchar("color", { length: 7 }).default("#3b82f6"), // Hex color for UI
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique().on(table.userId, table.name),
+]);
+
 // Routers table - Stores MikroTik router configurations
 export const routers = pgTable("routers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  groupId: varchar("group_id").references(() => routerGroups.id, { onDelete: "set null" }),
   name: varchar("name", { length: 255 }).notNull(),
   ipAddress: varchar("ip_address", { length: 255 }).notNull(),
   port: integer("port").notNull().default(8728), // MikroTik API port
@@ -58,15 +72,39 @@ export const routers = pgTable("routers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Relations - Defined after all tables
+export const routerGroupsRelations = relations(routerGroups, ({ one, many }) => ({
+  user: one(users, {
+    fields: [routerGroups.userId],
+    references: [users.id],
+  }),
+  routers: many(routers),
+}));
+
 export const routersRelations = relations(routers, ({ one, many }) => ({
   user: one(users, {
     fields: [routers.userId],
     references: [users.id],
   }),
+  group: one(routerGroups, {
+    fields: [routers.groupId],
+    references: [routerGroups.id],
+  }),
   monitoredPorts: many(monitoredPorts),
   trafficData: many(trafficData),
   alerts: many(alerts),
 }));
+
+// Router Group Schemas
+export const insertRouterGroupSchema = createInsertSchema(routerGroups).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRouterGroup = z.infer<typeof insertRouterGroupSchema>;
+export type RouterGroup = typeof routerGroups.$inferSelect;
 
 // Custom schema for router input - accepts plain password instead of encryptedPassword
 export const insertRouterSchema = z.object({
@@ -75,6 +113,7 @@ export const insertRouterSchema = z.object({
   port: z.number().min(1).max(65535).default(8728),
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
+  groupId: z.string().optional(),
 });
 
 export type InsertRouter = z.infer<typeof insertRouterSchema>;

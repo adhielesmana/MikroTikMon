@@ -19,30 +19,45 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 - ✅ End-to-end testing passed
 - ✅ Architect review approved
 
-## Recent Changes (Latest Session - December 2024)
-**All Three Tasks Completed:**
-
-**Task 1 - Frontend & Schema:**
+## Recent Changes (Latest Session - December 2024 & October 2025)
+**Phase 1 - MVP Complete (December 2024):**
 - Complete database schema with users, routers, monitored ports, traffic data, alerts, notifications
 - All frontend pages: Landing, Dashboard, Routers, Alerts, Settings, Admin Users
-- Reusable components: RouterCard, AddRouterDialog, AppSidebar
+- Reusable components: RouterCard, AddRouterDialog, AppSidebar, AddPortDialog
 - Mobile-first responsive design with dark mode support
-
-**Task 2 - Backend Implementation:**
 - Replit Auth integration with session management
-- Role-based middleware (isAuthenticated, isAdmin, isEnabled)
 - All API endpoints (router CRUD, ports, traffic, alerts, admin)
 - MikroTik API client for traffic polling
 - Background scheduler with 30-second intervals
-- Email service configured
-- User-scoped WebSocket server
+- User-scoped WebSocket server for real-time notifications
+- Email service configured (console logging mode)
+- Encrypted credential storage
 
-**Task 3 - Integration & Testing:**
-- Fixed router validation schema (accepts plain password)
-- Fixed WebSocket security (user-scoped notifications)
-- End-to-end testing completed successfully
-- All authentication, CRUD, and navigation flows verified
-- No blocking bugs identified
+**Phase 2 - Advanced Features (October 2025):**
+
+**Task 1 - WebSocket Client & Real-time Notifications:**
+- ✅ Frontend WebSocket connection with user authentication
+- ✅ Real-time popup notifications using toast system
+- ✅ Proper connection/reconnection handling with refs
+- ✅ Fixed session isolation bug (no cross-user notifications)
+- ✅ Architect reviewed and approved
+
+**Task 2 - Port Configuration UI:**
+- ✅ AddPortDialog component for add/edit ports
+- ✅ Form validation with threshold, email/popup toggles
+- ✅ Delete port functionality with confirmation
+- ✅ Integrated with RouterDetails page
+- ✅ Architect reviewed and approved
+
+**Task 3 - Router Groups:**
+- ✅ Added router_groups table with name, description, color
+- ✅ Added groupId foreign key to routers table
+- ✅ CRUD API endpoints for router groups
+- ✅ ManageGroupsDialog component for group management
+- ✅ Group selection in AddRouterDialog
+- ✅ Group filtering in Routers page
+- ✅ Fixed schema initialization order bug
+- ✅ Ready for testing
 
 ## Project Architecture
 
@@ -68,12 +83,13 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 ### Database Schema
 **Core Tables:**
 1. `users` - User accounts with roles (admin/user) and enabled status
-2. `routers` - MikroTik router configurations with encrypted credentials
-3. `monitored_ports` - Port monitoring configuration with thresholds
-4. `traffic_data` - Historical traffic metrics (time-series data)
-5. `alerts` - Triggered threshold breach alerts
-6. `notifications` - Notification delivery history
-7. `sessions` - User session management (Replit Auth)
+2. `router_groups` - Organize routers by location/function with color coding
+3. `routers` - MikroTik router configurations with encrypted credentials and optional group
+4. `monitored_ports` - Port monitoring configuration with thresholds
+5. `traffic_data` - Historical traffic metrics (time-series data)
+6. `alerts` - Triggered threshold breach alerts
+7. `notifications` - Notification delivery history
+8. `sessions` - User session management (Replit Auth)
 
 ### Key Features Implemented
 
@@ -89,6 +105,11 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 - Connection status monitoring
 - Test connection functionality
 - Each user manages their own router collection
+- **Router Groups:** Organize routers by location/function
+  - Create groups with custom names, descriptions, and colors
+  - Assign routers to groups during creation or editing
+  - Filter routers by group on the Routers page
+  - Groups cascade to null on delete (routers remain ungrouped)
 
 #### Traffic Monitoring (Frontend Ready)
 - Real-time traffic graphs with Recharts
@@ -156,6 +177,12 @@ PATCH  /api/routers/:id             - Update router ✅
 DELETE /api/routers/:id             - Delete router ✅
 POST   /api/routers/test            - Test connection ✅
 POST   /api/routers/:id/test        - Test specific router ✅
+
+Router Groups:
+GET    /api/router-groups           - List user's groups ✅
+POST   /api/router-groups           - Create new group ✅
+PATCH  /api/router-groups/:id       - Update group ✅
+DELETE /api/router-groups/:id       - Delete group ✅
 
 Ports:
 GET    /api/routers/:id/ports       - List monitored ports ✅
