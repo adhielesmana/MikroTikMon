@@ -1,19 +1,34 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Activity, Server } from "lucide-react";
+import { ArrowLeft, Activity, Server, Pencil, Trash2 } from "lucide-react";
 import type { Router, MonitoredPort, TrafficData } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytesPerSecond, formatRelativeTime } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useState } from "react";
+import { AddPortDialog } from "@/components/AddPortDialog";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function RouterDetails() {
   const { id } = useParams<{ id: string }>();
   const [timeRange, setTimeRange] = useState("1h");
+  const { toast } = useToast();
 
   const { data: router, isLoading: loadingRouter } = useQuery<Router>({
     queryKey: ["/api/routers", id],
@@ -29,6 +44,26 @@ export default function RouterDetails() {
     queryKey: ["/api/routers", id, "traffic", timeRange],
     enabled: !!id,
     refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  const deletePortMutation = useMutation({
+    mutationFn: async (portId: string) => {
+      return apiRequest("DELETE", `/api/ports/${portId}`, undefined);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/routers", id, "ports"] });
+      toast({
+        title: "Port deleted",
+        description: "Monitored port has been removed successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   if (loadingRouter) {
@@ -229,10 +264,15 @@ export default function RouterDetails() {
       {/* Monitored Ports List */}
       <Card>
         <CardHeader>
-          <CardTitle>Monitored Ports</CardTitle>
-          <CardDescription>
-            Configure port monitoring and alert thresholds
-          </CardDescription>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <CardTitle>Monitored Ports</CardTitle>
+              <CardDescription>
+                Configure port monitoring and alert thresholds
+              </CardDescription>
+            </div>
+            {id && <AddPortDialog routerId={id} />}
+          </div>
         </CardHeader>
         <CardContent>
           {loadingPorts ? (
@@ -246,10 +286,10 @@ export default function RouterDetails() {
               {ports.map((port) => (
                 <div
                   key={port.id}
-                  className="flex items-center justify-between p-3 rounded-md border hover-elevate"
+                  className="flex items-center justify-between p-3 rounded-md border"
                   data-testid={`port-item-${port.id}`}
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium" data-testid={`text-port-name-${port.id}`}>
                       {port.portName}
                     </p>
@@ -257,7 +297,7 @@ export default function RouterDetails() {
                       Threshold: {formatBytesPerSecond(port.minThresholdBps)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Badge variant={port.enabled ? "default" : "secondary"}>
                       {port.enabled ? "Enabled" : "Disabled"}
                     </Badge>
@@ -267,15 +307,60 @@ export default function RouterDetails() {
                     {port.popupNotifications && (
                       <Badge variant="outline" className="text-xs">Popup</Badge>
                     )}
+                    <AddPortDialog 
+                      routerId={id!} 
+                      port={port}
+                      trigger={
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          data-testid={`button-edit-port-${port.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive"
+                          data-testid={`button-delete-port-${port.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Monitored Port?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently remove monitoring for port "{port.portName}". 
+                            All historical traffic data and associated alerts will be deleted.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deletePortMutation.mutate(port.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete Port
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
+            <div className="text-center py-8 space-y-3">
               <p className="text-sm text-muted-foreground">
                 No ports configured for monitoring
               </p>
+              {id && <AddPortDialog routerId={id} />}
             </div>
           )}
         </CardContent>
