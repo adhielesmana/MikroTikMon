@@ -62,9 +62,12 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 **Task 4 - SNMP Fallback Support:**
 - ✅ Extended router schema with SNMP fields (enabled, community, version, port)
 - ✅ Installed net-snmp library for SNMP functionality
-- ✅ Implemented SNMP client methods in MikroTik client
+- ✅ Implemented SNMP client methods with 64-bit counter support
   - testSNMPConnection() - Test SNMP connectivity
   - getInterfaceStatsViaSNMP() - Query traffic via SNMP with rate calculation
+    - Uses 64-bit counters (IF-HC-MIB) to prevent rollover on high-throughput links
+    - Falls back to 32-bit counters for legacy devices
+    - Global byte counter cache for accurate rate calculation across polls
   - getInterfaceListViaSNMP() - Get port list via SNMP
   - getRouterInfoViaSNMP() - Get system info via SNMP
 - ✅ Automatic fallback logic when API fails (especially permission errors)
@@ -72,9 +75,14 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 - ✅ Updated all router test endpoints with SNMP support
 - ✅ Frontend SNMP configuration UI in AddRouterDialog
   - Collapsible SNMP section with toggle
-  - Community string, version, and port configuration
+  - Community string, version (v1/v2c only), and port configuration
   - Visual feedback when SNMP is enabled
-- ✅ Ready for testing with live router
+- ✅ Critical bug fixes applied:
+  - Fixed byte counter cache persistence (moved to global scope)
+  - Removed unsupported SNMPv3 (requires auth/priv params not implemented)
+  - Implemented 64-bit counters to prevent rollover regression
+- ✅ Architect reviewed and approved
+- ✅ Production ready for live router testing
 
 ## Project Architecture
 
