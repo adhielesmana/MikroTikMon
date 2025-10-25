@@ -1,18 +1,206 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { sql } from 'drizzle-orm';
+import {
+  index,
+  jsonb,
+  pgTable,
+  timestamp,
+  varchar,
+  text,
+  boolean,
+  integer,
+  real,
+  unique,
+} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Session storage table - Required for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table - Required for Replit Auth, extended with role and enabled status
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  role: varchar("role", { length: 20 }).notNull().default("user"), // 'admin' or 'user'
+  enabled: boolean("enabled").notNull().default(false), // New users disabled by default
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Routers table - Stores MikroTik router configurations
+export const routers = pgTable("routers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 255 }).notNull(),
+  port: integer("port").notNull().default(8728), // MikroTik API port
+  username: varchar("username", { length: 255 }).notNull(),
+  // Password is encrypted using crypto-js
+  encryptedPassword: text("encrypted_password").notNull(),
+  connected: boolean("connected").notNull().default(false),
+  lastConnected: timestamp("last_connected"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const routersRelations = relations(routers, ({ one, many }) => ({
+  user: one(users, {
+    fields: [routers.userId],
+    references: [users.id],
+  }),
+  monitoredPorts: many(monitoredPorts),
+  trafficData: many(trafficData),
+  alerts: many(alerts),
+}));
+
+// Custom schema for router input - accepts plain password instead of encryptedPassword
+export const insertRouterSchema = z.object({
+  name: z.string().min(1, "Router name is required"),
+  ipAddress: z.string().min(1, "IP address is required"),
+  port: z.number().min(1).max(65535).default(8728),
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export type InsertRouter = z.infer<typeof insertRouterSchema>;
+export type Router = typeof routers.$inferSelect;
+
+// Monitored Ports table - Stores which ports to monitor and their thresholds
+export const monitoredPorts = pgTable("monitored_ports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
+  portName: varchar("port_name", { length: 255 }).notNull(), // e.g., "ether1", "ether2"
+  enabled: boolean("enabled").notNull().default(true),
+  // Minimum threshold in bytes per second
+  minThresholdBps: integer("min_threshold_bps").notNull().default(0),
+  emailNotifications: boolean("email_notifications").notNull().default(true),
+  popupNotifications: boolean("popup_notifications").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique().on(table.routerId, table.portName),
+]);
+
+export const monitoredPortsRelations = relations(monitoredPorts, ({ one, many }) => ({
+  router: one(routers, {
+    fields: [monitoredPorts.routerId],
+    references: [routers.id],
+  }),
+  trafficData: many(trafficData),
+  alerts: many(alerts),
+}));
+
+export const insertMonitoredPortSchema = createInsertSchema(monitoredPorts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMonitoredPort = z.infer<typeof insertMonitoredPortSchema>;
+export type MonitoredPort = typeof monitoredPorts.$inferSelect;
+
+// Traffic Data table - Stores historical traffic data
+export const trafficData = pgTable("traffic_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
+  portId: varchar("port_id").notNull().references(() => monitoredPorts.id, { onDelete: "cascade" }),
+  portName: varchar("port_name", { length: 255 }).notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  rxBytesPerSecond: real("rx_bytes_per_second").notNull().default(0), // Download
+  txBytesPerSecond: real("tx_bytes_per_second").notNull().default(0), // Upload
+  totalBytesPerSecond: real("total_bytes_per_second").notNull().default(0), // Total
+}, (table) => [
+  index("idx_traffic_data_router_port_time").on(table.routerId, table.portId, table.timestamp),
+  index("idx_traffic_data_timestamp").on(table.timestamp),
+]);
+
+export const trafficDataRelations = relations(trafficData, ({ one }) => ({
+  router: one(routers, {
+    fields: [trafficData.routerId],
+    references: [routers.id],
+  }),
+  port: one(monitoredPorts, {
+    fields: [trafficData.portId],
+    references: [monitoredPorts.id],
+  }),
+}));
+
+export type TrafficData = typeof trafficData.$inferSelect;
+
+// Alerts table - Stores triggered alerts
+export const alerts = pgTable("alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
+  portId: varchar("port_id").notNull().references(() => monitoredPorts.id, { onDelete: "cascade" }),
+  portName: varchar("port_name", { length: 255 }).notNull(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  severity: varchar("severity", { length: 20 }).notNull().default("warning"), // 'critical', 'warning', 'info'
+  message: text("message").notNull(),
+  currentTrafficBps: real("current_traffic_bps").notNull(),
+  thresholdBps: real("threshold_bps").notNull(),
+  acknowledged: boolean("acknowledged").notNull().default(false),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_alerts_user_created").on(table.userId, table.createdAt),
+  index("idx_alerts_router").on(table.routerId),
+]);
+
+export const alertsRelations = relations(alerts, ({ one }) => ({
+  router: one(routers, {
+    fields: [alerts.routerId],
+    references: [routers.id],
+  }),
+  port: one(monitoredPorts, {
+    fields: [alerts.portId],
+    references: [monitoredPorts.id],
+  }),
+  user: one(users, {
+    fields: [alerts.userId],
+    references: [users.id],
+  }),
+}));
+
+export type Alert = typeof alerts.$inferSelect;
+
+// Notifications table - Stores notification history
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  alertId: varchar("alert_id").references(() => alerts.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 20 }).notNull(), // 'email', 'popup'
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  read: boolean("read").notNull().default(false),
+  sentAt: timestamp("sent_at").defaultNow(),
+}, (table) => [
+  index("idx_notifications_user_sent").on(table.userId, table.sentAt),
+]);
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+  alert: one(alerts, {
+    fields: [notifications.alertId],
+    references: [alerts.id],
+  }),
+}));
+
+export type Notification = typeof notifications.$inferSelect;
