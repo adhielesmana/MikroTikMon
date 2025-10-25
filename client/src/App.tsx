@@ -15,11 +15,12 @@ import Settings from "@/pages/Settings";
 import AdminUsers from "@/pages/AdminUsers";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Bell } from "lucide-react";
+import { Bell, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import type { Alert } from "@shared/schema";
+import { useWebSocket } from "@/lib/useWebSocket";
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { user, isEnabled } = useAuth();
@@ -27,6 +28,9 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
     queryKey: ["/api/alerts"],
     refetchInterval: 30000, // Refetch every 30 seconds
   });
+
+  // Connect to WebSocket for real-time notifications
+  const { isConnected } = useWebSocket(user?.id || null);
 
   const activeAlerts = alerts?.filter(a => !a.acknowledged).length || 0;
 
@@ -53,6 +57,19 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
                 </Badge>
               )}
             </Button>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              {isConnected ? (
+                <>
+                  <Wifi className="h-3 w-3 text-green-500" />
+                  <span className="hidden sm:inline">Live</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3 w-3 text-muted-foreground" />
+                  <span className="hidden sm:inline">Offline</span>
+                </>
+              )}
+            </div>
           </div>
         </header>
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
