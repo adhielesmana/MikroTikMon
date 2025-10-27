@@ -78,6 +78,15 @@ export function RouterCard({ router, onEdit, onDelete, onTest }: RouterCardProps
             {router.connected ? "Connected" : "Disconnected"}
           </Badge>
         </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">Reachable</span>
+          <Badge
+            variant={router.reachable ? "default" : "destructive"}
+            data-testid={`badge-router-reachable-${router.id}`}
+          >
+            {router.reachable ? "Yes" : "No"}
+          </Badge>
+        </div>
         {router.lastConnected && (
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-muted-foreground">Last Seen</span>

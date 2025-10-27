@@ -50,6 +50,7 @@ export interface IStorage {
   updateRouter(id: string, data: Partial<InsertRouter> & { password?: string }): Promise<Router>;
   deleteRouter(id: string): Promise<void>;
   updateRouterConnection(id: string, connected: boolean): Promise<void>;
+  updateRouterReachability(id: string, reachable: boolean): Promise<void>;
   getRouterCredentials(id: string): Promise<{ username: string; password: string } | undefined>;
 
   // Router Groups operations
@@ -177,6 +178,13 @@ export class DatabaseStorage implements IStorage {
         connected,
         lastConnected: connected ? new Date() : undefined,
       })
+      .where(eq(routers.id, id));
+  }
+
+  async updateRouterReachability(id: string, reachable: boolean): Promise<void> {
+    await db
+      .update(routers)
+      .set({ reachable })
       .where(eq(routers.id, id));
   }
 

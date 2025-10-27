@@ -67,6 +67,7 @@ export const routers = pgTable("routers", {
   // Password is encrypted using crypto-js
   encryptedPassword: text("encrypted_password").notNull(),
   connected: boolean("connected").notNull().default(false),
+  reachable: boolean("reachable").notNull().default(false), // Basic network connectivity check
   lastConnected: timestamp("last_connected"),
   // REST API configuration for HTTPS fallback (RouterOS v7.1+)
   restEnabled: boolean("rest_enabled").notNull().default(false),

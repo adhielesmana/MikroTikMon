@@ -1,6 +1,7 @@
 import { RouterOSAPI } from "routeros-client";
 import * as snmp from "net-snmp";
 import https from "https";
+import net from "net";
 
 export interface MikrotikConnection {
   host: string;
@@ -72,6 +73,51 @@ export class MikrotikClient {
       this.connection.snmpCommunity || "public",
       options
     );
+  }
+
+  async checkReachability(): Promise<boolean> {
+    // Simple network reachability check using TCP connection attempt
+    // Try to connect to any configured port to check basic network connectivity
+    return new Promise((resolve) => {
+      const ports = [
+        this.connection.port, // Native API port
+        ...(this.connection.restEnabled ? [this.connection.restPort || 443] : []),
+        ...(this.connection.snmpEnabled ? [this.connection.snmpPort || 161] : []),
+      ];
+
+      let attempted = 0;
+      let reachable = false;
+
+      // Try each port with a quick timeout
+      for (const port of ports) {
+        const socket = new net.Socket();
+        socket.setTimeout(3000); // 3 second timeout
+
+        socket.on('connect', () => {
+          reachable = true;
+          socket.destroy();
+          resolve(true);
+        });
+
+        socket.on('timeout', () => {
+          socket.destroy();
+          attempted++;
+          if (attempted >= ports.length && !reachable) {
+            resolve(false);
+          }
+        });
+
+        socket.on('error', () => {
+          socket.destroy();
+          attempted++;
+          if (attempted >= ports.length && !reachable) {
+            resolve(false);
+          }
+        });
+
+        socket.connect(port, this.connection.host);
+      }
+    });
   }
 
   async testSNMPConnection(): Promise<boolean> {

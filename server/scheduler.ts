@@ -69,6 +69,10 @@ async function pollRouterTraffic() {
           snmpPort: router.snmpPort || 161,
         });
 
+        // Check basic network reachability
+        const isReachable = await client.checkReachability();
+        await storage.updateRouterReachability(routerId, isReachable);
+
         const stats = await client.getInterfaceStats();
 
         // Update router connection status
@@ -166,6 +170,30 @@ async function pollRouterTraffic() {
         console.error(`[Scheduler] Error polling router ${routerId}:`, error);
         // Update router as disconnected
         await storage.updateRouterConnection(routerId, false);
+        
+        // Still try to check reachability even if connection fails
+        try {
+          const credentials = await storage.getRouterCredentials(routerId);
+          if (credentials) {
+            const client = new MikrotikClient({
+              host: router.ipAddress,
+              port: router.port,
+              user: credentials.username,
+              password: credentials.password,
+              restEnabled: router.restEnabled || false,
+              restPort: router.restPort || 443,
+              snmpEnabled: router.snmpEnabled || false,
+              snmpCommunity: router.snmpCommunity || "public",
+              snmpVersion: router.snmpVersion || "2c",
+              snmpPort: router.snmpPort || 161,
+            });
+            const isReachable = await client.checkReachability();
+            await storage.updateRouterReachability(routerId, isReachable);
+          }
+        } catch (reachError) {
+          // If reachability check fails, mark as unreachable
+          await storage.updateRouterReachability(routerId, false);
+        }
       }
     }
 
