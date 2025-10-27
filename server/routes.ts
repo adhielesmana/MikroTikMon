@@ -209,11 +209,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Forbidden" });
       }
       
-      const credentials = storage.decryptPassword(router.encryptedPassword);
+      const credentials = await storage.getRouterCredentials(req.params.id);
+      if (!credentials) {
+        return res.status(404).json({ message: "Router credentials not found" });
+      }
+      
       const client = new MikrotikClient({
         host: router.ipAddress,
         port: router.port,
-        user: router.username,
+        user: credentials.username,
         password: credentials.password,
         snmpEnabled: router.snmpEnabled || false,
         snmpCommunity: router.snmpCommunity || "public",
