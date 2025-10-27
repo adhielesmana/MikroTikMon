@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Routers from "@/pages/Routers";
+import RouterDetails from "@/pages/RouterDetails";
 import Alerts from "@/pages/Alerts";
 import Settings from "@/pages/Settings";
 import AdminUsers from "@/pages/AdminUsers";
@@ -114,6 +115,13 @@ function Router() {
             {() => (
               <AuthenticatedLayout>
                 <Routers />
+              </AuthenticatedLayout>
+            )}
+          </Route>
+          <Route path="/routers/:id">
+            {() => (
+              <AuthenticatedLayout>
+                <RouterDetails />
               </AuthenticatedLayout>
             )}
           </Route>

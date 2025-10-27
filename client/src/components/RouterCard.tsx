@@ -7,9 +7,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Server, MoreVertical, Pencil, Trash2, RefreshCw } from "lucide-react";
+import { Server, MoreVertical, Pencil, Trash2, RefreshCw, Eye } from "lucide-react";
 import type { Router } from "@shared/schema";
 import { formatRelativeTime } from "@/lib/utils";
+import { Link } from "wouter";
 
 interface RouterCardProps {
   router: Router;
@@ -42,6 +43,12 @@ export function RouterCard({ router, onEdit, onDelete, onTest }: RouterCardProps
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild data-testid={`menu-view-${router.id}`}>
+              <Link href={`/routers/${router.id}`}>
+                <Eye className="h-4 w-4 mr-2" />
+                View Details
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit?.(router)} data-testid={`menu-edit-${router.id}`}>
               <Pencil className="h-4 w-4 mr-2" />
               Edit
