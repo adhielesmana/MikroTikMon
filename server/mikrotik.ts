@@ -398,37 +398,57 @@ export class MikrotikClient {
 
   private async restRequest(endpoint: string, allowSelfSigned: boolean = true): Promise<any> {
     const restPort = this.connection.restPort || 443;
-    const url = `https://${this.connection.host}:${restPort}${endpoint}`;
     const auth = Buffer.from(`${this.connection.user}:${this.connection.password}`).toString('base64');
 
-    try {
-      const httpsAgent = new https.Agent({
-        // SECURITY NOTE: MikroTik routers typically use self-signed certificates for REST API.
-        // allowSelfSigned=true is the practical default for MikroTik compatibility.
-        // For production deployments with proper CA-signed certificates, set to false.
-        // Future enhancement: Add per-router configuration option for certificate verification.
-        rejectUnauthorized: !allowSelfSigned,
-      });
-
-      const response = await fetch(url, {
+    return new Promise((resolve, reject) => {
+      const options = {
+        hostname: this.connection.host,
+        port: restPort,
+        path: endpoint,
         method: 'GET',
         headers: {
           'Authorization': `Basic ${auth}`,
           'Accept': 'application/json',
         },
-        // @ts-ignore - Node.js fetch agent option
-        agent: httpsAgent,
+        // SECURITY NOTE: MikroTik routers typically use self-signed certificates for REST API.
+        // allowSelfSigned=true is the practical default for MikroTik compatibility.
+        // For production deployments with proper CA-signed certificates, set to false.
+        // Future enhancement: Add per-router configuration option for certificate verification.
+        rejectUnauthorized: !allowSelfSigned,
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              resolve(JSON.parse(data));
+            } catch (error) {
+              reject(new Error(`Failed to parse REST API response: ${error}`));
+            }
+          } else {
+            reject(new Error(`REST API request failed: ${res.statusCode} ${res.statusMessage}`));
+          }
+        });
       });
 
-      if (!response.ok) {
-        throw new Error(`REST API request failed: ${response.status} ${response.statusText}`);
-      }
+      req.on('error', (error: any) => {
+        console.error(`REST API request to ${endpoint} failed:`, error.message);
+        reject(error);
+      });
 
-      return await response.json();
-    } catch (error: any) {
-      console.error(`REST API request to ${endpoint} failed:`, error.message);
-      throw error;
-    }
+      req.setTimeout(10000, () => {
+        req.destroy();
+        reject(new Error('REST API request timeout'));
+      });
+
+      req.end();
+    });
   }
 
   async testRESTConnection(): Promise<boolean> {
@@ -489,8 +509,11 @@ export class MikrotikClient {
     }
 
     try {
+      console.log(`[REST API] Attempting to connect to ${this.connection.host}:${this.connection.restPort || 443}...`);
       // Get current interface stats
       const interfaces = await this.restRequest('/rest/interface');
+      console.log(`[REST API] Successfully retrieved ${interfaces.length} interfaces`);
+      console.log(`[REST API] Interface names:`, interfaces.map((i: any) => i.name).join(', '));
       
       const result: InterfaceStats[] = [];
       
@@ -505,22 +528,26 @@ export class MikrotikClient {
         const cached = snmpByteCountCache.get(cacheKey);
         const now = Date.now();
         
+        let rxRate = 0;
+        let txRate = 0;
+        
         if (cached) {
           const timeDiff = (now - cached.timestamp) / 1000; // seconds
           if (timeDiff > 0) {
-            const rxRate = Math.max(0, (rxBytes - cached.rx) / timeDiff);
-            const txRate = Math.max(0, (txBytes - cached.tx) / timeDiff);
-            
-            result.push({
-              name,
-              rxBytesPerSecond: rxRate,
-              txBytesPerSecond: txRate,
-              totalBytesPerSecond: rxRate + txRate,
-            });
+            rxRate = Math.max(0, (rxBytes - cached.rx) / timeDiff);
+            txRate = Math.max(0, (txBytes - cached.tx) / timeDiff);
           }
         }
         
-        // Update cache
+        // Always add the interface to results (even on first poll with 0 rates)
+        result.push({
+          name,
+          rxBytesPerSecond: rxRate,
+          txBytesPerSecond: txRate,
+          totalBytesPerSecond: rxRate + txRate,
+        });
+        
+        // Update cache for next poll
         snmpByteCountCache.set(cacheKey, { rx: rxBytes, tx: txBytes, timestamp: now });
       }
       
