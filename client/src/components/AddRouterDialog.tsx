@@ -42,6 +42,8 @@ const routerFormSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
   groupId: z.string().optional(),
+  restEnabled: z.boolean().default(false),
+  restPort: z.coerce.number().min(1).max(65535).default(443),
   snmpEnabled: z.boolean().default(false),
   snmpCommunity: z.string().default("public"),
   snmpVersion: z.enum(["1", "2c"]).default("2c"), // Only v1 and v2c supported (v3 requires additional auth params)
@@ -91,6 +93,8 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
           username: router.username,
           password: "",
           groupId: router.groupId || undefined,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
           snmpEnabled: router.snmpEnabled || false,
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: (router.snmpVersion as "1" | "2c") || "2c",
@@ -104,6 +108,8 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
           username: "admin",
           password: "",
           groupId: undefined,
+          restEnabled: false,
+          restPort: 443,
           snmpEnabled: false,
           snmpCommunity: "public",
           snmpVersion: "2c" as "1" | "2c",
@@ -298,9 +304,58 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
+                  <h4 className="text-sm font-medium">REST API Fallback</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Use HTTPS REST API when native API fails (RouterOS v7.1+)
+                  </p>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="restEnabled"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-rest-enabled"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {form.watch("restEnabled") && (
+                <div className="space-y-4 pl-4 border-l-2">
+                  <FormField
+                    control={form.control}
+                    name="restPort"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>REST API Port (HTTPS)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="443" {...field} data-testid="input-rest-port" />
+                        </FormControl>
+                        <FormDescription>
+                          Default: 443 (HTTPS). Requires REST API enabled on router
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
+
+            <Separator className="my-4" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
                   <h4 className="text-sm font-medium">SNMP Fallback</h4>
                   <p className="text-sm text-muted-foreground">
-                    Use SNMP when API access is denied
+                    Use SNMP when both APIs fail
                   </p>
                 </div>
                 <FormField
