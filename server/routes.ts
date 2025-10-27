@@ -125,13 +125,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/routers/test", isAuthenticated, async (req: any, res) => {
     try {
-      const { ipAddress, port, username, password, snmpEnabled, snmpCommunity, snmpVersion, snmpPort } = req.body;
+      const { ipAddress, port, username, password, restEnabled, restPort, snmpEnabled, snmpCommunity, snmpVersion, snmpPort } = req.body;
       
       const client = new MikrotikClient({
         host: ipAddress,
         port: port || 8728,
         user: username,
         password,
+        restEnabled: restEnabled || false,
+        restPort: restPort || 443,
         snmpEnabled: snmpEnabled || false,
         snmpCommunity: snmpCommunity || "public",
         snmpVersion: snmpVersion || "2c",
@@ -174,6 +176,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         port: router.port,
         user: credentials.username,
         password: credentials.password,
+        restEnabled: router.restEnabled || false,
+        restPort: router.restPort || 443,
         snmpEnabled: router.snmpEnabled || false,
         snmpCommunity: router.snmpCommunity || "public",
         snmpVersion: router.snmpVersion || "2c",
@@ -219,6 +223,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         port: router.port,
         user: credentials.username,
         password: credentials.password,
+        restEnabled: router.restEnabled || false,
+        restPort: router.restPort || 443,
         snmpEnabled: router.snmpEnabled || false,
         snmpCommunity: router.snmpCommunity || "public",
         snmpVersion: router.snmpVersion || "2c",

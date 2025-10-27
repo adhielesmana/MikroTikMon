@@ -61,6 +61,8 @@ async function pollRouterTraffic() {
           port: router.port,
           user: credentials.username,
           password: credentials.password,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
           snmpEnabled: router.snmpEnabled || false,
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: router.snmpVersion || "2c",
