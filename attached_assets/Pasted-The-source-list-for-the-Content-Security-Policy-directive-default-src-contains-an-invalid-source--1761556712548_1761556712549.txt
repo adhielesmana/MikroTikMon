@@ -1,0 +1,431 @@
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+sp.replit.com/sdk.js/v1/dMePKGC4BqfBivpe0Hvl8IoPpzSHgjdX/sdk.min.js:1  Failed to load resource: net::ERR_CERT_DATE_INVALID
+/~:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+/~:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+/~:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+ 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+ [LaunchDarkly] LaunchDarkly client initialized
+/~:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+ Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'battery'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'layout-animations'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'navigation-override'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'oversized-images'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'publickey-credentials'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'speaker-selection'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'unoptimized-images'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'unsized-media'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Unrecognized feature: 'pointer-lock'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-61ae8ab1b09a7983.js:1
+ Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-61ae8ab1b09a7983.js:1
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'battery'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'battery'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+workspace_iframe.html?initialPath=%2F&id=%3Ar4q%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+client:536 WebSocket connection to 'wss://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/?token=gR_hCVlexUgh' failed: 
+setupWebSocket @ client:536
+ WebSocket connection to 'wss://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/?token=gR_hCVlexUgh' failed: 
+setupWebSocket @ 9d509a6b-3152-48ba-9…ev/@vite/client:536
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=gR_hCVlexUgh' is invalid.
+9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/api/auth/user:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/api/auth/user:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+/oidc-login-consent/iS9ZzUMWDsxYVu4xr_9lI:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+/oidc-login-consent/iS9ZzUMWDsxYVu4xr_9lI:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+/oidc-login-consent/iS9ZzUMWDsxYVu4xr_9lI:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+[Violation] Potential permissions policy violation: payment is not allowed in this document.
+sp.replit.com/sdk.js/v1/dMePKGC4BqfBivpe0Hvl8IoPpzSHgjdX/sdk.min.js:1  Failed to load resource: net::ERR_CERT_DATE_INVALID
+[Violation] Potential permissions policy violation: payment is not allowed in this document.
+client:536 WebSocket connection to 'wss://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/?token=gR_hCVlexUgh' failed: 
+setupWebSocket @ client:536
+ WebSocket connection to 'wss://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/?token=gR_hCVlexUgh' failed: 
+setupWebSocket @ 9d509a6b-3152-48ba-9…ev/@vite/client:536
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=gR_hCVlexUgh' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+injected.js:27 [WebSocket] Connecting to wss://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/ws
+injected.js:27 [WebSocket] Connected
+injected.js:27 [WebSocket] Message received: Object
+injected.js:27 [WebSocket] Authenticating with userId: 42013885
+injected.js:27 [WebSocket] Message received: Object
+injected.js:27 [WebSocket] Authentication successful
+@radix-ui_react-select.js?v=e10a9e4b:873 Uncaught Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at @radix-ui_react-select.js?v=e10a9e4b:873:13
+    at renderWithHooks (chunk-WERSD76P.js?v=e10a9e4b:11548:26)
+    at updateForwardRef (chunk-WERSD76P.js?v=e10a9e4b:14325:28)
+    at beginWork (chunk-WERSD76P.js?v=e10a9e4b:15946:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WERSD76P.js?v=e10a9e4b:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WERSD76P.js?v=e10a9e4b:3699:24)
+    at invokeGuardedCallback (chunk-WERSD76P.js?v=e10a9e4b:3733:39)
+    at beginWork$1 (chunk-WERSD76P.js?v=e10a9e4b:19765:15)
+    at performUnitOfWork (chunk-WERSD76P.js?v=e10a9e4b:19198:20)
+    at workLoopSync (chunk-WERSD76P.js?v=e10a9e4b:19137:13)
+@radix-ui_react-select.js?v=e10a9e4b:873 Uncaught Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at @radix-ui_react-select.js?v=e10a9e4b:873:13
+    at renderWithHooks (chunk-WERSD76P.js?v=e10a9e4b:11548:26)
+    at updateForwardRef (chunk-WERSD76P.js?v=e10a9e4b:14325:28)
+    at beginWork (chunk-WERSD76P.js?v=e10a9e4b:15946:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WERSD76P.js?v=e10a9e4b:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WERSD76P.js?v=e10a9e4b:3699:24)
+    at invokeGuardedCallback (chunk-WERSD76P.js?v=e10a9e4b:3733:39)
+    at beginWork$1 (chunk-WERSD76P.js?v=e10a9e4b:19765:15)
+    at performUnitOfWork (chunk-WERSD76P.js?v=e10a9e4b:19198:20)
+    at workLoopSync (chunk-WERSD76P.js?v=e10a9e4b:19137:13)
+injected.js:27 The above error occurred in the <SelectItem> component:
+
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=e10a9e4b:846:7
+    at _c1 (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/src/components/ui/select.tsx:208:12)
+    at div
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PALV7G7K.js?v=e10a9e4b:42:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:79:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:56:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AWJ7E7GQ.js?v=e10a9e4b:39:15
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=e10a9e4b:757:13
+    at div
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:79:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:56:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AWJ7E7GQ.js?v=e10a9e4b:39:15
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=e10a9e4b:300:58
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:79:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:56:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PALV7G7K.js?v=e10a9e4b:42:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-YUBKWY7D.js?v=e10a9e4b:260:22
+    at SelectPortal
+    at _c7 (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/src/components/ui/select.tsx:123:12)
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at CollectionProvider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AWJ7E7GQ.js?v=e10a9e4b:29:13)
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at Popper (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WJ76UY37.js?v=e10a9e4b:1919:11)
+    at Select (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=e10a9e4b:88:5)
+    at div
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/src/components/ui/form.tsx:72:6
+    at Controller (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CXJMC5RA.js?v=e10a9e4b:298:35)
+    at FormField (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/src/components/ui/form.tsx:33:6)
+    at form
+    at FormProvider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CXJMC5RA.js?v=e10a9e4b:102:11)
+    at div
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.jan
+(anonymous) @ injected.js:27
+chunk-WERSD76P.js?v=e10a9e4b:9129 Uncaught Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at @radix-ui_react-select.js?v=e10a9e4b:873:13
+    at renderWithHooks (chunk-WERSD76P.js?v=e10a9e4b:11548:26)
+    at updateForwardRef (chunk-WERSD76P.js?v=e10a9e4b:14325:28)
+    at beginWork (chunk-WERSD76P.js?v=e10a9e4b:15946:22)
+    at beginWork$1 (chunk-WERSD76P.js?v=e10a9e4b:19753:22)
+    at performUnitOfWork (chunk-WERSD76P.js?v=e10a9e4b:19198:20)
+    at workLoopSync (chunk-WERSD76P.js?v=e10a9e4b:19137:13)
+    at renderRootSync (chunk-WERSD76P.js?v=e10a9e4b:19116:15)
+    at recoverFromConcurrentError (chunk-WERSD76P.js?v=e10a9e4b:18736:28)
+    at performSyncWorkOnRoot (chunk-WERSD76P.js?v=e10a9e4b:18879:28)
+injected.js:27 [WebSocket] Manually disconnecting
+injected.js:27 [WebSocket] Disconnected
+injected.js:27 [WebSocket] Not reconnecting (manual disconnect or unmounted)
+workspace_iframe.html?initialPath=%2Frouters&id=%3Ar4q%3A:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+client:536 WebSocket connection to 'wss://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/?token=gR_hCVlexUgh' failed: 
+setupWebSocket @ client:536
+(anonymous) @ client:531
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=gR_hCVlexUgh' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+setupWebSocket @ client:536
+fallback @ client:509
+(anonymous) @ client:555
+injected.js:27 [WebSocket] Connecting to wss://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/ws
+injected.js:27 [WebSocket] Connected
+injected.js:27 [WebSocket] Message received: {type: 'auth_required'}
+injected.js:27 [WebSocket] Authenticating with userId: 42013885
+injected.js:27 [WebSocket] Message received: {type: 'auth_success'}
+injected.js:27 [WebSocket] Authentication successful
+@radix-ui_react-select.js?v=e10a9e4b:873 Uncaught Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at @radix-ui_react-select.js?v=e10a9e4b:873:13
+    at renderWithHooks (chunk-WERSD76P.js?v=e10a9e4b:11548:26)
+    at updateForwardRef (chunk-WERSD76P.js?v=e10a9e4b:14325:28)
+    at beginWork (chunk-WERSD76P.js?v=e10a9e4b:15946:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WERSD76P.js?v=e10a9e4b:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WERSD76P.js?v=e10a9e4b:3699:24)
+    at invokeGuardedCallback (chunk-WERSD76P.js?v=e10a9e4b:3733:39)
+    at beginWork$1 (chunk-WERSD76P.js?v=e10a9e4b:19765:15)
+    at performUnitOfWork (chunk-WERSD76P.js?v=e10a9e4b:19198:20)
+    at workLoopSync (chunk-WERSD76P.js?v=e10a9e4b:19137:13)
+(anonymous) @ @radix-ui_react-select.js?v=e10a9e4b:873
+renderWithHooks @ chunk-WERSD76P.js?v=e10a9e4b:11548
+updateForwardRef @ chunk-WERSD76P.js?v=e10a9e4b:14325
+beginWork @ chunk-WERSD76P.js?v=e10a9e4b:15946
+callCallback2 @ chunk-WERSD76P.js?v=e10a9e4b:3674
+invokeGuardedCallbackDev @ chunk-WERSD76P.js?v=e10a9e4b:3699
+invokeGuardedCallback @ chunk-WERSD76P.js?v=e10a9e4b:3733
+beginWork$1 @ chunk-WERSD76P.js?v=e10a9e4b:19765
+performUnitOfWork @ chunk-WERSD76P.js?v=e10a9e4b:19198
+workLoopSync @ chunk-WERSD76P.js?v=e10a9e4b:19137
+renderRootSync @ chunk-WERSD76P.js?v=e10a9e4b:19116
+performSyncWorkOnRoot @ chunk-WERSD76P.js?v=e10a9e4b:18874
+flushSyncCallbacks @ chunk-WERSD76P.js?v=e10a9e4b:9119
+(anonymous) @ chunk-WERSD76P.js?v=e10a9e4b:18627
+@radix-ui_react-select.js?v=e10a9e4b:873 Uncaught Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at @radix-ui_react-select.js?v=e10a9e4b:873:13
+    at renderWithHooks (chunk-WERSD76P.js?v=e10a9e4b:11548:26)
+    at updateForwardRef (chunk-WERSD76P.js?v=e10a9e4b:14325:28)
+    at beginWork (chunk-WERSD76P.js?v=e10a9e4b:15946:22)
+    at HTMLUnknownElement.callCallback2 (chunk-WERSD76P.js?v=e10a9e4b:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-WERSD76P.js?v=e10a9e4b:3699:24)
+    at invokeGuardedCallback (chunk-WERSD76P.js?v=e10a9e4b:3733:39)
+    at beginWork$1 (chunk-WERSD76P.js?v=e10a9e4b:19765:15)
+    at performUnitOfWork (chunk-WERSD76P.js?v=e10a9e4b:19198:20)
+    at workLoopSync (chunk-WERSD76P.js?v=e10a9e4b:19137:13)
+(anonymous) @ @radix-ui_react-select.js?v=e10a9e4b:873
+renderWithHooks @ chunk-WERSD76P.js?v=e10a9e4b:11548
+updateForwardRef @ chunk-WERSD76P.js?v=e10a9e4b:14325
+beginWork @ chunk-WERSD76P.js?v=e10a9e4b:15946
+callCallback2 @ chunk-WERSD76P.js?v=e10a9e4b:3674
+invokeGuardedCallbackDev @ chunk-WERSD76P.js?v=e10a9e4b:3699
+invokeGuardedCallback @ chunk-WERSD76P.js?v=e10a9e4b:3733
+beginWork$1 @ chunk-WERSD76P.js?v=e10a9e4b:19765
+performUnitOfWork @ chunk-WERSD76P.js?v=e10a9e4b:19198
+workLoopSync @ chunk-WERSD76P.js?v=e10a9e4b:19137
+renderRootSync @ chunk-WERSD76P.js?v=e10a9e4b:19116
+recoverFromConcurrentError @ chunk-WERSD76P.js?v=e10a9e4b:18736
+performSyncWorkOnRoot @ chunk-WERSD76P.js?v=e10a9e4b:18879
+flushSyncCallbacks @ chunk-WERSD76P.js?v=e10a9e4b:9119
+(anonymous) @ chunk-WERSD76P.js?v=e10a9e4b:18627
+injected.js:27 The above error occurred in the <SelectItem> component:
+
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=e10a9e4b:846:7
+    at _c1 (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/src/components/ui/select.tsx:208:12)
+    at div
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PALV7G7K.js?v=e10a9e4b:42:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:79:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:56:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AWJ7E7GQ.js?v=e10a9e4b:39:15
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=e10a9e4b:757:13
+    at div
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:79:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:56:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AWJ7E7GQ.js?v=e10a9e4b:39:15
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=e10a9e4b:300:58
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:79:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-LXTJ4TFU.js?v=e10a9e4b:56:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-PALV7G7K.js?v=e10a9e4b:42:13
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-YUBKWY7D.js?v=e10a9e4b:260:22
+    at SelectPortal
+    at _c7 (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/src/components/ui/select.tsx:123:12)
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at CollectionProvider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AWJ7E7GQ.js?v=e10a9e4b:29:13)
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at Provider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-JCDXHMNF.js?v=e10a9e4b:38:15)
+    at Popper (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-WJ76UY37.js?v=e10a9e4b:1919:11)
+    at Select (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-select.js?v=e10a9e4b:88:5)
+    at div
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/src/components/ui/form.tsx:72:6
+    at Controller (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CXJMC5RA.js?v=e10a9e4b:298:35)
+    at FormField (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/src/components/ui/form.tsx:33:6)
+    at form
+    at FormProvider (https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.janeway.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-CXJMC5RA.js?v=e10a9e4b:102:11)
+    at div
+    at https://9d509a6b-3152-48ba-9216-ef211dcc89ec-00-s3jtqtkl4zut.jan
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+(anonymous) @ injected.js:27
+logCapturedError @ chunk-WERSD76P.js?v=e10a9e4b:14032
+update.callback @ chunk-WERSD76P.js?v=e10a9e4b:14052
+callCallback @ chunk-WERSD76P.js?v=e10a9e4b:11248
+commitUpdateQueue @ chunk-WERSD76P.js?v=e10a9e4b:11265
+commitLayoutEffectOnFiber @ chunk-WERSD76P.js?v=e10a9e4b:17093
+commitLayoutMountEffects_complete @ chunk-WERSD76P.js?v=e10a9e4b:17980
+commitLayoutEffects_begin @ chunk-WERSD76P.js?v=e10a9e4b:17969
+commitLayoutEffects @ chunk-WERSD76P.js?v=e10a9e4b:17920
+commitRootImpl @ chunk-WERSD76P.js?v=e10a9e4b:19353
+commitRoot @ chunk-WERSD76P.js?v=e10a9e4b:19277
+performSyncWorkOnRoot @ chunk-WERSD76P.js?v=e10a9e4b:18895
+flushSyncCallbacks @ chunk-WERSD76P.js?v=e10a9e4b:9119
+(anonymous) @ chunk-WERSD76P.js?v=e10a9e4b:18627
+chunk-WERSD76P.js?v=e10a9e4b:9129 Uncaught Error: A <Select.Item /> must have a value prop that is not an empty string. This is because the Select value can be set to an empty string to clear the selection and show the placeholder.
+    at @radix-ui_react-select.js?v=e10a9e4b:873:13
+    at renderWithHooks (chunk-WERSD76P.js?v=e10a9e4b:11548:26)
+    at updateForwardRef (chunk-WERSD76P.js?v=e10a9e4b:14325:28)
+    at beginWork (chunk-WERSD76P.js?v=e10a9e4b:15946:22)
+    at beginWork$1 (chunk-WERSD76P.js?v=e10a9e4b:19753:22)
+    at performUnitOfWork (chunk-WERSD76P.js?v=e10a9e4b:19198:20)
+    at workLoopSync (chunk-WERSD76P.js?v=e10a9e4b:19137:13)
+    at renderRootSync (chunk-WERSD76P.js?v=e10a9e4b:19116:15)
+    at recoverFromConcurrentError (chunk-WERSD76P.js?v=e10a9e4b:18736:28)
+    at performSyncWorkOnRoot (chunk-WERSD76P.js?v=e10a9e4b:18879:28)
+(anonymous) @ @radix-ui_react-select.js?v=e10a9e4b:873
+renderWithHooks @ chunk-WERSD76P.js?v=e10a9e4b:11548
+updateForwardRef @ chunk-WERSD76P.js?v=e10a9e4b:14325
+beginWork @ chunk-WERSD76P.js?v=e10a9e4b:15946
+beginWork$1 @ chunk-WERSD76P.js?v=e10a9e4b:19753
+performUnitOfWork @ chunk-WERSD76P.js?v=e10a9e4b:19198
+workLoopSync @ chunk-WERSD76P.js?v=e10a9e4b:19137
+renderRootSync @ chunk-WERSD76P.js?v=e10a9e4b:19116
+recoverFromConcurrentError @ chunk-WERSD76P.js?v=e10a9e4b:18736
+performSyncWorkOnRoot @ chunk-WERSD76P.js?v=e10a9e4b:18879
+flushSyncCallbacks @ chunk-WERSD76P.js?v=e10a9e4b:9119
+(anonymous) @ chunk-WERSD76P.js?v=e10a9e4b:18627
+injected.js:27 [WebSocket] Manually disconnecting
+injected.js:27 [WebSocket] Disconnected
+injected.js:27 [WebSocket] Not reconnecting (manual disconnect or unmounted)

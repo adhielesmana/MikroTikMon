@@ -206,14 +206,17 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Group (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(value) => field.onChange(value === "none" ? undefined : value)} 
+                    value={field.value || "none"}
+                  >
                     <FormControl>
                       <SelectTrigger data-testid="select-router-group">
                         <SelectValue placeholder="No group" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">No group</SelectItem>
+                      <SelectItem value="none">No group</SelectItem>
                       {groups?.map((group) => (
                         <SelectItem key={group.id} value={group.id}>
                           <div className="flex items-center gap-2">
