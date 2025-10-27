@@ -261,11 +261,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllEnabledPorts(): Promise<(MonitoredPort & { router: Router })[]> {
+    // Return all enabled ports regardless of router connection status
+    // This allows the scheduler to check reachability and attempt connections
+    // for all routers, not just those already connected
     const result = await db
       .select()
       .from(monitoredPorts)
       .innerJoin(routers, eq(monitoredPorts.routerId, routers.id))
-      .where(and(eq(monitoredPorts.enabled, true), eq(routers.connected, true)));
+      .where(eq(monitoredPorts.enabled, true));
 
     return result.map(r => ({ ...r.monitored_ports, router: r.routers }));
   }

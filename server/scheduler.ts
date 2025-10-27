@@ -70,7 +70,9 @@ async function pollRouterTraffic() {
         });
 
         // Check basic network reachability
+        console.log(`[Scheduler] Checking reachability for router ${router.name} (${router.ipAddress})...`);
         const isReachable = await client.checkReachability();
+        console.log(`[Scheduler] Reachability result for ${router.name}: ${isReachable}`);
         await storage.updateRouterReachability(routerId, isReachable);
 
         const stats = await client.getInterfaceStats();
@@ -173,6 +175,7 @@ async function pollRouterTraffic() {
         
         // Still try to check reachability even if connection fails
         try {
+          console.log(`[Scheduler] Connection failed for ${router.name}, checking reachability...`);
           const credentials = await storage.getRouterCredentials(routerId);
           if (credentials) {
             const client = new MikrotikClient({
@@ -188,9 +191,11 @@ async function pollRouterTraffic() {
               snmpPort: router.snmpPort || 161,
             });
             const isReachable = await client.checkReachability();
+            console.log(`[Scheduler] Reachability result for ${router.name} (after error): ${isReachable}`);
             await storage.updateRouterReachability(routerId, isReachable);
           }
         } catch (reachError) {
+          console.log(`[Scheduler] Reachability check failed for ${router.name}, marking as unreachable`);
           // If reachability check fails, mark as unreachable
           await storage.updateRouterReachability(routerId, false);
         }

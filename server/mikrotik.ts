@@ -76,46 +76,61 @@ export class MikrotikClient {
   }
 
   async checkReachability(): Promise<boolean> {
-    // Simple network reachability check using TCP connection attempt
-    // Try to connect to any configured port to check basic network connectivity
+    // Network reachability check using TCP connection tests
+    // NOTE: ICMP ping is not available in Replit cloud environment due to security restrictions
+    // This method tests common ports to determine if the host is reachable on the network
+    
     return new Promise((resolve) => {
-      const ports = [
-        this.connection.port, // Native API port
+      // Test multiple common ports to maximize chance of detecting reachability
+      // Include MikroTik-specific ports and common web ports
+      const portsToTest = [
+        this.connection.port, // Primary API port
+        8291, // MikroTik Winbox port (commonly open)
+        80,   // HTTP (commonly open)
+        443,  // HTTPS (commonly open)
         ...(this.connection.restEnabled ? [this.connection.restPort || 443] : []),
         ...(this.connection.snmpEnabled ? [this.connection.snmpPort || 161] : []),
       ];
-
-      let attempted = 0;
+      
+      // Remove duplicates
+      const uniquePorts = [...new Set(portsToTest)];
+      
+      let tested = 0;
       let reachable = false;
-
+      
       // Try each port with a quick timeout
-      for (const port of ports) {
+      for (const port of uniquePorts) {
         const socket = new net.Socket();
-        socket.setTimeout(3000); // 3 second timeout
-
+        socket.setTimeout(2000); // 2 second timeout per port
+        
         socket.on('connect', () => {
           reachable = true;
           socket.destroy();
           resolve(true);
         });
-
+        
         socket.on('timeout', () => {
           socket.destroy();
-          attempted++;
-          if (attempted >= ports.length && !reachable) {
+          tested++;
+          if (tested >= uniquePorts.length && !reachable) {
             resolve(false);
           }
         });
-
+        
         socket.on('error', () => {
           socket.destroy();
-          attempted++;
-          if (attempted >= ports.length && !reachable) {
+          tested++;
+          if (tested >= uniquePorts.length && !reachable) {
             resolve(false);
           }
         });
-
+        
         socket.connect(port, this.connection.host);
+      }
+      
+      // Edge case: no ports to test
+      if (uniquePorts.length === 0) {
+        resolve(false);
       }
     });
   }
