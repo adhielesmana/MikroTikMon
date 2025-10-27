@@ -6,6 +6,8 @@ export interface MikrotikConnection {
   port: number;
   user: string;
   password: string;
+  restEnabled?: boolean;
+  restPort?: number;
   snmpEnabled?: boolean;
   snmpCommunity?: string;
   snmpVersion?: string;
@@ -330,8 +332,137 @@ export class MikrotikClient {
     });
   }
 
+  // ============ REST API Methods (RouterOS v7.1+) ============
+
+  private async restRequest(endpoint: string): Promise<any> {
+    const restPort = this.connection.restPort || 443;
+    const url = `https://${this.connection.host}:${restPort}${endpoint}`;
+    const auth = Buffer.from(`${this.connection.user}:${this.connection.password}`).toString('base64');
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Accept': 'application/json',
+        },
+        // Allow self-signed certificates (common for MikroTik routers)
+        // @ts-ignore - Node.js fetch agent option
+        agent: new (await import('https')).Agent({ rejectUnauthorized: false }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`REST API request failed: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      console.error(`REST API request to ${endpoint} failed:`, error.message);
+      throw error;
+    }
+  }
+
+  async testRESTConnection(): Promise<boolean> {
+    if (!this.connection.restEnabled) {
+      return false;
+    }
+
+    try {
+      await this.restRequest('/rest/system/resource');
+      return true;
+    } catch (error) {
+      console.error("REST API connection test failed:", error);
+      return false;
+    }
+  }
+
+  async getRouterInfoViaREST(): Promise<RouterInfo | null> {
+    if (!this.connection.restEnabled) {
+      return null;
+    }
+
+    try {
+      const [identity, resource] = await Promise.all([
+        this.restRequest('/rest/system/identity'),
+        this.restRequest('/rest/system/resource'),
+      ]);
+
+      return {
+        identity: identity[0]?.name || 'Unknown',
+        model: resource[0]?.['board-name'] || 'Unknown',
+        routerOsVersion: resource[0]?.['version'] || 'Unknown',
+        uptime: resource[0]?.['uptime'] || '0',
+      };
+    } catch (error) {
+      console.error("Failed to get router info via REST:", error);
+      return null;
+    }
+  }
+
+  async getInterfaceListViaREST(): Promise<string[]> {
+    if (!this.connection.restEnabled) {
+      return [];
+    }
+
+    try {
+      const interfaces = await this.restRequest('/rest/interface');
+      return interfaces.map((iface: any) => iface.name).filter(Boolean);
+    } catch (error) {
+      console.error("Failed to get interface list via REST:", error);
+      return [];
+    }
+  }
+
+  async getInterfaceStatsViaREST(): Promise<InterfaceStats[]> {
+    if (!this.connection.restEnabled) {
+      return [];
+    }
+
+    try {
+      // Get current interface stats
+      const interfaces = await this.restRequest('/rest/interface');
+      
+      const result: InterfaceStats[] = [];
+      
+      for (const iface of interfaces) {
+        // REST API doesn't provide real-time rates directly, so we calculate from byte counters
+        const name = iface.name;
+        const rxBytes = parseInt(iface['rx-byte'] || '0');
+        const txBytes = parseInt(iface['tx-byte'] || '0');
+        
+        // Use cache to calculate rates (same approach as SNMP)
+        const cacheKey = `rest-${this.connection.host}-${name}`;
+        const cached = snmpByteCountCache.get(cacheKey);
+        const now = Date.now();
+        
+        if (cached) {
+          const timeDiff = (now - cached.timestamp) / 1000; // seconds
+          if (timeDiff > 0) {
+            const rxRate = Math.max(0, (rxBytes - cached.rx) / timeDiff);
+            const txRate = Math.max(0, (txBytes - cached.tx) / timeDiff);
+            
+            result.push({
+              name,
+              rxBytesPerSecond: rxRate,
+              txBytesPerSecond: txRate,
+              totalBytesPerSecond: rxRate + txRate,
+            });
+          }
+        }
+        
+        // Update cache
+        snmpByteCountCache.set(cacheKey, { rx: rxBytes, tx: txBytes, timestamp: now });
+      }
+      
+      return result;
+    } catch (error) {
+      console.error("Failed to get interface stats via REST:", error);
+      return [];
+    }
+  }
+
   async testConnection(): Promise<boolean> {
-    // Try API first
+    // Try native API first
     try {
       const api = new RouterOSAPI({
         host: this.connection.host,
@@ -345,9 +476,16 @@ export class MikrotikClient {
       await api.close();
       return true;
     } catch (error: any) {
-      console.error("MikroTik API connection test failed:", error);
+      console.error("MikroTik native API connection test failed:", error);
       
-      // If API fails and SNMP is enabled, try SNMP
+      // Try REST API if enabled
+      if (this.connection.restEnabled) {
+        console.log("Falling back to REST API connection test...");
+        const restSuccess = await this.testRESTConnection();
+        if (restSuccess) return true;
+      }
+      
+      // Try SNMP if enabled
       if (this.connection.snmpEnabled) {
         console.log("Falling back to SNMP connection test...");
         return await this.testSNMPConnection();
@@ -399,7 +537,7 @@ export class MikrotikClient {
 
       return result;
     } catch (error: any) {
-      console.error("Failed to get interface stats via API:", error);
+      console.error("Failed to get interface stats via native API:", error);
       if (api) {
         try {
           await api.close();
@@ -408,9 +546,20 @@ export class MikrotikClient {
         }
       }
       
-      // Fall back to SNMP if enabled (for any API failure: connection, permission, timeout, etc.)
+      // Try REST API if enabled
+      if (this.connection.restEnabled) {
+        console.log("Native API failed, falling back to REST API...");
+        try {
+          const restStats = await this.getInterfaceStatsViaREST();
+          if (restStats.length > 0) return restStats;
+        } catch (restError) {
+          console.error("REST API also failed:", restError);
+        }
+      }
+      
+      // Try SNMP if enabled (for any API failure: connection, permission, timeout, etc.)
       if (this.connection.snmpEnabled) {
-        console.log("API failed, falling back to SNMP...");
+        console.log("Native API and REST API failed, falling back to SNMP...");
         return await this.getInterfaceStatsViaSNMP();
       }
       
@@ -440,7 +589,7 @@ export class MikrotikClient {
 
       return [];
     } catch (error: any) {
-      console.error("Failed to get interface list via API:", error);
+      console.error("Failed to get interface list via native API:", error);
       if (api) {
         try {
           await api.close();
@@ -449,9 +598,16 @@ export class MikrotikClient {
         }
       }
       
-      // Fall back to SNMP if enabled
+      // Try REST API if enabled
+      if (this.connection.restEnabled) {
+        console.log("Native API failed, falling back to REST API for interface list...");
+        const restList = await this.getInterfaceListViaREST();
+        if (restList.length > 0) return restList;
+      }
+      
+      // Try SNMP if enabled
       if (this.connection.snmpEnabled) {
-        console.log("API failed, falling back to SNMP for interface list...");
+        console.log("Native API and REST API failed, falling back to SNMP for interface list...");
         return await this.getInterfaceListViaSNMP();
       }
       

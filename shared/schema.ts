@@ -68,6 +68,9 @@ export const routers = pgTable("routers", {
   encryptedPassword: text("encrypted_password").notNull(),
   connected: boolean("connected").notNull().default(false),
   lastConnected: timestamp("last_connected"),
+  // REST API configuration for HTTPS fallback (RouterOS v7.1+)
+  restEnabled: boolean("rest_enabled").notNull().default(false),
+  restPort: integer("rest_port").notNull().default(443), // HTTPS port
   // SNMP configuration for fallback monitoring
   snmpEnabled: boolean("snmp_enabled").notNull().default(false),
   snmpCommunity: varchar("snmp_community", { length: 255 }).default("public"),
@@ -119,6 +122,8 @@ export const insertRouterSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
   groupId: z.string().optional(),
+  restEnabled: z.boolean().default(false),
+  restPort: z.number().min(1).max(65535).default(443),
   snmpEnabled: z.boolean().default(false),
   snmpCommunity: z.string().default("public"),
   snmpVersion: z.enum(["1", "2c"]).default("2c"), // Only v1 and v2c supported (v3 requires additional auth params)
