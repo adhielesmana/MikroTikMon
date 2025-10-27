@@ -408,18 +408,7 @@ export class MikrotikClient {
         }
       }
       
-      // Check if error is permission-related
-      const isPermissionError = error?.message?.toLowerCase().includes("permission") || 
-                                error?.message?.toLowerCase().includes("authorization") ||
-                                error?.message?.toLowerCase().includes("access denied");
-      
-      // Fall back to SNMP if enabled and error is permission-related
-      if (this.connection.snmpEnabled && isPermissionError) {
-        console.log("API permission denied, falling back to SNMP...");
-        return await this.getInterfaceStatsViaSNMP();
-      }
-      
-      // If SNMP is enabled even without permission error, try it
+      // Fall back to SNMP if enabled (for any API failure: connection, permission, timeout, etc.)
       if (this.connection.snmpEnabled) {
         console.log("API failed, falling back to SNMP...");
         return await this.getInterfaceStatsViaSNMP();
