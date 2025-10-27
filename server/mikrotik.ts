@@ -1,5 +1,6 @@
 import { RouterOSAPI } from "routeros-client";
 import * as snmp from "net-snmp";
+import https from "https";
 
 export interface MikrotikConnection {
   host: string;
@@ -334,21 +335,28 @@ export class MikrotikClient {
 
   // ============ REST API Methods (RouterOS v7.1+) ============
 
-  private async restRequest(endpoint: string): Promise<any> {
+  private async restRequest(endpoint: string, allowSelfSigned: boolean = true): Promise<any> {
     const restPort = this.connection.restPort || 443;
     const url = `https://${this.connection.host}:${restPort}${endpoint}`;
     const auth = Buffer.from(`${this.connection.user}:${this.connection.password}`).toString('base64');
 
     try {
+      const httpsAgent = new https.Agent({
+        // SECURITY NOTE: MikroTik routers typically use self-signed certificates for REST API.
+        // allowSelfSigned=true is the practical default for MikroTik compatibility.
+        // For production deployments with proper CA-signed certificates, set to false.
+        // Future enhancement: Add per-router configuration option for certificate verification.
+        rejectUnauthorized: !allowSelfSigned,
+      });
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Authorization': `Basic ${auth}`,
           'Accept': 'application/json',
         },
-        // Allow self-signed certificates (common for MikroTik routers)
         // @ts-ignore - Node.js fetch agent option
-        agent: new (await import('https')).Agent({ rejectUnauthorized: false }),
+        agent: httpsAgent,
       });
 
       if (!response.ok) {
@@ -387,11 +395,12 @@ export class MikrotikClient {
         this.restRequest('/rest/system/resource'),
       ]);
 
+      // MikroTik REST API returns objects directly, not arrays
       return {
-        identity: identity[0]?.name || 'Unknown',
-        model: resource[0]?.['board-name'] || 'Unknown',
-        routerOsVersion: resource[0]?.['version'] || 'Unknown',
-        uptime: resource[0]?.['uptime'] || '0',
+        identity: identity?.name || 'Unknown',
+        model: resource?.['board-name'] || 'Unknown',
+        routerOsVersion: resource?.['version'] || 'Unknown',
+        uptime: resource?.['uptime'] || '0',
       };
     } catch (error) {
       console.error("Failed to get router info via REST:", error);

@@ -91,10 +91,10 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
   - testRESTConnection() - Test REST API connectivity
   - getInterfaceStatsViaREST() - Query traffic via HTTPS REST API
     - Supports RouterOS v7.1+ with JSON responses
-    - Uses IF-HC-MIB OIDs for 64-bit counter support
+    - Proper object parsing (not array indexing)
     - Accurate rate calculation across polling intervals
   - getInterfaceListViaREST() - Get interface list via REST API
-  - getRouterInfoViaREST() - Get system info via REST API
+  - getRouterInfoViaREST() - Get system info via REST API (fixed object parsing)
 - ✅ Updated all MikrotikClient instantiations (routes.ts, scheduler.ts)
 - ✅ Frontend REST API configuration UI in AddRouterDialog
   - Collapsible REST API section with toggle (positioned before SNMP)
@@ -102,6 +102,10 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
   - Clear descriptions and visual feedback
 - ✅ Automatic fallback when native API fails or is unavailable
 - ✅ All test endpoints support REST API configuration
+- ✅ Security considerations documented:
+  - MikroTik routers typically use self-signed certificates for REST API
+  - Current implementation allows self-signed certificates for compatibility
+  - Future enhancement: Per-router certificate verification configuration
 - ✅ Production ready for RouterOS v7.1+ routers
 
 ## Project Architecture
