@@ -7,12 +7,19 @@ import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import type { MonitoredPort } from "@shared/schema";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const portFormSchema = z.object({
   portName: z.string().min(1, "Port name is required"),
@@ -34,6 +41,12 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const isEditing = !!port;
+
+  // Fetch available interfaces from router
+  const { data: interfacesData, isLoading: loadingInterfaces } = useQuery<{ interfaces: string[] }>({
+    queryKey: ["/api/routers", routerId, "interfaces"],
+    enabled: open && !isEditing, // Only fetch when dialog is open and adding new port
+  });
 
   const form = useForm<PortFormData>({
     resolver: zodResolver(portFormSchema),
@@ -128,16 +141,53 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
               name="portName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Port Name</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="e.g., ether1, ether2" 
-                      {...field} 
-                      data-testid="input-port-name"
-                    />
-                  </FormControl>
+                  <FormLabel>Interface</FormLabel>
+                  {isEditing ? (
+                    // When editing, show the port name as read-only
+                    <FormControl>
+                      <Input 
+                        value={field.value}
+                        disabled
+                        data-testid="input-port-name"
+                      />
+                    </FormControl>
+                  ) : loadingInterfaces ? (
+                    // Show loading state while fetching interfaces
+                    <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Loading interfaces...</span>
+                    </div>
+                  ) : interfacesData?.interfaces && interfacesData.interfaces.length > 0 ? (
+                    // Show dropdown with available interfaces
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-port-name">
+                          <SelectValue placeholder="Select an interface" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {interfacesData.interfaces.map((iface) => (
+                          <SelectItem key={iface} value={iface}>
+                            {iface}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    // Fallback to manual input if no interfaces loaded
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g., ether1, ether2" 
+                        {...field} 
+                        data-testid="input-port-name"
+                      />
+                    </FormControl>
+                  )}
                   <FormDescription>
-                    The interface name from your MikroTik router
+                    {isEditing 
+                      ? "Interface name cannot be changed" 
+                      : "Select the interface to monitor from your router"
+                    }
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

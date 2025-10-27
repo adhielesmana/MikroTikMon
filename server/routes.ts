@@ -195,6 +195,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get router interfaces
+  app.get("/api/routers/:id/interfaces", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const router = await storage.getRouter(req.params.id);
+      
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      if (router.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const credentials = storage.decryptPassword(router.encryptedPassword);
+      const client = new MikrotikClient({
+        host: router.ipAddress,
+        port: router.port,
+        user: router.username,
+        password: credentials.password,
+        snmpEnabled: router.snmpEnabled || false,
+        snmpCommunity: router.snmpCommunity || "public",
+        snmpVersion: router.snmpVersion || "2c",
+        snmpPort: router.snmpPort || 161,
+      });
+      
+      const interfaces = await client.getInterfaceList();
+      res.json({ interfaces });
+    } catch (error: any) {
+      console.error("Error fetching router interfaces:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch interfaces" });
+    }
+  });
+
   // Router Groups routes
   app.get("/api/router-groups", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
