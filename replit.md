@@ -84,6 +84,26 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 - ✅ Architect reviewed and approved
 - ✅ Production ready for live router testing
 
+**Task 5 - REST API Fallback Support:**
+- ✅ Extended router schema with REST API fields (restEnabled, restPort)
+- ✅ Implemented three-tier fallback system: Native API → REST API → SNMP
+- ✅ Implemented REST API client methods with HTTPS support
+  - testRESTConnection() - Test REST API connectivity
+  - getInterfaceStatsViaREST() - Query traffic via HTTPS REST API
+    - Supports RouterOS v7.1+ with JSON responses
+    - Uses IF-HC-MIB OIDs for 64-bit counter support
+    - Accurate rate calculation across polling intervals
+  - getInterfaceListViaREST() - Get interface list via REST API
+  - getRouterInfoViaREST() - Get system info via REST API
+- ✅ Updated all MikrotikClient instantiations (routes.ts, scheduler.ts)
+- ✅ Frontend REST API configuration UI in AddRouterDialog
+  - Collapsible REST API section with toggle (positioned before SNMP)
+  - Port configuration with HTTPS default (443)
+  - Clear descriptions and visual feedback
+- ✅ Automatic fallback when native API fails or is unavailable
+- ✅ All test endpoints support REST API configuration
+- ✅ Production ready for RouterOS v7.1+ routers
+
 ## Project Architecture
 
 ### Technology Stack
@@ -135,12 +155,18 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
   - Assign routers to groups during creation or editing
   - Filter routers by group on the Routers page
   - Groups cascade to null on delete (routers remain ungrouped)
-- **SNMP Fallback:** Automatic fallback when API access is denied
-  - Uses standard SNMP (SNMPv1/v2c) when MikroTik API fails
-  - Supports traffic monitoring, router info, and port status
-  - Uses 64-bit counters (IF-HC-MIB) to prevent rollover on high-throughput links
-  - Configurable community string, version, and port
+- **Three-Tier Fallback System:** Automatic failover for maximum connectivity
+  - **Native API (Primary):** MikroTik RouterOS API on port 8728
+  - **REST API (Secondary):** HTTPS REST API on port 443 (RouterOS v7.1+)
+    - JSON-based responses with IF-HC-MIB OID support
+    - 64-bit counter support for high-throughput links
+    - Configurable port with SSL/TLS encryption
+  - **SNMP (Tertiary):** Standard SNMP (SNMPv1/v2c) on port 161
+    - Uses 64-bit counters (IF-HC-MIB) to prevent rollover
+    - Falls back to 32-bit counters for legacy devices
+    - Configurable community string, version, and port
   - Seamless fallback with no user intervention required
+  - Each method can be enabled/disabled independently
 
 #### Traffic Monitoring (Frontend Ready)
 - Real-time traffic graphs with Recharts
