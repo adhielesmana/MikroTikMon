@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -66,18 +66,7 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
 
   const form = useForm<RouterFormData>({
     resolver: zodResolver(routerFormSchema),
-    defaultValues: router ? {
-      name: router.name,
-      ipAddress: router.ipAddress,
-      port: router.port,
-      username: router.username,
-      password: "",
-      groupId: router.groupId || undefined,
-      snmpEnabled: router.snmpEnabled || false,
-      snmpCommunity: router.snmpCommunity || "public",
-      snmpVersion: (router.snmpVersion as "1" | "2c") || "2c",
-      snmpPort: router.snmpPort || 161,
-    } : {
+    defaultValues: {
       name: "",
       ipAddress: "",
       port: 8728,
@@ -90,6 +79,39 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
       snmpPort: 161,
     },
   });
+
+  // Reset form when router changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      if (router) {
+        form.reset({
+          name: router.name,
+          ipAddress: router.ipAddress,
+          port: router.port,
+          username: router.username,
+          password: "",
+          groupId: router.groupId || undefined,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || "public",
+          snmpVersion: (router.snmpVersion as "1" | "2c") || "2c",
+          snmpPort: router.snmpPort || 161,
+        });
+      } else {
+        form.reset({
+          name: "",
+          ipAddress: "",
+          port: 8728,
+          username: "admin",
+          password: "",
+          groupId: undefined,
+          snmpEnabled: false,
+          snmpCommunity: "public",
+          snmpVersion: "2c" as "1" | "2c",
+          snmpPort: 161,
+        });
+      }
+    }
+  }, [router, open, form]);
 
   const mutation = useMutation({
     mutationFn: async (data: RouterFormData) => {
