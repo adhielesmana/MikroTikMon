@@ -108,6 +108,22 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
   - Future enhancement: Per-router certificate verification configuration
 - ✅ Production ready for RouterOS v7.1+ routers
 
+**Task 6 - Network Reachability Status:**
+- ✅ Added `reachable` boolean field to router schema
+- ✅ Implemented basic TCP connectivity check in MikrotikClient
+  - checkReachability() - Tests basic network connectivity (port 8728)
+  - Independent from authentication and API configuration
+  - Helps distinguish network/firewall issues from credential/config problems
+- ✅ Updated scheduler to check and update reachability status
+  - Checks reachability on each poll cycle (every 30 seconds)
+  - Also checks reachability when connection fails
+  - Updates database with current reachable status
+- ✅ Updated RouterCard UI to display reachability status
+  - Green "Yes" badge when router is reachable
+  - Red "No" badge when router is unreachable (network/firewall issue)
+  - Helps users quickly diagnose connectivity problems
+- ✅ Production ready for deployment
+
 ## Project Architecture
 
 ### Technology Stack
