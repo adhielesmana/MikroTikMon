@@ -401,12 +401,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           since = new Date(Date.now() - 60 * 60 * 1000);
           break;
         case "6h":
-          // For 6h+ ranges, fall back to database
-          return res.redirect(`/api/routers/${req.params.id}/traffic?timeRange=${timeRange}`);
         case "24h":
         case "7d":
         case "30d":
-          // For longer ranges, use database
+          // For longer ranges, redirect to database endpoint
           return res.redirect(`/api/routers/${req.params.id}/traffic?timeRange=${timeRange}`);
         default:
           since = new Date(Date.now() - 60 * 60 * 1000);
@@ -414,7 +412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { getRealtimeTraffic } = await import("./scheduler");
       const trafficData = getRealtimeTraffic(req.params.id, since);
-      res.json(trafficData);
+      res.json(trafficData || []);
     } catch (error) {
       console.error("Error fetching real-time traffic data:", error);
       res.status(500).json({ message: "Failed to fetch real-time traffic data" });

@@ -64,8 +64,8 @@ export default function RouterDetails() {
   
   const { data: trafficData, isLoading: loadingTraffic } = useQuery<TrafficData[]>({
     queryKey: useRealtimeEndpoint 
-      ? ["/api/routers", id, "traffic", "realtime", timeRange]
-      : ["/api/routers", id, "traffic", timeRange],
+      ? [`/api/routers/${id}/traffic/realtime?timeRange=${timeRange}`]
+      : [`/api/routers/${id}/traffic?timeRange=${timeRange}`],
     enabled: !!id,
     refetchInterval: useRealtimeEndpoint ? 1000 : 30000, // 1 second for real-time, 30 seconds for historical
   });
@@ -92,11 +92,20 @@ export default function RouterDetails() {
 
   // Initialize selected interfaces when they are loaded
   useEffect(() => {
-    if (allInterfaces && Array.isArray(allInterfaces) && allInterfaces.length > 0 && selectedInterfaces.size === 0) {
-      // Auto-select the first interface by default
-      setSelectedInterfaces(new Set([allInterfaces[0]]));
+    if (allInterfaces && Array.isArray(allInterfaces) && allInterfaces.length > 0 && 
+        ports && Array.isArray(ports) && selectedInterfaces.size === 0) {
+      // Auto-select all monitored ports by default
+      const monitoredPortNames = ports.map(p => p.portName);
+      const interfacesToSelect = allInterfaces.filter(iface => monitoredPortNames.includes(iface));
+      
+      // If no monitored ports match, fall back to selecting the first interface
+      if (interfacesToSelect.length > 0) {
+        setSelectedInterfaces(new Set(interfacesToSelect));
+      } else if (allInterfaces.length > 0) {
+        setSelectedInterfaces(new Set([allInterfaces[0]]));
+      }
     }
-  }, [allInterfaces]);
+  }, [allInterfaces, ports]);
 
   const toggleInterface = (interfaceName: string) => {
     const newSelected = new Set(selectedInterfaces);
@@ -110,7 +119,9 @@ export default function RouterDetails() {
 
   // Transform traffic data for multi-interface chart
   const chartData = useMemo(() => {
-    if (!trafficData) return [];
+    if (!trafficData || !Array.isArray(trafficData)) {
+      return [];
+    }
 
     // Group data by timestamp
     const dataByTime = new Map<string, any>();
