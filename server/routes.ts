@@ -199,45 +199,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get router interfaces
-  app.get("/api/routers/:id/interfaces", isAuthenticated, isEnabled, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const router = await storage.getRouter(req.params.id);
-      
-      if (!router) {
-        return res.status(404).json({ message: "Router not found" });
-      }
-      
-      if (router.userId !== userId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const credentials = await storage.getRouterCredentials(req.params.id);
-      if (!credentials) {
-        return res.status(404).json({ message: "Router credentials not found" });
-      }
-      
-      const client = new MikrotikClient({
-        host: router.ipAddress,
-        port: router.port,
-        user: credentials.username,
-        password: credentials.password,
-        restEnabled: router.restEnabled || false,
-        restPort: router.restPort || 443,
-        snmpEnabled: router.snmpEnabled || false,
-        snmpCommunity: router.snmpCommunity || "public",
-        snmpVersion: router.snmpVersion || "2c",
-        snmpPort: router.snmpPort || 161,
-      });
-      
-      const interfaces = await client.getInterfaceList();
-      res.json({ interfaces });
-    } catch (error: any) {
-      console.error("Error fetching router interfaces:", error);
-      res.status(500).json({ message: error.message || "Failed to fetch interfaces" });
-    }
-  });
 
   // Router Groups routes
   app.get("/api/router-groups", isAuthenticated, isEnabled, async (req: any, res) => {
@@ -411,6 +372,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Traffic Data routes
+  // Real-time traffic data (from in-memory store) - for current/recent viewing
+  app.get("/api/routers/:id/traffic/realtime", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const router = await storage.getRouter(req.params.id);
+      
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      if (router.userId !== userId) {
+        const user = await storage.getUser(userId);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+      }
+      
+      // Parse time range
+      const timeRange = req.query.timeRange || "1h";
+      let since = new Date();
+      
+      switch (timeRange) {
+        case "15m":
+          since = new Date(Date.now() - 15 * 60 * 1000);
+          break;
+        case "1h":
+          since = new Date(Date.now() - 60 * 60 * 1000);
+          break;
+        case "6h":
+          // For 6h+ ranges, fall back to database
+          return res.redirect(`/api/routers/${req.params.id}/traffic?timeRange=${timeRange}`);
+        case "24h":
+        case "7d":
+        case "30d":
+          // For longer ranges, use database
+          return res.redirect(`/api/routers/${req.params.id}/traffic?timeRange=${timeRange}`);
+        default:
+          since = new Date(Date.now() - 60 * 60 * 1000);
+      }
+      
+      const { getRealtimeTraffic } = await import("./scheduler");
+      const trafficData = getRealtimeTraffic(req.params.id, since);
+      res.json(trafficData);
+    } catch (error) {
+      console.error("Error fetching real-time traffic data:", error);
+      res.status(500).json({ message: "Failed to fetch real-time traffic data" });
+    }
+  });
+
+  // Historical traffic data (from database) - for long-term analysis
   app.get("/api/routers/:id/traffic", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -462,7 +473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all available interfaces for a router (with unique names from traffic data)
+  // Get all available interfaces for a router (from real-time traffic store)
   app.get("/api/routers/:id/interfaces", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -479,9 +490,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Get unique port names from recent traffic data
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // Last 24h
-      const trafficData = await storage.getRecentTraffic(req.params.id, since);
+      // Get unique port names from real-time traffic store
+      const { getRealtimeTraffic } = await import("./scheduler");
+      const trafficData = getRealtimeTraffic(req.params.id);
       
       // Extract unique port names
       const interfaceNames = Array.from(new Set(trafficData.map(d => d.portName)));

@@ -29,6 +29,58 @@ export function broadcastNotification(userId: string, notification: any) {
   });
 }
 
+// In-memory storage for real-time traffic data (last 2 hours per interface)
+interface RealtimeTrafficData {
+  routerId: string;
+  portName: string;
+  timestamp: Date;
+  rxBytesPerSecond: number;
+  txBytesPerSecond: number;
+  totalBytesPerSecond: number;
+}
+
+// Store data per router per interface: Map<routerId, Map<portName, data[]>>
+const realtimeTrafficStore = new Map<string, Map<string, RealtimeTrafficData[]>>();
+const MAX_ENTRIES_PER_INTERFACE = 7200; // 2 hours at 1 second intervals per interface
+
+export function getRealtimeTraffic(routerId: string, since?: Date): RealtimeTrafficData[] {
+  const routerData = realtimeTrafficStore.get(routerId);
+  if (!routerData) return [];
+  
+  // Flatten all interface data into a single array
+  const allData: RealtimeTrafficData[] = [];
+  for (const interfaceData of Array.from(routerData.values())) {
+    allData.push(...interfaceData);
+  }
+  
+  if (!since) return allData;
+  return allData.filter(d => d.timestamp >= since);
+}
+
+function addRealtimeTraffic(routerId: string, data: Omit<RealtimeTrafficData, 'routerId'>) {
+  // Get or create router's interface map
+  let routerData = realtimeTrafficStore.get(routerId);
+  if (!routerData) {
+    routerData = new Map<string, RealtimeTrafficData[]>();
+    realtimeTrafficStore.set(routerId, routerData);
+  }
+  
+  // Get or create interface's data array
+  let interfaceData = routerData.get(data.portName);
+  if (!interfaceData) {
+    interfaceData = [];
+    routerData.set(data.portName, interfaceData);
+  }
+  
+  // Add new data point
+  interfaceData.push({ routerId, ...data });
+  
+  // Keep only last MAX_ENTRIES_PER_INTERFACE for this specific interface
+  if (interfaceData.length > MAX_ENTRIES_PER_INTERFACE) {
+    interfaceData.splice(0, interfaceData.length - MAX_ENTRIES_PER_INTERFACE);
+  }
+}
+
 async function pollRouterTraffic() {
   try {
     console.log("[Scheduler] Polling router traffic data...");
@@ -44,7 +96,7 @@ async function pollRouterTraffic() {
       portsByRouter.set(port.router.id, existing);
     }
 
-    for (const [routerId, ports] of portsByRouter) {
+    for (const [routerId, ports] of Array.from(portsByRouter)) {
       const router = ports[0].router;
 
       try {
@@ -87,12 +139,12 @@ async function pollRouterTraffic() {
           await storage.updateRouterHostname(routerId, extractedHostname);
         }
 
-        // Store traffic data for ALL interfaces (not just monitored ones)
+        // Store traffic data for ALL interfaces in memory for real-time display
+        const timestamp = new Date();
         for (const stat of stats) {
-          await storage.insertTrafficData({
-            routerId: routerId,
-            portId: null, // NULL for non-monitored ports
+          addRealtimeTraffic(routerId, {
             portName: stat.name,
+            timestamp,
             rxBytesPerSecond: stat.rxBytesPerSecond,
             txBytesPerSecond: stat.txBytesPerSecond,
             totalBytesPerSecond: stat.totalBytesPerSecond,
@@ -296,13 +348,60 @@ async function pollRouterTraffic() {
   }
 }
 
+// Persist in-memory traffic data to database (runs every 5 minutes)
+async function persistTrafficData() {
+  try {
+    console.log("[Scheduler] Persisting traffic data to database...");
+    
+    let totalPersisted = 0;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    
+    // Iterate over each router's data
+    for (const [routerId, interfaceMap] of Array.from(realtimeTrafficStore.entries())) {
+      // Iterate over each interface's data for this router
+      for (const [portName, interfaceData] of Array.from(interfaceMap.entries())) {
+        // Get the last 5 minutes of data for this interface
+        const recentData = interfaceData.filter((d: RealtimeTrafficData) => d.timestamp >= fiveMinutesAgo);
+        
+        // Sample evenly to get ~5 data points per 5-minute period
+        const sampleInterval = Math.floor(recentData.length / 5) || 1;
+        for (let i = 0; i < recentData.length; i += sampleInterval) {
+          if (i >= recentData.length) break;
+          const sample = recentData[i];
+          
+          await storage.insertTrafficData({
+            routerId: sample.routerId,
+            portId: null,
+            portName: sample.portName,
+            rxBytesPerSecond: sample.rxBytesPerSecond,
+            txBytesPerSecond: sample.txBytesPerSecond,
+            totalBytesPerSecond: sample.totalBytesPerSecond,
+          });
+          totalPersisted++;
+        }
+      }
+    }
+    
+    console.log(`[Scheduler] Persisted ${totalPersisted} traffic data points to database`);
+  } catch (error) {
+    console.error("[Scheduler] Error persisting traffic data:", error);
+  }
+}
+
 export function startScheduler() {
   console.log("[Scheduler] Starting traffic monitoring scheduler...");
 
-  // Poll traffic every 30 seconds
-  cron.schedule("*/30 * * * * *", () => {
+  // Poll traffic every 1 second for real-time updates
+  cron.schedule("* * * * * *", () => {
     pollRouterTraffic().catch(error => {
-      console.error("[Scheduler] Unhandled error in scheduled task:", error);
+      console.error("[Scheduler] Unhandled error in real-time polling:", error);
+    });
+  });
+
+  // Persist to database every 5 minutes
+  cron.schedule("*/5 * * * *", () => {
+    persistTrafficData().catch(error => {
+      console.error("[Scheduler] Unhandled error in database persistence:", error);
     });
   });
 
@@ -313,5 +412,5 @@ export function startScheduler() {
     });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully");
+  console.log("[Scheduler] Scheduler started successfully (1s real-time polling, 5min database persistence)");
 }

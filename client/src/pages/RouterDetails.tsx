@@ -59,10 +59,15 @@ export default function RouterDetails() {
     enabled: !!id,
   });
 
+  // Use real-time endpoint for 15m and 1h ranges, database for longer ranges
+  const useRealtimeEndpoint = timeRange === "15m" || timeRange === "1h";
+  
   const { data: trafficData, isLoading: loadingTraffic } = useQuery<TrafficData[]>({
-    queryKey: ["/api/routers", id, "traffic", timeRange],
+    queryKey: useRealtimeEndpoint 
+      ? ["/api/routers", id, "traffic", "realtime", timeRange]
+      : ["/api/routers", id, "traffic", timeRange],
     enabled: !!id,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: useRealtimeEndpoint ? 1000 : 30000, // 1 second for real-time, 30 seconds for historical
   });
 
   const deletePortMutation = useMutation({
@@ -87,7 +92,7 @@ export default function RouterDetails() {
 
   // Initialize selected interfaces when they are loaded
   useEffect(() => {
-    if (allInterfaces && allInterfaces.length > 0 && selectedInterfaces.size === 0) {
+    if (allInterfaces && Array.isArray(allInterfaces) && allInterfaces.length > 0 && selectedInterfaces.size === 0) {
       // Auto-select the first interface by default
       setSelectedInterfaces(new Set([allInterfaces[0]]));
     }
@@ -130,7 +135,7 @@ export default function RouterDetails() {
 
   // Get selected interfaces list
   const selectedInterfacesList = useMemo(() => {
-    if (!allInterfaces) return [];
+    if (!allInterfaces || !Array.isArray(allInterfaces)) return [];
     return allInterfaces.filter(iface => selectedInterfaces.has(iface));
   }, [allInterfaces, selectedInterfaces]);
 
@@ -264,7 +269,7 @@ export default function RouterDetails() {
             </div>
 
             {/* Interface Selection */}
-            {allInterfaces && allInterfaces.length > 0 && (
+            {allInterfaces && Array.isArray(allInterfaces) && allInterfaces.length > 0 && (
               <div className="flex flex-wrap gap-4">
                 {allInterfaces.map((interfaceName, index) => {
                   const colors = INTERFACE_COLORS[index % INTERFACE_COLORS.length];

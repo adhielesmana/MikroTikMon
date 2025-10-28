@@ -27,6 +27,13 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 
 **Key Storage Methods:**
 - `getLatestUnacknowledgedAlertForPort`: Returns only unacknowledged alerts for proper alert independence and auto-acknowledgment logic.
+- `getRealtimeTraffic`: Retrieves in-memory traffic data for real-time graphing (per-interface buffering with 7200 entries each).
+- `getRecentTraffic`: Retrieves historical traffic data from database for long-term analysis.
+
+**In-Memory Storage:**
+- Nested Map structure: `Map<routerId, Map<portName, RealtimeTrafficData[]>>`
+- 7,200 entries per interface (2 hours at 1-second intervals)
+- Memory footprint: ~0.6 MB per router (9 interfaces × 7200 × ~80 bytes)
 
 ### Key Features
 -   **User Management:** Multi-user authentication (Replit Auth), Administrator/Normal User roles, admin approval for new users.
@@ -35,7 +42,12 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
     -   **Three-Tier Fallback System:** Automatic failover between Native MikroTik API, HTTPS REST API (RouterOS v7.1+ with 64-bit counter support), and SNMP (v1/v2c with 64-bit counter support) for maximum connectivity and data accuracy. Each method is independently configurable.
     -   **Automatic Hostname Extraction:** For REST API connections via IP, extracts hostname from SSL certificates for improved reliability.
     -   **Network Reachability Status:** Basic TCP connectivity check to distinguish network issues from configuration problems, displayed in the UI.
--   **Traffic Monitoring:** Real-time traffic graphs (Recharts) with multiple time ranges, per-port visualization, and historical data tracking.
+-   **Traffic Monitoring:** 
+    -   **Real-Time Updates:** 1-second polling interval with in-memory storage (2 hours per interface)
+    -   **All Interfaces Tracked:** Collects traffic data for ALL router interfaces (not just monitored ports)
+    -   **Multi-Interface Graphs:** Select and view multiple interfaces simultaneously with color-coded TX/RX lines
+    -   **Dual Data Sources:** Real-time endpoint for 15m/1h ranges (1s polling), database endpoint for 6h+ ranges (30s polling)
+    -   **Optimized Storage:** Database persistence every 5 minutes with intelligent sampling (~5 data points per interface per 5-minute period)
 -   **Alert System:** Configurable thresholds per port, dual notification (Email + In-App Popup), alert severity levels, acknowledgment workflow, and history tracking.
     -   **Alert De-duplication:** Prevents spamming by only generating new alerts when status changes (port down vs traffic threshold).
     -   **Auto-Acknowledgment:** Automatically acknowledges alerts when conditions return to normal (traffic above threshold or port comes back up).
