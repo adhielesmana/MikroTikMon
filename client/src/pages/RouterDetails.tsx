@@ -8,7 +8,7 @@ import type { Router, MonitoredPort, TrafficData } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytesPerSecond, formatRelativeTime } from "@/lib/utils";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, Fragment, useEffect } from "react";
 import { AddPortDialog } from "@/components/AddPortDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -40,7 +40,7 @@ const INTERFACE_COLORS = [
 export default function RouterDetails() {
   const { id } = useParams<{ id: string }>();
   const [timeRange, setTimeRange] = useState("1h");
-  const [selectedPorts, setSelectedPorts] = useState<Set<string>>(new Set());
+  const [selectedInterfaces, setSelectedInterfaces] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const { data: router, isLoading: loadingRouter } = useQuery<Router>({
@@ -50,6 +50,12 @@ export default function RouterDetails() {
 
   const { data: ports, isLoading: loadingPorts } = useQuery<MonitoredPort[]>({
     queryKey: ["/api/routers", id, "ports"],
+    enabled: !!id,
+  });
+
+  // Fetch all available interfaces
+  const { data: allInterfaces, isLoading: loadingInterfaces } = useQuery<string[]>({
+    queryKey: ["/api/routers", id, "interfaces"],
     enabled: !!id,
   });
 
@@ -79,27 +85,27 @@ export default function RouterDetails() {
     },
   });
 
-  // Initialize selected ports when ports are loaded
-  useMemo(() => {
-    if (ports && ports.length > 0 && selectedPorts.size === 0) {
-      // Auto-select the first port by default
-      setSelectedPorts(new Set([ports[0].id]));
+  // Initialize selected interfaces when they are loaded
+  useEffect(() => {
+    if (allInterfaces && allInterfaces.length > 0 && selectedInterfaces.size === 0) {
+      // Auto-select the first interface by default
+      setSelectedInterfaces(new Set([allInterfaces[0]]));
     }
-  }, [ports]);
+  }, [allInterfaces]);
 
-  const togglePort = (portId: string) => {
-    const newSelected = new Set(selectedPorts);
-    if (newSelected.has(portId)) {
-      newSelected.delete(portId);
+  const toggleInterface = (interfaceName: string) => {
+    const newSelected = new Set(selectedInterfaces);
+    if (newSelected.has(interfaceName)) {
+      newSelected.delete(interfaceName);
     } else {
-      newSelected.add(portId);
+      newSelected.add(interfaceName);
     }
-    setSelectedPorts(newSelected);
+    setSelectedInterfaces(newSelected);
   };
 
   // Transform traffic data for multi-interface chart
   const chartData = useMemo(() => {
-    if (!trafficData || !ports) return [];
+    if (!trafficData) return [];
 
     // Group data by timestamp
     const dataByTime = new Map<string, any>();
@@ -111,25 +117,22 @@ export default function RouterDetails() {
       }
       const timeData = dataByTime.get(time);
 
-      // Only include data for selected ports
-      if (selectedPorts.has(d.portId)) {
-        const port = ports.find(p => p.id === d.portId);
-        if (port) {
-          // Store RX and TX separately for each port
-          timeData[`${port.portName}_rx`] = d.rxBytesPerSecond / 1024 / 1024; // Convert to MB/s
-          timeData[`${port.portName}_tx`] = d.txBytesPerSecond / 1024 / 1024;
-        }
+      // Only include data for selected interfaces
+      if (selectedInterfaces.has(d.portName)) {
+        // Store RX and TX separately for each interface
+        timeData[`${d.portName}_rx`] = d.rxBytesPerSecond / 1024 / 1024; // Convert to MB/s
+        timeData[`${d.portName}_tx`] = d.txBytesPerSecond / 1024 / 1024;
       }
     });
 
     return Array.from(dataByTime.values());
-  }, [trafficData, ports, selectedPorts]);
+  }, [trafficData, selectedInterfaces]);
 
-  // Get port names for selected ports
-  const selectedPortsData = useMemo(() => {
-    if (!ports) return [];
-    return ports.filter(p => selectedPorts.has(p.id));
-  }, [ports, selectedPorts]);
+  // Get selected interfaces list
+  const selectedInterfacesList = useMemo(() => {
+    if (!allInterfaces) return [];
+    return allInterfaces.filter(iface => selectedInterfaces.has(iface));
+  }, [allInterfaces, selectedInterfaces]);
 
   if (loadingRouter) {
     return (
@@ -199,19 +202,19 @@ export default function RouterDetails() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Monitored Ports</CardTitle>
+            <CardTitle className="text-sm font-medium">Available Interfaces</CardTitle>
             <Server className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {loadingPorts ? (
+            {loadingInterfaces ? (
               <Skeleton className="h-8 w-16" />
             ) : (
               <>
-                <div className="text-2xl font-mono font-semibold" data-testid="text-monitored-ports-count">
-                  {ports?.length || 0}
+                <div className="text-2xl font-mono font-semibold" data-testid="text-interfaces-count">
+                  {allInterfaces?.length || 0}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {ports?.filter(p => p.enabled).length || 0} enabled
+                  {ports?.filter(p => p.enabled).length || 0} monitored
                 </p>
               </>
             )}
@@ -261,20 +264,21 @@ export default function RouterDetails() {
             </div>
 
             {/* Interface Selection */}
-            {ports && ports.length > 0 && (
+            {allInterfaces && allInterfaces.length > 0 && (
               <div className="flex flex-wrap gap-4">
-                {ports.map((port, index) => {
+                {allInterfaces.map((interfaceName, index) => {
                   const colors = INTERFACE_COLORS[index % INTERFACE_COLORS.length];
+                  const isMonitored = ports?.some(p => p.portName === interfaceName);
                   return (
-                    <div key={port.id} className="flex items-center gap-2">
+                    <div key={interfaceName} className="flex items-center gap-2">
                       <Checkbox
-                        id={`port-${port.id}`}
-                        checked={selectedPorts.has(port.id)}
-                        onCheckedChange={() => togglePort(port.id)}
-                        data-testid={`checkbox-port-${port.id}`}
+                        id={`interface-${interfaceName}`}
+                        checked={selectedInterfaces.has(interfaceName)}
+                        onCheckedChange={() => toggleInterface(interfaceName)}
+                        data-testid={`checkbox-interface-${interfaceName}`}
                       />
                       <label
-                        htmlFor={`port-${port.id}`}
+                        htmlFor={`interface-${interfaceName}`}
                         className="text-sm font-medium cursor-pointer flex items-center gap-2"
                       >
                         <div className="flex items-center gap-1">
@@ -287,7 +291,10 @@ export default function RouterDetails() {
                             style={{ backgroundColor: colors.tx }}
                           />
                         </div>
-                        {port.portName}
+                        {interfaceName}
+                        {isMonitored && (
+                          <Badge variant="outline" className="text-xs ml-1">Monitored</Badge>
+                        )}
                       </label>
                     </div>
                   );
@@ -299,7 +306,7 @@ export default function RouterDetails() {
         <CardContent>
           {loadingTraffic ? (
             <Skeleton className="h-80 w-full" />
-          ) : chartData.length > 0 && selectedPorts.size > 0 ? (
+          ) : chartData.length > 0 && selectedInterfaces.size > 0 ? (
             <ResponsiveContainer width="100%" height={320}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -321,23 +328,23 @@ export default function RouterDetails() {
                   }}
                 />
                 <Legend />
-                {selectedPortsData.map((port, index) => {
+                {selectedInterfacesList.map((interfaceName, index) => {
                   const colors = INTERFACE_COLORS[index % INTERFACE_COLORS.length];
                   return (
-                    <Fragment key={port.id}>
+                    <Fragment key={interfaceName}>
                       <Line
                         type="monotone"
-                        dataKey={`${port.portName}_rx`}
+                        dataKey={`${interfaceName}_rx`}
                         stroke={colors.rx}
-                        name={`${port.portName} RX`}
+                        name={`${interfaceName} RX`}
                         strokeWidth={2}
                         dot={false}
                       />
                       <Line
                         type="monotone"
-                        dataKey={`${port.portName}_tx`}
+                        dataKey={`${interfaceName}_tx`}
                         stroke={colors.tx}
-                        name={`${port.portName} TX`}
+                        name={`${interfaceName} TX`}
                         strokeWidth={2}
                         dot={false}
                       />
@@ -348,7 +355,7 @@ export default function RouterDetails() {
             </ResponsiveContainer>
           ) : (
             <div className="h-80 flex items-center justify-center text-sm text-muted-foreground">
-              {selectedPorts.size === 0 
+              {selectedInterfaces.size === 0 
                 ? "Select at least one interface to display traffic data"
                 : "No traffic data available"}
             </div>

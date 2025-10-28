@@ -462,6 +462,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all available interfaces for a router (with unique names from traffic data)
+  app.get("/api/routers/:id/interfaces", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const router = await storage.getRouter(req.params.id);
+      
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      if (router.userId !== userId) {
+        const user = await storage.getUser(userId);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+      }
+      
+      // Get unique port names from recent traffic data
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // Last 24h
+      const trafficData = await storage.getRecentTraffic(req.params.id, since);
+      
+      // Extract unique port names
+      const interfaceNames = Array.from(new Set(trafficData.map(d => d.portName)));
+      
+      res.json(interfaceNames);
+    } catch (error) {
+      console.error("Error fetching interfaces:", error);
+      res.status(500).json({ message: "Failed to fetch interfaces" });
+    }
+  });
+
   // Alert routes
   app.get("/api/alerts", isAuthenticated, isEnabled, async (req: any, res) => {
     try {

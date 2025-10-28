@@ -72,6 +72,7 @@ export interface IStorage {
   // Traffic Data operations
   insertTrafficData(data: Omit<TrafficData, "id" | "timestamp">): Promise<void>;
   getTrafficData(routerId: string, portId: string, since: Date): Promise<TrafficData[]>;
+  getTrafficDataByPortName(routerId: string, portName: string, since: Date): Promise<TrafficData[]>;
   getRecentTraffic(routerId: string, since: Date): Promise<TrafficData[]>;
 
   // Alert operations
@@ -296,6 +297,20 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(trafficData.routerId, routerId),
           eq(trafficData.portId, portId),
+          gte(trafficData.timestamp, since)
+        )
+      )
+      .orderBy(trafficData.timestamp);
+  }
+
+  async getTrafficDataByPortName(routerId: string, portName: string, since: Date): Promise<TrafficData[]> {
+    return db
+      .select()
+      .from(trafficData)
+      .where(
+        and(
+          eq(trafficData.routerId, routerId),
+          eq(trafficData.portName, portName),
           gte(trafficData.timestamp, since)
         )
       )

@@ -87,7 +87,19 @@ async function pollRouterTraffic() {
           await storage.updateRouterHostname(routerId, extractedHostname);
         }
 
-        // Process each monitored port
+        // Store traffic data for ALL interfaces (not just monitored ones)
+        for (const stat of stats) {
+          await storage.insertTrafficData({
+            routerId: routerId,
+            portId: null, // NULL for non-monitored ports
+            portName: stat.name,
+            rxBytesPerSecond: stat.rxBytesPerSecond,
+            txBytesPerSecond: stat.txBytesPerSecond,
+            totalBytesPerSecond: stat.totalBytesPerSecond,
+          });
+        }
+
+        // Process each monitored port for alerting
         for (const port of ports) {
           const stat = stats.find(s => s.name === port.portName);
           if (!stat) {

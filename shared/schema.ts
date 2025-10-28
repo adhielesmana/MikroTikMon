@@ -172,14 +172,14 @@ export type MonitoredPort = typeof monitoredPorts.$inferSelect;
 export const trafficData = pgTable("traffic_data", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
-  portId: varchar("port_id").notNull().references(() => monitoredPorts.id, { onDelete: "cascade" }),
+  portId: varchar("port_id").references(() => monitoredPorts.id, { onDelete: "cascade" }), // Nullable for non-monitored interfaces
   portName: varchar("port_name", { length: 255 }).notNull(),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
   rxBytesPerSecond: real("rx_bytes_per_second").notNull().default(0), // Download
   txBytesPerSecond: real("tx_bytes_per_second").notNull().default(0), // Upload
   totalBytesPerSecond: real("total_bytes_per_second").notNull().default(0), // Total
 }, (table) => [
-  index("idx_traffic_data_router_port_time").on(table.routerId, table.portId, table.timestamp),
+  index("idx_traffic_data_router_port_name_time").on(table.routerId, table.portName, table.timestamp),
   index("idx_traffic_data_timestamp").on(table.timestamp),
 ]);
 
