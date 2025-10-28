@@ -12,7 +12,7 @@ export default function Dashboard() {
     queryKey: ["/api/routers"],
   });
 
-  const { data: alerts, isLoading: loadingAlerts } = useQuery<Alert[]>({
+  const { data: alerts, isLoading: loadingAlerts } = useQuery<(Alert & { routerName: string })[]>({
     queryKey: ["/api/alerts"],
   });
 
@@ -216,7 +216,7 @@ export default function Dashboard() {
                         'text-blue-500'
                       }`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{alert.portName}</p>
+                        <p className="text-sm font-medium truncate">{alert.portName} - {alert.routerName}</p>
                         <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
                       </div>
                       {!alert.acknowledged && (
