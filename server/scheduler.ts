@@ -388,6 +388,20 @@ async function persistTrafficData() {
   }
 }
 
+// Clean up old traffic data (older than 2 years)
+async function cleanupOldData() {
+  try {
+    const twoYearsAgo = new Date();
+    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+    
+    console.log(`[Scheduler] Cleaning up traffic data older than ${twoYearsAgo.toISOString()}...`);
+    const deletedCount = await storage.cleanupOldTrafficData(twoYearsAgo);
+    console.log(`[Scheduler] Cleaned up ${deletedCount} old traffic data records`);
+  } catch (error) {
+    console.error("[Scheduler] Error cleaning up old data:", error);
+  }
+}
+
 export function startScheduler() {
   console.log("[Scheduler] Starting traffic monitoring scheduler...");
 
@@ -405,6 +419,13 @@ export function startScheduler() {
     });
   });
 
+  // Clean up old data daily at 2 AM
+  cron.schedule("0 2 * * *", () => {
+    cleanupOldData().catch(error => {
+      console.error("[Scheduler] Unhandled error in cleanup:", error);
+    });
+  });
+
   // Run immediately on startup
   setTimeout(() => {
     pollRouterTraffic().catch(error => {
@@ -412,5 +433,5 @@ export function startScheduler() {
     });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully (1s real-time polling, 5min database persistence)");
+  console.log("[Scheduler] Scheduler started successfully (1s real-time polling, 5min database persistence, daily cleanup)");
 }

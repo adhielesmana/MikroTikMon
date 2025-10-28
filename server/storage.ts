@@ -20,7 +20,7 @@ import {
   type Notification,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, gte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, lt, sql } from "drizzle-orm";
 import CryptoJS from "crypto-js";
 
 const ENCRYPTION_KEY = process.env.SESSION_SECRET || "default-key-change-in-production";
@@ -74,6 +74,7 @@ export interface IStorage {
   getTrafficData(routerId: string, portId: string, since: Date): Promise<TrafficData[]>;
   getTrafficDataByPortName(routerId: string, portName: string, since: Date): Promise<TrafficData[]>;
   getRecentTraffic(routerId: string, since: Date): Promise<TrafficData[]>;
+  cleanupOldTrafficData(before: Date): Promise<number>;
 
   // Alert operations
   getAlerts(userId: string): Promise<(Alert & { routerName: string })[]>;
@@ -328,6 +329,14 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(trafficData.timestamp);
+  }
+
+  async cleanupOldTrafficData(before: Date): Promise<number> {
+    const result = await db
+      .delete(trafficData)
+      .where(lt(trafficData.timestamp, before));
+    
+    return result.rowCount || 0;
   }
 
   // Alert operations
