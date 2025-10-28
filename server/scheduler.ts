@@ -307,6 +307,10 @@ async function checkAlerts() {
           let hasActiveAlert = !!latestAlert;
           let isPortDownAlert = latestAlert && latestAlert.message.includes("is DOWN");
           let isTrafficAlert = latestAlert && !latestAlert.message.includes("is DOWN");
+          
+          if (hasActiveAlert) {
+            console.log(`[Scheduler] Found unacknowledged alert for ${router.name} - ${port.portName}: ${isPortDownAlert ? 'Port Down' : 'Traffic'} Alert`);
+          }
 
           // Check port status (down/up)
           if (!stat.running) {
@@ -370,6 +374,8 @@ async function checkAlerts() {
 
           // Check traffic threshold
           const isBelowThreshold = stat.totalBytesPerSecond < port.minThresholdBps;
+          
+          console.log(`[Scheduler] ${router.name} - ${port.portName}: Traffic ${(stat.totalBytesPerSecond / 1024).toFixed(2)} KB/s vs Threshold ${(port.minThresholdBps / 1024).toFixed(2)} KB/s (${isBelowThreshold ? 'BELOW' : 'ABOVE'})`);
 
           if (isBelowThreshold) {
             // Increment violation count
@@ -451,9 +457,12 @@ async function checkAlerts() {
             
             // Auto-acknowledge traffic alert if traffic returned to normal
             if (hasActiveAlert && isTrafficAlert) {
+              console.log(`[Scheduler] Auto-acknowledging traffic alert for ${router.name} - ${port.portName} (traffic returned to normal)`);
               await storage.acknowledgeAlert(latestAlert!.id);
               resetViolationCount(`traffic_${port.id}`); // Ensure counter is reset on auto-acknowledge
-              console.log(`[Scheduler] Auto-acknowledged alert for ${router.name} - ${port.portName} (traffic returned to normal)`);
+              console.log(`[Scheduler] Successfully auto-acknowledged alert for ${router.name} - ${port.portName}`);
+            } else {
+              console.log(`[Scheduler] No auto-acknowledgment needed for ${router.name} - ${port.portName} (hasActiveAlert: ${hasActiveAlert}, isTrafficAlert: ${isTrafficAlert})`);
             }
           }
         }
