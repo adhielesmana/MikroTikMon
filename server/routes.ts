@@ -510,7 +510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract unique port names
       const interfaceNames = Array.from(new Set(trafficData.map(d => d.portName)));
       
-      res.json(interfaceNames);
+      res.json({ interfaces: interfaceNames });
     } catch (error) {
       console.error("Error fetching interfaces:", error);
       res.status(500).json({ message: "Failed to fetch interfaces" });
