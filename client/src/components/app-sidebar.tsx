@@ -1,4 +1,4 @@
-import { LayoutDashboard, Server, Bell, Settings, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, Server, Bell, Settings, Users, LogOut, TrendingUp } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -30,6 +30,11 @@ export function AppSidebar() {
       title: "Routers",
       url: "/routers",
       icon: Server,
+    },
+    {
+      title: "Graph History",
+      url: "/graph-history",
+      icon: TrendingUp,
     },
     {
       title: "Alerts",

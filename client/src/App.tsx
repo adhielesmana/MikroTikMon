@@ -11,6 +11,7 @@ import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import Routers from "@/pages/Routers";
 import RouterDetails from "@/pages/RouterDetails";
+import GraphHistory from "@/pages/GraphHistory";
 import Alerts from "@/pages/Alerts";
 import Settings from "@/pages/Settings";
 import AdminUsers from "@/pages/AdminUsers";
@@ -122,6 +123,13 @@ function Router() {
             {() => (
               <AuthenticatedLayout>
                 <RouterDetails />
+              </AuthenticatedLayout>
+            )}
+          </Route>
+          <Route path="/graph-history">
+            {() => (
+              <AuthenticatedLayout>
+                <GraphHistory />
               </AuthenticatedLayout>
             )}
           </Route>
