@@ -110,17 +110,10 @@ export default function Alerts() {
                     </TableCell>
                     <TableCell>
                       {alert.acknowledged ? (
-                        <div className="flex flex-col gap-1">
-                          <Badge variant="outline" className="w-fit">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Acknowledged
-                          </Badge>
-                          {alert.acknowledgedAt && (
-                            <span className="text-xs text-muted-foreground">
-                              {formatRelativeTime(alert.acknowledgedAt)}
-                            </span>
-                          )}
-                        </div>
+                        <Badge variant="outline" className="w-fit">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Acknowledged
+                        </Badge>
                       ) : (
                         <Badge variant="destructive" className="w-fit">
                           <AlertTriangle className="h-3 w-3 mr-1" />
