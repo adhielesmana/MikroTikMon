@@ -7,6 +7,7 @@ import {
   trafficData,
   alerts,
   notifications,
+  appSettings,
   type User,
   type UpsertUser,
   type Router,
@@ -18,6 +19,7 @@ import {
   type TrafficData,
   type Alert,
   type Notification,
+  type AppSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lt, sql } from "drizzle-orm";
@@ -433,6 +435,37 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ read: true })
       .where(eq(notifications.id, id));
+  }
+
+  // App Settings operations
+  async getAppSettings(): Promise<AppSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(appSettings)
+      .limit(1);
+    return settings;
+  }
+
+  async updateAppSettings(logoUrl: string | null): Promise<AppSettings> {
+    // Check if settings exist
+    const existing = await this.getAppSettings();
+    
+    if (existing) {
+      // Update existing
+      const [updated] = await db
+        .update(appSettings)
+        .set({ logoUrl, updatedAt: new Date() })
+        .where(eq(appSettings.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      // Create new
+      const [created] = await db
+        .insert(appSettings)
+        .values({ logoUrl })
+        .returning();
+      return created;
+    }
   }
 }
 
