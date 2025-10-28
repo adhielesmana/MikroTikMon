@@ -204,13 +204,6 @@ async function pollRouterTraffic() {
         // Update router connection status (only if reachable AND data retrieved successfully)
         await storage.updateRouterConnection(router.id, true);
 
-        // Check if hostname was extracted from SSL certificate (when connecting via IP)
-        const extractedHostname = client.getExtractedHostname();
-        if (extractedHostname && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
-          console.log(`[Scheduler] Updating router ${router.name} IP from ${router.ipAddress} to hostname ${extractedHostname}`);
-          await storage.updateRouterHostname(router.id, extractedHostname);
-        }
-
         // Store traffic data for ALL interfaces in memory for real-time display
         const timestamp = new Date();
         for (const stat of stats) {
