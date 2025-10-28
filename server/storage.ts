@@ -51,6 +51,7 @@ export interface IStorage {
   deleteRouter(id: string): Promise<void>;
   updateRouterConnection(id: string, connected: boolean): Promise<void>;
   updateRouterReachability(id: string, reachable: boolean): Promise<void>;
+  updateRouterHostname(id: string, hostname: string): Promise<void>;
   getRouterCredentials(id: string): Promise<{ username: string; password: string } | undefined>;
 
   // Router Groups operations
@@ -188,6 +189,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(routers.id, id));
   }
 
+  async updateRouterHostname(id: string, hostname: string): Promise<void> {
+    await db
+      .update(routers)
+      .set({ ipAddress: hostname })
+      .where(eq(routers.id, id));
+  }
+
   async getRouterCredentials(id: string): Promise<{ username: string; password: string } | undefined> {
     const [router] = await db.select().from(routers).where(eq(routers.id, id));
     if (!router) return undefined;
@@ -312,6 +320,16 @@ export class DatabaseStorage implements IStorage {
       .from(alerts)
       .where(eq(alerts.userId, userId))
       .orderBy(desc(alerts.createdAt));
+  }
+
+  async getLatestAlertForPort(portId: string): Promise<Alert | undefined> {
+    const [alert] = await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.portId, portId))
+      .orderBy(desc(alerts.createdAt))
+      .limit(1);
+    return alert;
   }
 
   async getAllAlerts(): Promise<Alert[]> {

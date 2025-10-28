@@ -80,6 +80,13 @@ async function pollRouterTraffic() {
         // Update router connection status
         await storage.updateRouterConnection(routerId, true);
 
+        // Check if hostname was extracted from SSL certificate (when connecting via IP)
+        const extractedHostname = client.getExtractedHostname();
+        if (extractedHostname && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
+          console.log(`[Scheduler] Updating router ${router.name} IP from ${router.ipAddress} to hostname ${extractedHostname}`);
+          await storage.updateRouterHostname(routerId, extractedHostname);
+        }
+
         // Process each monitored port
         for (const port of ports) {
           const stat = stats.find(s => s.name === port.portName);
@@ -99,7 +106,16 @@ async function pollRouterTraffic() {
           });
 
           // Check threshold and create alert if necessary
-          if (stat.totalBytesPerSecond < port.minThresholdBps) {
+          const isBelowThreshold = stat.totalBytesPerSecond < port.minThresholdBps;
+          
+          // Check if there's already a recent unacknowledged alert for this port
+          const latestAlert = await storage.getLatestAlertForPort(port.id);
+          const hasActiveAlert = latestAlert && !latestAlert.acknowledged;
+
+          // Only create a new alert if:
+          // 1. Traffic is below threshold AND there's no active alert (first breach)
+          // 2. Status changed (was OK, now breached - but this is covered by condition 1)
+          if (isBelowThreshold && !hasActiveAlert) {
             // Determine severity based on how far below threshold
             const percentBelow = ((port.minThresholdBps - stat.totalBytesPerSecond) / port.minThresholdBps) * 100;
             let severity = "warning";

@@ -396,6 +396,8 @@ export class MikrotikClient {
 
   // ============ REST API Methods (RouterOS v7.1+) ============
 
+  private extractedHostname: string | null = null;
+
   private async restRequest(endpoint: string, allowSelfSigned: boolean = true): Promise<any> {
     const restPort = this.connection.restPort || 443;
     const auth = Buffer.from(`${this.connection.user}:${this.connection.password}`).toString('base64');
@@ -418,6 +420,25 @@ export class MikrotikClient {
       };
 
       const req = https.request(options, (res) => {
+        // Extract hostname from SSL certificate if connecting via IP address
+        if (/^\d+\.\d+\.\d+\.\d+$/.test(this.connection.host)) {
+          try {
+            const socket = (req as any).socket;
+            if (socket && socket.getPeerCertificate) {
+              const cert = socket.getPeerCertificate();
+              if (cert && cert.subject && cert.subject.CN) {
+                const hostname = cert.subject.CN;
+                if (hostname && hostname !== this.connection.host) {
+                  console.log(`[REST API] Extracted hostname from certificate: ${hostname}`);
+                  this.extractedHostname = hostname;
+                }
+              }
+            }
+          } catch (error) {
+            // Silently ignore certificate extraction errors
+          }
+        }
+
         let data = '';
 
         res.on('data', (chunk) => {
@@ -449,6 +470,10 @@ export class MikrotikClient {
 
       req.end();
     });
+  }
+
+  getExtractedHostname(): string | null {
+    return this.extractedHostname;
   }
 
   async testRESTConnection(): Promise<boolean> {
