@@ -1,14 +1,31 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Eye, Pencil, RefreshCw, Trash2, MoreVertical } from "lucide-react";
 import type { Router, RouterGroup } from "@shared/schema";
-import { RouterCard } from "@/components/RouterCard";
 import { AddRouterDialog } from "@/components/AddRouterDialog";
 import { ManageGroupsDialog } from "@/components/ManageGroupsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatRelativeTime } from "@/lib/utils";
+import { Link } from "wouter";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -156,25 +173,100 @@ export default function Routers() {
         )}
       </div>
 
-      {/* Routers Grid */}
+      {/* Routers Table */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <Skeleton key={i} className="h-48" />
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map(i => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       ) : filteredRouters && filteredRouters.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredRouters.map(router => (
-            <RouterCard
-              key={router.id}
-              router={router}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onTest={handleTest}
-            />
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Router Name</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Reachable</TableHead>
+                    <TableHead>Last Seen</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRouters.map((router) => (
+                    <TableRow key={router.id} data-testid={`router-row-${router.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-router-name-${router.id}`}>
+                        {router.name}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-router-ip-${router.id}`}>
+                        {router.ipAddress}:{router.port}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={router.connected ? "default" : "secondary"}
+                          data-testid={`badge-router-status-${router.id}`}
+                        >
+                          {router.connected ? "Connected" : "Disconnected"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={router.reachable ? "default" : "destructive"}
+                          data-testid={`badge-router-reachable-${router.id}`}
+                        >
+                          {router.reachable ? "Yes" : "No"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm" data-testid={`text-router-last-seen-${router.id}`}>
+                        {router.lastConnected ? formatRelativeTime(router.lastConnected) : "Never"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" data-testid={`button-router-menu-${router.id}`}>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild data-testid={`menu-view-${router.id}`}>
+                              <Link href={`/routers/${router.id}`}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(router)} data-testid={`menu-edit-${router.id}`}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleTest(router)} data-testid={`menu-test-${router.id}`}>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Test Connection
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(router)}
+                              className="text-destructive"
+                              data-testid={`menu-delete-${router.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <div className="text-center py-16">
           <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
