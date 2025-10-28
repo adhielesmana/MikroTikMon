@@ -436,31 +436,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Parse time range
-      const timeRange = req.query.timeRange || "1h";
+      // Support custom date range via startDate query parameter
       let since = new Date();
       
-      switch (timeRange) {
-        case "15m":
-          since = new Date(Date.now() - 15 * 60 * 1000);
-          break;
-        case "1h":
-          since = new Date(Date.now() - 60 * 60 * 1000);
-          break;
-        case "6h":
-          since = new Date(Date.now() - 6 * 60 * 60 * 1000);
-          break;
-        case "24h":
-          since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          break;
-        case "7d":
-          since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case "30d":
-          since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-          break;
-        default:
-          since = new Date(Date.now() - 60 * 60 * 1000);
+      if (req.query.startDate) {
+        // Custom date range
+        since = new Date(req.query.startDate as string);
+      } else {
+        // Parse predefined time range
+        const timeRange = req.query.timeRange || "1h";
+        
+        switch (timeRange) {
+          case "15m":
+            since = new Date(Date.now() - 15 * 60 * 1000);
+            break;
+          case "1h":
+            since = new Date(Date.now() - 60 * 60 * 1000);
+            break;
+          case "12h":
+            since = new Date(Date.now() - 12 * 60 * 60 * 1000);
+            break;
+          case "6h":
+            since = new Date(Date.now() - 6 * 60 * 60 * 1000);
+            break;
+          case "1d":
+          case "24h":
+            since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            break;
+          case "7d":
+            since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            break;
+          case "30d":
+            since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            break;
+          default:
+            since = new Date(Date.now() - 60 * 60 * 1000);
+        }
       }
       
       const trafficData = await storage.getRecentTraffic(req.params.id, since);
