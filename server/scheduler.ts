@@ -171,30 +171,17 @@ async function pollRouterTraffic() {
       }
     }
 
-    // Get all enabled monitored ports with their routers
-    const monitoredPorts = await storage.getAllEnabledPorts();
-
-    // Group ports by router to minimize connections
-    const portsByRouter = new Map<string, typeof monitoredPorts>();
-    for (const port of monitoredPorts) {
-      const existing = portsByRouter.get(port.router.id) || [];
-      existing.push(port);
-      portsByRouter.set(port.router.id, existing);
-    }
-
-    for (const [routerId, ports] of Array.from(portsByRouter)) {
-      const router = ports[0].router;
+    // Collect traffic data for ALL reachable routers (so interface list is populated)
+    for (const router of allRouters) {
+      // Skip if not reachable
+      if (!reachableRouterIds.has(router.id)) {
+        continue;
+      }
 
       try {
-        // Skip traffic collection if router is not reachable
-        if (!reachableRouterIds.has(routerId)) {
-          continue;
-        }
-
         // Get router credentials
-        const credentials = await storage.getRouterCredentials(routerId);
+        const credentials = await storage.getRouterCredentials(router.id);
         if (!credentials) {
-          console.error(`[Scheduler] No credentials for router ${routerId}`);
           continue;
         }
 
@@ -215,19 +202,19 @@ async function pollRouterTraffic() {
         const stats = await client.getInterfaceStats();
 
         // Update router connection status (only if reachable AND data retrieved successfully)
-        await storage.updateRouterConnection(routerId, true);
+        await storage.updateRouterConnection(router.id, true);
 
         // Check if hostname was extracted from SSL certificate (when connecting via IP)
         const extractedHostname = client.getExtractedHostname();
         if (extractedHostname && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
           console.log(`[Scheduler] Updating router ${router.name} IP from ${router.ipAddress} to hostname ${extractedHostname}`);
-          await storage.updateRouterHostname(routerId, extractedHostname);
+          await storage.updateRouterHostname(router.id, extractedHostname);
         }
 
         // Store traffic data for ALL interfaces in memory for real-time display
         const timestamp = new Date();
         for (const stat of stats) {
-          addRealtimeTraffic(routerId, {
+          addRealtimeTraffic(router.id, {
             portName: stat.name,
             timestamp,
             rxBytesPerSecond: stat.rxBytesPerSecond,
@@ -235,58 +222,53 @@ async function pollRouterTraffic() {
             totalBytesPerSecond: stat.totalBytesPerSecond,
           });
         }
+      } catch (error: any) {
+        console.error(`[Scheduler] Failed to collect traffic for router ${router.name}: ${error.message}`);
+        // Update router connection status
+        await storage.updateRouterConnection(router.id, false);
+      }
+    }
 
-        // Only store traffic data for monitored ports (alert checking done separately)
+    // Get all enabled monitored ports with their routers for database persistence
+    const monitoredPorts = await storage.getAllEnabledPorts();
+
+    // Group ports by router
+    const portsByRouter = new Map<string, typeof monitoredPorts>();
+    for (const port of monitoredPorts) {
+      const existing = portsByRouter.get(port.router.id) || [];
+      existing.push(port);
+      portsByRouter.set(port.router.id, existing);
+    }
+
+    // Store traffic data to database for monitored ports only
+    for (const [routerId, ports] of Array.from(portsByRouter)) {
+      try {
+        // Get the latest realtime data for this router
+        const realtimeData = getRealtimeTraffic(routerId);
+        
+        // Store to database for each monitored port
         for (const port of ports) {
-          const stat = stats.find(s => s.name === port.portName);
-          if (!stat) {
-            console.warn(`[Scheduler] Port ${port.portName} not found in router stats`);
+          const portData = realtimeData.filter(d => d.portName === port.portName);
+          if (portData.length === 0) {
+            console.warn(`[Scheduler] Port ${port.portName} not found in realtime data for router ${routerId}`);
             continue;
           }
-
-          // Store traffic data (only for ports that are up)
-          if (stat.running) {
-            await storage.insertTrafficData({
-              routerId: port.routerId,
-              portId: port.id,
-              portName: port.portName,
-              rxBytesPerSecond: stat.rxBytesPerSecond,
-              txBytesPerSecond: stat.txBytesPerSecond,
-              totalBytesPerSecond: stat.totalBytesPerSecond,
-            });
-          }
+          
+          // Get the most recent data point
+          const latestData = portData[portData.length - 1];
+          
+          // Store traffic data to database
+          await storage.insertTrafficData({
+            routerId: port.routerId,
+            portId: port.id,
+            portName: port.portName,
+            rxBytesPerSecond: latestData.rxBytesPerSecond,
+            txBytesPerSecond: latestData.txBytesPerSecond,
+            totalBytesPerSecond: latestData.totalBytesPerSecond,
+          });
         }
       } catch (error: any) {
-        console.error(`Failed to get interface stats via native API: ${error.constructor.name}`);
-        console.error(error);
-
-        // Update router connection status
-        await storage.updateRouterConnection(routerId, false);
-        
-        // Try to check reachability even on error
-        try {
-          const credentials = await storage.getRouterCredentials(routerId);
-          if (credentials) {
-            const client = new MikrotikClient({
-              host: router.ipAddress,
-              port: router.port,
-              user: credentials.username,
-              password: credentials.password,
-              restEnabled: router.restEnabled || false,
-              restPort: router.restPort || 443,
-              snmpEnabled: router.snmpEnabled || false,
-              snmpCommunity: router.snmpCommunity || "public",
-              snmpVersion: router.snmpVersion || "2c",
-              snmpPort: router.snmpPort || 161,
-            });
-            const isReachable = await client.checkReachability();
-            console.log(`[Scheduler] Reachability result for ${router.name} (after error): ${isReachable}`);
-            await storage.updateRouterReachability(routerId, isReachable);
-          }
-        } catch (reachError) {
-          console.log(`[Scheduler] Reachability check failed for ${router.name}, marking as unreachable`);
-          await storage.updateRouterReachability(routerId, false);
-        }
+        console.error(`[Scheduler] Failed to store traffic data for router ${routerId}: ${error.message}`);
       }
     }
   } catch (error) {
