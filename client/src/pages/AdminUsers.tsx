@@ -1,9 +1,9 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Users, UserCheck, UserX, Loader2 } from "lucide-react";
+import { Users, UserCheck, UserX, Loader2, Trash2 } from "lucide-react";
 import type { User } from "@shared/schema";
 import { formatDate } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +22,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function AdminUsers() {
   const { toast } = useToast();
@@ -95,79 +103,87 @@ export default function AdminUsers() {
   const activeUsers = users?.filter(u => u.enabled) || [];
   const pendingUsers = users?.filter(u => !u.enabled) || [];
 
-  const UserCard = ({ user }: { user: User }) => (
-    <Card data-testid={`user-card-${user.id}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10 shrink-0">
+  const UserTableRow = ({ user }: { user: User }) => (
+    <TableRow data-testid={`user-row-${user.id}`}>
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <Avatar className="h-9 w-9 shrink-0">
             <AvatarImage src={user.profileImageUrl || undefined} alt={user.firstName || "User"} />
             <AvatarFallback>
               {user.firstName?.[0]}{user.lastName?.[0]}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-base truncate" data-testid={`text-user-name-${user.id}`}>
-                  {user.firstName} {user.lastName}
-                </CardTitle>
-                <p className="text-xs text-muted-foreground truncate" data-testid={`text-user-email-${user.id}`}>
-                  {user.email}
-                </p>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                  {user.role}
-                </Badge>
-                <Badge variant={user.enabled ? "default" : "secondary"}>
-                  {user.enabled ? "Enabled" : "Disabled"}
-                </Badge>
-              </div>
+          <div className="min-w-0">
+            <div className="font-medium truncate" data-testid={`text-user-name-${user.id}`}>
+              {user.firstName} {user.lastName}
+            </div>
+            <div className="text-xs text-muted-foreground truncate" data-testid={`text-user-email-${user.id}`}>
+              {user.email}
             </div>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="text-muted-foreground">Joined</span>
-          <span className="font-mono">{formatDate(user.createdAt!)}</span>
+      </TableCell>
+      <TableCell>
+        <Badge variant={user.role === "admin" ? "default" : "secondary"} data-testid={`badge-user-role-${user.id}`}>
+          {user.role}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <Switch
+          checked={user.enabled}
+          onCheckedChange={(checked) => toggleMutation.mutate({ userId: user.id, enabled: checked })}
+          disabled={toggleMutation.isPending}
+          data-testid={`switch-user-enabled-${user.id}`}
+        />
+      </TableCell>
+      <TableCell className="text-sm font-mono" data-testid={`text-user-joined-${user.id}`}>
+        {formatDate(user.createdAt!)}
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => changeRoleMutation.mutate({
+              userId: user.id,
+              role: user.role === "admin" ? "user" : "admin"
+            })}
+            disabled={changeRoleMutation.isPending}
+            data-testid={`button-toggle-role-${user.id}`}
+          >
+            {user.role === "admin" ? "Make User" : "Make Admin"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setDeletingUser(user)}
+            data-testid={`button-delete-user-${user.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
+      </TableCell>
+    </TableRow>
+  );
 
-        <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
-          <div className="flex items-center gap-2 flex-1">
-            <span className="text-xs text-muted-foreground">Status:</span>
-            <Switch
-              checked={user.enabled}
-              onCheckedChange={(checked) => toggleMutation.mutate({ userId: user.id, enabled: checked })}
-              disabled={toggleMutation.isPending}
-              data-testid={`switch-user-enabled-${user.id}`}
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => changeRoleMutation.mutate({
-                userId: user.id,
-                role: user.role === "admin" ? "user" : "admin"
-              })}
-              disabled={changeRoleMutation.isPending}
-              data-testid={`button-toggle-role-${user.id}`}
-            >
-              {user.role === "admin" ? "Make User" : "Make Admin"}
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => setDeletingUser(user)}
-              data-testid={`button-delete-user-${user.id}`}
-            >
-              Delete
-            </Button>
-          </div>
-        </div>
-      </CardContent>
+  const UsersTable = ({ userList }: { userList: User[] }) => (
+    <Card>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>User</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Joined</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {userList.map(user => (
+            <UserTableRow key={user.id} user={user} />
+          ))}
+        </TableBody>
+      </Table>
     </Card>
   );
 
@@ -253,19 +269,17 @@ export default function AdminUsers() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
+        <TabsContent value="all" className="space-y-4" data-testid="tab-content-all">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2, 3, 4].map(i => (
-                <Skeleton key={i} className="h-48" />
-              ))}
-            </div>
+            <Card>
+              <div className="p-8">
+                {[1, 2, 3, 4].map(i => (
+                  <Skeleton key={i} className="h-16 mb-2" />
+                ))}
+              </div>
+            </Card>
           ) : users && users.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {users.map(user => (
-                <UserCard key={user.id} user={user} />
-              ))}
-            </div>
+            <UsersTable userList={users} />
           ) : (
             <Card>
               <CardContent className="py-16 text-center">
@@ -276,19 +290,17 @@ export default function AdminUsers() {
           )}
         </TabsContent>
 
-        <TabsContent value="active" className="space-y-4">
+        <TabsContent value="active" className="space-y-4" data-testid="tab-content-active">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2, 3, 4].map(i => (
-                <Skeleton key={i} className="h-48" />
-              ))}
-            </div>
+            <Card>
+              <div className="p-8">
+                {[1, 2, 3, 4].map(i => (
+                  <Skeleton key={i} className="h-16 mb-2" />
+                ))}
+              </div>
+            </Card>
           ) : activeUsers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeUsers.map(user => (
-                <UserCard key={user.id} user={user} />
-              ))}
-            </div>
+            <UsersTable userList={activeUsers} />
           ) : (
             <Card>
               <CardContent className="py-16 text-center">
@@ -299,19 +311,17 @@ export default function AdminUsers() {
           )}
         </TabsContent>
 
-        <TabsContent value="pending" className="space-y-4">
+        <TabsContent value="pending" className="space-y-4" data-testid="tab-content-pending">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2].map(i => (
-                <Skeleton key={i} className="h-48" />
-              ))}
-            </div>
+            <Card>
+              <div className="p-8">
+                {[1, 2].map(i => (
+                  <Skeleton key={i} className="h-16 mb-2" />
+                ))}
+              </div>
+            </Card>
           ) : pendingUsers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pendingUsers.map(user => (
-                <UserCard key={user.id} user={user} />
-              ))}
-            </div>
+            <UsersTable userList={pendingUsers} />
           ) : (
             <Card>
               <CardContent className="py-16 text-center">
