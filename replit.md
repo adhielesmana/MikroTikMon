@@ -3,6 +3,10 @@
 ## Overview
 A comprehensive, enterprise-grade network monitoring platform for MikroTik routers. It offers real-time traffic analysis, intelligent threshold-based alerting, and multi-user role-based access control. The platform is designed for professional network administrators, providing a production-ready solution for efficient network oversight. The project aims to provide a robust, scalable, and user-friendly system for monitoring MikroTik router performance and health.
 
+## Recent Changes (Oct 28, 2025)
+-   **Custom Logo Support:** Administrators can now upload a custom logo via URL in Settings, which replaces "MikroTik Monitor" text in the sidebar. Fallback to text if logo fails to load.
+-   **Dynamic Interface Filtering:** Added per-router toggle to include/exclude dynamic interfaces (PPPoE, L2TP). Default is static interfaces only (Ethernet, VLAN, Bridge, VRRP, VLAN, Bonding). Filtering applied at MikrotikClient level across all three connection methods (Native API, REST API, SNMP).
+
 ## User Preferences
 - Professional, data-dense monitoring interface
 - Mobile and desktop accessibility required
