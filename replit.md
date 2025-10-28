@@ -23,7 +23,10 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 **Backend:** Express.js with TypeScript, PostgreSQL (Neon serverless) with Drizzle ORM, Replit Auth (OpenID Connect) for authentication, MikroTik RouterOS API client, Node-cron for scheduled traffic polling, Nodemailer for email notifications, WebSocket server.
 
 ### Database Schema
-**Core Tables:** `users` (with roles), `router_groups`, `routers` (with encrypted credentials), `monitored_ports` (with thresholds), `traffic_data` (time-series), `alerts`, `notifications`, `sessions`.
+**Core Tables:** `users` (with roles), `router_groups`, `routers` (with encrypted credentials), `monitored_ports` (with thresholds), `traffic_data` (time-series), `alerts` (with acknowledged status), `notifications`, `sessions`.
+
+**Key Storage Methods:**
+- `getLatestUnacknowledgedAlertForPort`: Returns only unacknowledged alerts for proper alert independence and auto-acknowledgment logic.
 
 ### Key Features
 -   **User Management:** Multi-user authentication (Replit Auth), Administrator/Normal User roles, admin approval for new users.
@@ -33,7 +36,12 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
     -   **Automatic Hostname Extraction:** For REST API connections via IP, extracts hostname from SSL certificates for improved reliability.
     -   **Network Reachability Status:** Basic TCP connectivity check to distinguish network issues from configuration problems, displayed in the UI.
 -   **Traffic Monitoring:** Real-time traffic graphs (Recharts) with multiple time ranges, per-port visualization, and historical data tracking.
--   **Alert System:** Configurable thresholds per port, dual notification (Email + In-App Popup), alert severity levels, acknowledgment workflow, and history tracking. Includes **Alert De-duplication** to prevent spamming by only generating new alerts when status changes.
+-   **Alert System:** Configurable thresholds per port, dual notification (Email + In-App Popup), alert severity levels, acknowledgment workflow, and history tracking.
+    -   **Alert De-duplication:** Prevents spamming by only generating new alerts when status changes (port down vs traffic threshold).
+    -   **Auto-Acknowledgment:** Automatically acknowledges alerts when conditions return to normal (traffic above threshold or port comes back up).
+    -   **Port Status Monitoring:** Independent port down/up detection with critical severity alerts, separate from traffic threshold monitoring.
+    -   **Dashboard Alert Filtering:** Recent alerts section shows only unacknowledged/active alerts requiring attention.
+    -   **Table-Based Alert History:** Professional table layout for viewing and managing all alert history with sorting and filtering capabilities.
 -   **Responsive Design:** Mobile-first approach with collapsible sidebar, touch-friendly interactions, auto-sizing components, and dark mode support.
 -   **Security Features:** Encrypted router credentials (crypto-js AES), role-based access control, user approval workflow, session-based authentication, user-scoped WebSocket notifications, and proper authorization checks.
 -   **Performance:** Background scheduler (30-second polling), indexed traffic data, efficient Drizzle ORM queries, real-time WebSocket updates, and responsive UI.
