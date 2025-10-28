@@ -21,6 +21,7 @@ export interface InterfaceStats {
   rxBytesPerSecond: number;
   txBytesPerSecond: number;
   totalBytesPerSecond: number;
+  running: boolean; // Port operational status (up/down)
 }
 
 export interface RouterInfo {
@@ -249,6 +250,7 @@ export class MikrotikClient {
         rxBytesPerSecond,
         txBytesPerSecond,
         totalBytesPerSecond: rxBytesPerSecond + txBytesPerSecond,
+        running: data.running ?? true, // Default to true if not available
       });
     }
 
@@ -570,6 +572,7 @@ export class MikrotikClient {
           rxBytesPerSecond: rxRate,
           txBytesPerSecond: txRate,
           totalBytesPerSecond: rxRate + txRate,
+          running: iface.running === "true" || iface.running === true || iface.disabled === "false" || iface.disabled === false, // Port status from REST API
         });
         
         // Update cache for next poll
@@ -653,6 +656,7 @@ export class MikrotikClient {
             rxBytesPerSecond: rxRate,
             txBytesPerSecond: txRate,
             totalBytesPerSecond: rxRate + txRate,
+            running: stat.running === "true" || stat.running === true, // Port status
           });
         }
       }

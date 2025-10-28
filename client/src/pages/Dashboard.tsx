@@ -201,9 +201,9 @@ export default function Dashboard() {
                   <Skeleton key={i} className="h-16" />
                 ))}
               </div>
-            ) : alerts && alerts.length > 0 ? (
+            ) : alerts && alerts.filter(a => !a.acknowledged).length > 0 ? (
               <div className="space-y-3">
-                {alerts.slice(0, 5).map((alert) => (
+                {alerts.filter(a => !a.acknowledged).slice(0, 5).map((alert) => (
                   <div
                     key={alert.id}
                     className="p-3 rounded-md border border-border/50 hover-elevate"

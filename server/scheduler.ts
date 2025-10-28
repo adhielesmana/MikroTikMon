@@ -95,7 +95,65 @@ async function pollRouterTraffic() {
             continue;
           }
 
-          // Store traffic data
+          // Check if there's already a recent unacknowledged alert for this port
+          let latestAlert = await storage.getLatestUnacknowledgedAlertForPort(port.id);
+          let hasActiveAlert = !!latestAlert;
+          let isPortDownAlert = latestAlert && latestAlert.message.includes("is DOWN");
+          let isTrafficAlert = latestAlert && !latestAlert.message.includes("is DOWN");
+
+          // Check port status (down/up)
+          if (!stat.running) {
+            // Port is DOWN - create port down alert (skip traffic threshold check)
+            // Only skip if there's already an active PORT DOWN alert (not traffic alert)
+            if (!hasActiveAlert || !isPortDownAlert) {
+              const alert = await storage.createAlert({
+                routerId: port.routerId,
+                portId: port.id,
+                portName: port.portName,
+                userId: router.userId,
+                severity: "critical",
+                message: `Port ${port.portName} is DOWN`,
+                currentTrafficBps: 0,
+                thresholdBps: port.minThresholdBps,
+              });
+
+              // Create notification
+              const notification = await storage.createNotification({
+                userId: router.userId,
+                alertId: alert.id,
+                type: "popup",
+                title: `Port Down: ${router.name}`,
+                message: alert.message,
+              });
+
+              // Broadcast real-time notification via WebSocket
+              broadcastNotification(router.userId, {
+                id: notification.id,
+                title: notification.title,
+                message: notification.message,
+                severity: alert.severity,
+                routerName: router.name,
+                portName: port.portName,
+              });
+
+              console.log(`[Scheduler] Port down alert created for ${router.name} - ${port.portName}`);
+            }
+            continue; // Skip traffic threshold check for down ports
+          }
+
+          // Port is UP - auto-acknowledge port down alert if exists
+          if (hasActiveAlert && isPortDownAlert) {
+            await storage.acknowledgeAlert(latestAlert!.id);
+            console.log(`[Scheduler] Auto-acknowledged port down alert for ${router.name} - ${port.portName} (port came back up)`);
+            
+            // Re-fetch latest unacknowledged alert to check if there's now a different active alert (e.g., traffic alert)
+            latestAlert = await storage.getLatestUnacknowledgedAlertForPort(port.id);
+            hasActiveAlert = !!latestAlert;
+            isPortDownAlert = latestAlert && latestAlert.message.includes("is DOWN");
+            isTrafficAlert = latestAlert && !latestAlert.message.includes("is DOWN");
+          }
+
+          // Store traffic data (only for ports that are up)
           await storage.insertTrafficData({
             routerId: port.routerId,
             portId: port.id,
@@ -105,17 +163,19 @@ async function pollRouterTraffic() {
             totalBytesPerSecond: stat.totalBytesPerSecond,
           });
 
-          // Check threshold and create alert if necessary
+          // Check traffic threshold and create alert if necessary
           const isBelowThreshold = stat.totalBytesPerSecond < port.minThresholdBps;
-          
-          // Check if there's already a recent unacknowledged alert for this port
-          const latestAlert = await storage.getLatestAlertForPort(port.id);
-          const hasActiveAlert = latestAlert && !latestAlert.acknowledged;
 
-          // Only create a new alert if:
-          // 1. Traffic is below threshold AND there's no active alert (first breach)
-          // 2. Status changed (was OK, now breached - but this is covered by condition 1)
-          if (isBelowThreshold && !hasActiveAlert) {
+          // Auto-acknowledge traffic alert if traffic returned to normal
+          if (!isBelowThreshold && hasActiveAlert && isTrafficAlert) {
+            await storage.acknowledgeAlert(latestAlert!.id);
+            console.log(`[Scheduler] Auto-acknowledged alert for ${router.name} - ${port.portName} (traffic returned to normal)`);
+          }
+
+          // Only create a new traffic alert if:
+          // 1. Traffic is below threshold AND there's no active TRAFFIC alert (first breach)
+          // 2. Port down alerts don't prevent traffic alerts (they're separate)
+          if (isBelowThreshold && (!hasActiveAlert || isPortDownAlert)) {
             // Determine severity based on how far below threshold
             const percentBelow = ((port.minThresholdBps - stat.totalBytesPerSecond) / port.minThresholdBps) * 100;
             let severity = "warning";

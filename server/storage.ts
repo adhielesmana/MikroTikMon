@@ -77,6 +77,8 @@ export interface IStorage {
   // Alert operations
   getAlerts(userId: string): Promise<Alert[]>;
   getAllAlerts(): Promise<Alert[]>;
+  getLatestAlertForPort(portId: string): Promise<Alert | undefined>;
+  getLatestUnacknowledgedAlertForPort(portId: string): Promise<Alert | undefined>;
   createAlert(alert: Omit<Alert, "id" | "createdAt" | "acknowledged" | "acknowledgedAt">): Promise<Alert>;
   acknowledgeAlert(id: string): Promise<void>;
 
@@ -327,6 +329,16 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(alerts)
       .where(eq(alerts.portId, portId))
+      .orderBy(desc(alerts.createdAt))
+      .limit(1);
+    return alert;
+  }
+
+  async getLatestUnacknowledgedAlertForPort(portId: string): Promise<Alert | undefined> {
+    const [alert] = await db
+      .select()
+      .from(alerts)
+      .where(and(eq(alerts.portId, portId), eq(alerts.acknowledged, false)))
       .orderBy(desc(alerts.createdAt))
       .limit(1);
     return alert;

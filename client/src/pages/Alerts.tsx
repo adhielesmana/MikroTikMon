@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
@@ -9,6 +9,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function Alerts() {
   const { toast } = useToast();
@@ -39,94 +47,110 @@ export default function Alerts() {
   const activeAlerts = alerts?.filter(a => !a.acknowledged) || [];
   const acknowledgedAlerts = alerts?.filter(a => a.acknowledged) || [];
 
-  const AlertCard = ({ alert }: { alert: Alert }) => {
-    const severityConfig = {
-      critical: {
-        icon: AlertTriangle,
-        color: "text-destructive",
-        bgColor: "bg-destructive/10",
-        badge: "destructive" as const,
-      },
-      warning: {
-        icon: AlertTriangle,
-        color: "text-yellow-500",
-        bgColor: "bg-yellow-500/10",
-        badge: "secondary" as const,
-      },
-      info: {
-        icon: Clock,
-        color: "text-blue-500",
-        bgColor: "bg-blue-500/10",
-        badge: "secondary" as const,
-      },
+  const getSeverityBadge = (severity: string) => {
+    const config = {
+      critical: { variant: "destructive" as const, color: "text-destructive" },
+      warning: { variant: "secondary" as const, color: "text-yellow-500" },
+      info: { variant: "secondary" as const, color: "text-blue-500" },
     };
-
-    const config = severityConfig[alert.severity as keyof typeof severityConfig] || severityConfig.info;
-    const Icon = config.icon;
-
-    return (
-      <Card data-testid={`alert-card-${alert.id}`}>
-        <CardHeader className="pb-3">
-          <div className="flex items-start gap-3">
-            <div className={`h-10 w-10 rounded-md ${config.bgColor} flex items-center justify-center shrink-0`}>
-              <Icon className={`h-5 w-5 ${config.color}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <CardTitle className="text-base" data-testid={`text-alert-port-${alert.id}`}>
-                  {alert.portName}
-                </CardTitle>
-                <Badge variant={config.badge} className="shrink-0">
-                  {alert.severity}
-                </Badge>
-              </div>
-              <CardDescription className="text-xs">
-                {formatRelativeTime(alert.createdAt!)}
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm" data-testid={`text-alert-message-${alert.id}`}>{alert.message}</p>
-          
-          <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Current Traffic</p>
-              <p className="text-sm font-mono font-semibold" data-testid={`text-alert-current-${alert.id}`}>
-                {formatBytesPerSecond(alert.currentTrafficBps)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Threshold</p>
-              <p className="text-sm font-mono font-semibold">
-                {formatBytesPerSecond(alert.thresholdBps)}
-              </p>
-            </div>
-          </div>
-
-          {!alert.acknowledged && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full mt-2"
-              onClick={() => acknowledgeMutation.mutate(alert.id)}
-              disabled={acknowledgeMutation.isPending}
-              data-testid={`button-acknowledge-${alert.id}`}
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Acknowledge
-            </Button>
-          )}
-
-          {alert.acknowledged && alert.acknowledgedAt && (
-            <p className="text-xs text-muted-foreground pt-2 border-t">
-              Acknowledged {formatRelativeTime(alert.acknowledgedAt)}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-    );
+    return config[severity as keyof typeof config] || config.info;
   };
+
+  const AlertTable = ({ alertsList }: { alertsList: Alert[] }) => (
+    <Card>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Port</TableHead>
+                <TableHead>Severity</TableHead>
+                <TableHead>Message</TableHead>
+                <TableHead>Current Traffic</TableHead>
+                <TableHead>Threshold</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {alertsList.map((alert) => {
+                const severityConfig = getSeverityBadge(alert.severity);
+                return (
+                  <TableRow key={alert.id} data-testid={`alert-row-${alert.id}`}>
+                    <TableCell className="font-medium" data-testid={`text-alert-port-${alert.id}`}>
+                      {alert.portName}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={severityConfig.variant}>
+                        {alert.severity}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-md" data-testid={`text-alert-message-${alert.id}`}>
+                      <p className="text-sm truncate">{alert.message}</p>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm" data-testid={`text-alert-current-${alert.id}`}>
+                      {formatBytesPerSecond(alert.currentTrafficBps)}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {formatBytesPerSecond(alert.thresholdBps)}
+                    </TableCell>
+                    <TableCell>
+                      {alert.acknowledged ? (
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="outline" className="w-fit">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Acknowledged
+                          </Badge>
+                          {alert.acknowledgedAt && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatRelativeTime(alert.acknowledgedAt)}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <Badge variant="destructive" className="w-fit">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatRelativeTime(alert.createdAt!)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {!alert.acknowledged && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => acknowledgeMutation.mutate(alert.id)}
+                          disabled={acknowledgeMutation.isPending}
+                          data-testid={`button-acknowledge-${alert.id}`}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Acknowledge
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const EmptyState = ({ icon: Icon, title, description }: { icon: any, title: string, description: string }) => (
+    <Card>
+      <CardContent className="py-16 text-center">
+        <Icon className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">{title}</p>
+        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6">
@@ -159,82 +183,67 @@ export default function Alerts() {
 
         <TabsContent value="active" className="space-y-4">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2, 3, 4].map(i => (
-                <Skeleton key={i} className="h-64" />
-              ))}
-            </div>
-          ) : activeAlerts.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeAlerts.map(alert => (
-                <AlertCard key={alert.id} alert={alert} />
-              ))}
-            </div>
-          ) : (
             <Card>
-              <CardContent className="py-16 text-center">
-                <CheckCircle2 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">
-                  No active alerts
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  All monitored ports are above their thresholds
-                </p>
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map(i => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
               </CardContent>
             </Card>
+          ) : activeAlerts.length > 0 ? (
+            <AlertTable alertsList={activeAlerts} />
+          ) : (
+            <EmptyState
+              icon={CheckCircle2}
+              title="No active alerts"
+              description="All monitored ports are above their thresholds"
+            />
           )}
         </TabsContent>
 
         <TabsContent value="acknowledged" className="space-y-4">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2, 3, 4].map(i => (
-                <Skeleton key={i} className="h-64" />
-              ))}
-            </div>
-          ) : acknowledgedAlerts.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {acknowledgedAlerts.map(alert => (
-                <AlertCard key={alert.id} alert={alert} />
-              ))}
-            </div>
-          ) : (
             <Card>
-              <CardContent className="py-16 text-center">
-                <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">
-                  No acknowledged alerts
-                </p>
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map(i => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
               </CardContent>
             </Card>
+          ) : acknowledgedAlerts.length > 0 ? (
+            <AlertTable alertsList={acknowledgedAlerts} />
+          ) : (
+            <EmptyState
+              icon={Clock}
+              title="No acknowledged alerts"
+              description="Acknowledged alerts will appear here"
+            />
           )}
         </TabsContent>
 
         <TabsContent value="all" className="space-y-4">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <Skeleton key={i} className="h-64" />
-              ))}
-            </div>
-          ) : alerts && alerts.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {alerts.map(alert => (
-                <AlertCard key={alert.id} alert={alert} />
-              ))}
-            </div>
-          ) : (
             <Card>
-              <CardContent className="py-16 text-center">
-                <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">
-                  No alerts have been triggered yet
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Alerts will appear here when traffic drops below configured thresholds
-                </p>
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
               </CardContent>
             </Card>
+          ) : alerts && alerts.length > 0 ? (
+            <AlertTable alertsList={alerts} />
+          ) : (
+            <EmptyState
+              icon={AlertTriangle}
+              title="No alerts have been triggered yet"
+              description="Alerts will appear here when traffic drops below configured thresholds or ports go down"
+            />
           )}
         </TabsContent>
       </Tabs>
