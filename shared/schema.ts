@@ -77,6 +77,8 @@ export const routers = pgTable("routers", {
   snmpCommunity: varchar("snmp_community", { length: 255 }).default("public"),
   snmpVersion: varchar("snmp_version", { length: 10 }).default("2c"), // "1", "2c", or "3"
   snmpPort: integer("snmp_port").notNull().default(161),
+  // Interface filtering - include dynamic interfaces (pppoe, l2tp) or only static (ethernet, vlan)
+  includeDynamicInterfaces: boolean("include_dynamic_interfaces").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -129,6 +131,7 @@ export const insertRouterSchema = z.object({
   snmpCommunity: z.string().default("public"),
   snmpVersion: z.enum(["1", "2c"]).default("2c"), // Only v1 and v2c supported (v3 requires additional auth params)
   snmpPort: z.number().min(1).max(65535).default(161),
+  includeDynamicInterfaces: z.boolean().default(false),
 });
 
 export type InsertRouter = z.infer<typeof insertRouterSchema>;
@@ -258,3 +261,20 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
 }));
 
 export type Notification = typeof notifications.$inferSelect;
+
+// App Settings table - Global application settings
+export const appSettings = pgTable("app_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  logoUrl: text("logo_url"), // Can be a file upload URL or external URL
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAppSettingsSchema = createInsertSchema(appSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAppSettings = z.infer<typeof insertAppSettingsSchema>;
+export type AppSettings = typeof appSettings.$inferSelect;
