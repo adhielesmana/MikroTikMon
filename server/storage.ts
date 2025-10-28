@@ -391,6 +391,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async acknowledgeAlert(id: string): Promise<void> {
+    // First get the alert to find its portId
+    const [alert] = await db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.id, id))
+      .limit(1);
+    
+    // Update the alert
     await db
       .update(alerts)
       .set({
@@ -398,6 +406,12 @@ export class DatabaseStorage implements IStorage {
         acknowledgedAt: new Date(),
       })
       .where(eq(alerts.id, id));
+    
+    // Reset violation counters for this port to enforce 3-check confirmation on future alerts
+    if (alert && alert.portId) {
+      const { resetAlertViolationCounters } = await import("./scheduler");
+      resetAlertViolationCounters(alert.portId);
+    }
   }
 
   // Notification operations

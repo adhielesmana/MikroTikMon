@@ -62,6 +62,30 @@ function getViolationCount(portId: string): number {
   return consecutiveViolations.get(portId)?.count || 0;
 }
 
+// Export function to reset violation counters when alerts are acknowledged
+export function resetAlertViolationCounters(portId: string): void {
+  resetViolationCount(`port_down_${portId}`);
+  resetViolationCount(`traffic_${portId}`);
+  console.log(`[Scheduler] Reset violation counters for port ${portId}`);
+}
+
+// Cleanup stale violation counters (older than 10 minutes)
+function cleanupStaleViolationCounters(): void {
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+  let cleaned = 0;
+  
+  for (const [portId, data] of Array.from(consecutiveViolations.entries())) {
+    if (data.lastCheck < tenMinutesAgo) {
+      consecutiveViolations.delete(portId);
+      cleaned++;
+    }
+  }
+  
+  if (cleaned > 0) {
+    console.log(`[Scheduler] Cleaned up ${cleaned} stale violation counters`);
+  }
+}
+
 export function getRealtimeTraffic(routerId: string, since?: Date): RealtimeTrafficData[] {
   const routerData = realtimeTrafficStore.get(routerId);
   if (!routerData) return [];
@@ -334,6 +358,7 @@ async function checkAlerts() {
           // Auto-acknowledge port down alert if exists
           if (hasActiveAlert && isPortDownAlert) {
             await storage.acknowledgeAlert(latestAlert!.id);
+            resetViolationCount(`port_down_${port.id}`); // Reset counter on auto-acknowledge
             console.log(`[Scheduler] Auto-acknowledged port down alert for ${router.name} - ${port.portName} (port came back up)`);
             
             // Re-fetch latest unacknowledged alert
@@ -427,6 +452,7 @@ async function checkAlerts() {
             // Auto-acknowledge traffic alert if traffic returned to normal
             if (hasActiveAlert && isTrafficAlert) {
               await storage.acknowledgeAlert(latestAlert!.id);
+              resetViolationCount(`traffic_${port.id}`); // Ensure counter is reset on auto-acknowledge
               console.log(`[Scheduler] Auto-acknowledged alert for ${router.name} - ${port.portName} (traffic returned to normal)`);
             }
           }
@@ -521,6 +547,11 @@ export function startScheduler() {
     });
   });
 
+  // Clean up stale violation counters every 5 minutes
+  cron.schedule("*/5 * * * *", () => {
+    cleanupStaleViolationCounters();
+  });
+
   // Clean up old data daily at 2 AM
   cron.schedule("0 2 * * *", () => {
     cleanupOldData().catch(error => {
@@ -538,5 +569,5 @@ export function startScheduler() {
     });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully (1s real-time polling, 60s alert checking with 3-check confirmation, 5min database persistence, daily cleanup)");
+  console.log("[Scheduler] Scheduler started successfully (1s real-time polling, 60s alert checking with 3-check confirmation, 5min database persistence, 5min counter cleanup, daily data cleanup)");
 }
