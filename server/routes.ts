@@ -138,6 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         snmpCommunity: snmpCommunity || "public",
         snmpVersion: snmpVersion || "2c",
         snmpPort: snmpPort || 161,
+        includeDynamicInterfaces: false, // Test connection always shows all interfaces
       });
       
       const success = await client.testConnection();
@@ -182,6 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         snmpCommunity: router.snmpCommunity || "public",
         snmpVersion: router.snmpVersion || "2c",
         snmpPort: router.snmpPort || 161,
+        includeDynamicInterfaces: router.includeDynamicInterfaces || false,
       });
       
       const success = await client.testConnection();

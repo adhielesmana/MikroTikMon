@@ -14,6 +14,23 @@ export interface MikrotikConnection {
   snmpCommunity?: string;
   snmpVersion?: string;
   snmpPort?: number;
+  includeDynamicInterfaces?: boolean;
+}
+
+// Helper function to filter interfaces based on type
+function filterInterfaces(interfaces: string[], includeDynamic: boolean): string[] {
+  if (includeDynamic) {
+    return interfaces; // Return all interfaces
+  }
+  
+  // Filter to only static interfaces (ethernet, vlan, bridge, etc.)
+  // Exclude dynamic interfaces like pppoe-*, l2tp-*, pptp-*, etc.
+  const dynamicPrefixes = ['pppoe-', 'l2tp-', 'pptp-', 'sstp-', 'ovpn-'];
+  
+  return interfaces.filter(name => {
+    const lowerName = name.toLowerCase();
+    return !dynamicPrefixes.some(prefix => lowerName.startsWith(prefix));
+  });
 }
 
 export interface InterfaceStats {
@@ -391,7 +408,8 @@ export class MikrotikClient {
           }
         }
 
-        resolve(interfaces);
+        const filtered = filterInterfaces(interfaces, this.connection.includeDynamicInterfaces || false);
+        resolve(filtered);
       });
     });
   }
@@ -523,7 +541,8 @@ export class MikrotikClient {
 
     try {
       const interfaces = await this.restRequest('/rest/interface');
-      return interfaces.map((iface: any) => iface.name).filter(Boolean);
+      const allInterfaces = interfaces.map((iface: any) => iface.name).filter(Boolean);
+      return filterInterfaces(allInterfaces, this.connection.includeDynamicInterfaces || false);
     } catch (error) {
       console.error("Failed to get interface list via REST:", error);
       return [];
@@ -710,7 +729,8 @@ export class MikrotikClient {
       await api.close();
 
       if (Array.isArray(interfaces)) {
-        return interfaces.map((iface: any) => iface.name).filter(Boolean);
+        const allInterfaces = interfaces.map((iface: any) => iface.name).filter(Boolean);
+        return filterInterfaces(allInterfaces, this.connection.includeDynamicInterfaces || false);
       }
 
       return [];

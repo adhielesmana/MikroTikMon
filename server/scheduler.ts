@@ -151,6 +151,7 @@ async function pollRouterTraffic() {
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: router.snmpVersion || "2c",
           snmpPort: router.snmpPort || 161,
+          includeDynamicInterfaces: router.includeDynamicInterfaces || false,
         });
 
         const isReachable = await client.checkReachability();
@@ -197,6 +198,7 @@ async function pollRouterTraffic() {
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: router.snmpVersion || "2c",
           snmpPort: router.snmpPort || 161,
+          includeDynamicInterfaces: router.includeDynamicInterfaces || false,
         });
 
         const stats = await client.getInterfaceStats();
@@ -308,6 +310,7 @@ async function checkAlerts() {
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: router.snmpVersion || "2c",
           snmpPort: router.snmpPort || 161,
+          includeDynamicInterfaces: router.includeDynamicInterfaces || false,
         });
 
         const stats = await client.getInterfaceStats();
