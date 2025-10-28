@@ -127,6 +127,50 @@ function addRealtimeTraffic(routerId: string, data: Omit<RealtimeTrafficData, 'r
 // Traffic data collection (runs every 1 second)
 async function pollRouterTraffic() {
   try {
+    // First, check reachability for ALL routers (not just those with monitored ports)
+    const allRouters = await storage.getAllRouters();
+    const reachableRouterIds = new Set<string>();
+    
+    for (const router of allRouters) {
+      try {
+        const credentials = await storage.getRouterCredentials(router.id);
+        if (!credentials) {
+          console.log(`[Scheduler] Skipping reachability check for ${router.name} - no credentials`);
+          continue;
+        }
+
+        console.log(`[Scheduler] Checking reachability for ${router.name} (${router.ipAddress})...`);
+        const client = new MikrotikClient({
+          host: router.ipAddress,
+          port: router.port,
+          user: credentials.username,
+          password: credentials.password,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || "public",
+          snmpVersion: router.snmpVersion || "2c",
+          snmpPort: router.snmpPort || 161,
+        });
+
+        const isReachable = await client.checkReachability();
+        console.log(`[Scheduler] Reachability result for ${router.name}: ${isReachable}`);
+        await storage.updateRouterReachability(router.id, isReachable);
+        
+        if (isReachable) {
+          reachableRouterIds.add(router.id);
+        } else {
+          console.log(`[Scheduler] Router ${router.name} is unreachable, marking as disconnected`);
+          await storage.updateRouterConnection(router.id, false);
+        }
+      } catch (error) {
+        console.log(`[Scheduler] Reachability check failed for ${router.name}, marking as unreachable`);
+        // Mark as unreachable on error
+        await storage.updateRouterReachability(router.id, false);
+        await storage.updateRouterConnection(router.id, false);
+      }
+    }
+
     // Get all enabled monitored ports with their routers
     const monitoredPorts = await storage.getAllEnabledPorts();
 
@@ -142,6 +186,11 @@ async function pollRouterTraffic() {
       const router = ports[0].router;
 
       try {
+        // Skip traffic collection if router is not reachable
+        if (!reachableRouterIds.has(routerId)) {
+          continue;
+        }
+
         // Get router credentials
         const credentials = await storage.getRouterCredentials(routerId);
         if (!credentials) {
@@ -162,19 +211,6 @@ async function pollRouterTraffic() {
           snmpVersion: router.snmpVersion || "2c",
           snmpPort: router.snmpPort || 161,
         });
-
-        // Check basic network reachability
-        console.log(`[Scheduler] Checking reachability for router ${router.name} (${router.ipAddress})...`);
-        const isReachable = await client.checkReachability();
-        console.log(`[Scheduler] Reachability result for ${router.name}: ${isReachable}`);
-        await storage.updateRouterReachability(routerId, isReachable);
-        
-        // If not reachable, mark as disconnected and skip data collection
-        if (!isReachable) {
-          console.log(`[Scheduler] Router ${router.name} is unreachable, marking as disconnected`);
-          await storage.updateRouterConnection(routerId, false);
-          continue;
-        }
 
         const stats = await client.getInterfaceStats();
 
