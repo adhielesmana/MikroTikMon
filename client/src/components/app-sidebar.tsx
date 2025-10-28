@@ -1,4 +1,5 @@
 import { LayoutDashboard, Server, Bell, Settings, Users, LogOut, TrendingUp } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -19,6 +20,10 @@ import { Badge } from "@/components/ui/badge";
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, isAdmin } = useAuth();
+  
+  const { data: settings } = useQuery({
+    queryKey: ["/api/settings"],
+  });
 
   const menuItems = [
     {
@@ -54,9 +59,24 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4 border-b">
-        <div className="flex items-center gap-2">
-          <Server className="h-6 w-6 text-primary" />
-          <span className="font-semibold text-lg">MikroTik Monitor</span>
+        <div className="flex items-center gap-2" data-testid="sidebar-header-logo">
+          {settings?.logo_url ? (
+            <img
+              src={settings.logo_url}
+              alt="Application logo"
+              className="h-8 object-contain max-w-[180px]"
+              data-testid="img-sidebar-logo"
+              onError={(e) => {
+                // Fallback to text if logo fails to load
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <>
+              <Server className="h-6 w-6 text-primary" />
+              <span className="font-semibold text-lg" data-testid="text-sidebar-title">MikroTik Monitor</span>
+            </>
+          )}
         </div>
       </SidebarHeader>
 
