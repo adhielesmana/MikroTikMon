@@ -436,12 +436,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Support custom date range via startDate query parameter
+      // Support custom date range via startDate and endDate query parameters
       let since = new Date();
+      let until: Date | undefined = undefined;
       
       if (req.query.startDate) {
         // Custom date range
         since = new Date(req.query.startDate as string);
+        if (req.query.endDate) {
+          until = new Date(req.query.endDate as string);
+        }
       } else {
         // Parse predefined time range
         const timeRange = req.query.timeRange || "1h";
@@ -474,7 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const trafficData = await storage.getRecentTraffic(req.params.id, since);
+      const trafficData = await storage.getRecentTraffic(req.params.id, since, until);
       res.json(trafficData);
     } catch (error) {
       console.error("Error fetching traffic data:", error);

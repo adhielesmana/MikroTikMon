@@ -36,8 +36,10 @@ const INTERFACE_COLORS = [
 export default function GraphHistory() {
   const [selectedRouterId, setSelectedRouterId] = useState<string>("");
   const [timeRange, setTimeRange] = useState<string>("1d");
-  const [customDate, setCustomDate] = useState<Date>();
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState<Date>();
+  const [customEndDate, setCustomEndDate] = useState<Date>();
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   // Fetch all routers
   const { data: routers, isLoading: loadingRouters } = useQuery<Router[]>({
@@ -48,11 +50,14 @@ export default function GraphHistory() {
   const { data: trafficData, isLoading: loadingTraffic } = useQuery({
     queryKey: [
       `/api/routers/${selectedRouterId}/traffic`,
-      timeRange === "custom" && customDate
-        ? { startDate: customDate.toISOString() }
+      timeRange === "custom" && customStartDate
+        ? { 
+            startDate: customStartDate.toISOString(),
+            endDate: customEndDate ? customEndDate.toISOString() : new Date().toISOString()
+          }
         : { timeRange },
     ],
-    enabled: !!selectedRouterId,
+    enabled: !!selectedRouterId && (timeRange !== "custom" || !!customStartDate),
   });
 
   // Transform traffic data for multi-interface chart
@@ -100,10 +105,9 @@ export default function GraphHistory() {
 
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value);
-    if (value === "custom") {
-      setShowDatePicker(true);
-    } else {
-      setShowDatePicker(false);
+    if (value !== "custom") {
+      setCustomStartDate(undefined);
+      setCustomEndDate(undefined);
     }
   };
 
@@ -176,33 +180,60 @@ export default function GraphHistory() {
                 </Select>
 
                 {timeRange === "custom" && (
-                  <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" data-testid="button-date-picker">
-                        <CalendarIcon className="h-4 w-4 mr-2" />
-                        {customDate ? format(customDate, "PPP") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={customDate}
-                        onSelect={(date) => {
-                          setCustomDate(date);
-                          setShowDatePicker(false);
-                        }}
-                        disabled={(date) => date > new Date() || date < new Date("2023-01-01")}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <div className="flex gap-2">
+                    <Popover open={showStartDatePicker} onOpenChange={setShowStartDatePicker}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" data-testid="button-start-date-picker">
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          {customStartDate ? format(customStartDate, "PPP") : "Start date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={customStartDate}
+                          onSelect={(date) => {
+                            setCustomStartDate(date);
+                            setShowStartDatePicker(false);
+                          }}
+                          disabled={(date) => date > new Date() || date < new Date("2023-01-01")}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    
+                    <Popover open={showEndDatePicker} onOpenChange={setShowEndDatePicker}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" data-testid="button-end-date-picker">
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          {customEndDate ? format(customEndDate, "PPP") : "End date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={customEndDate}
+                          onSelect={(date) => {
+                            setCustomEndDate(date);
+                            setShowEndDatePicker(false);
+                          }}
+                          disabled={(date) => 
+                            date > new Date() || 
+                            date < new Date("2023-01-01") ||
+                            (customStartDate ? date < customStartDate : false)
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
           {selectedRouter && (
-            <div className="pt-2 border-t">
+            <div className="pt-2 border-t" data-testid="info-selected-router">
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium">Selected Router:</span> {selectedRouter.name} ({selectedRouter.ipAddress})
               </p>
@@ -225,7 +256,7 @@ export default function GraphHistory() {
                   Historical traffic data for all interfaces ({interfaceNames.length} interface{interfaceNames.length !== 1 ? 's' : ''})
                 </CardDescription>
               </div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground" data-testid="text-data-point-count">
                 {chartData.length} data points
               </div>
             </div>
@@ -301,8 +332,8 @@ export default function GraphHistory() {
 
             {/* Interface Legend */}
             {interfaceNames.length > 0 && (
-              <div className="mt-6 pt-4 border-t">
-                <p className="text-sm font-medium mb-3">Interfaces ({interfaceNames.length})</p>
+              <div className="mt-6 pt-4 border-t" data-testid="section-interface-legend">
+                <p className="text-sm font-medium mb-3" data-testid="text-interface-count">Interfaces ({interfaceNames.length})</p>
                 <div className="flex flex-wrap gap-3">
                   {interfaceNames.map((name: string, index: number) => (
                     <div key={name} className="flex items-center gap-2" data-testid={`legend-interface-${name}`}>
@@ -314,7 +345,7 @@ export default function GraphHistory() {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-3">
+                <p className="text-xs text-muted-foreground mt-3" data-testid="text-legend-description">
                   Solid lines show RX (download), dashed lines show TX (upload)
                 </p>
               </div>

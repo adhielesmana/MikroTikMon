@@ -49,6 +49,8 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
     -   **Dual Data Sources:** Real-time endpoint for 15m/1h ranges (1s polling), database endpoint for 6h+ ranges (30s polling)
     -   **Optimized Storage:** Database persistence every 5 minutes with intelligent sampling (~5 data points per interface per 5-minute period)
     -   **Default Selection:** All monitored ports automatically selected on page load for immediate visualization
+    -   **Graph History Page:** Dedicated page for viewing historical data with router selection and time range controls (1h, 12h, 1d, 7d, 30d, or custom date range)
+    -   **2-Year Data Retention:** Historical traffic data stored for 2 years with automatic daily cleanup
 -   **Alert System:** Configurable thresholds per port, dual notification (Email + In-App Popup), alert severity levels, acknowledgment workflow, and history tracking.
     -   **Alert De-duplication:** Prevents spamming by only generating new alerts when status changes (port down vs traffic threshold).
     -   **Auto-Acknowledgment:** Automatically acknowledges alerts when conditions return to normal (traffic above threshold or port comes back up).
