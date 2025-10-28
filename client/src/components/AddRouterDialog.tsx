@@ -48,6 +48,7 @@ const routerFormSchema = z.object({
   snmpCommunity: z.string().default("public"),
   snmpVersion: z.enum(["1", "2c"]).default("2c"), // Only v1 and v2c supported (v3 requires additional auth params)
   snmpPort: z.coerce.number().min(1).max(65535).default(161),
+  includeDynamicInterfaces: z.boolean().default(false),
 });
 
 type RouterFormData = z.infer<typeof routerFormSchema>;
@@ -79,6 +80,7 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
       snmpCommunity: "public",
       snmpVersion: "2c" as "1" | "2c",
       snmpPort: 161,
+      includeDynamicInterfaces: false,
     },
   });
 
@@ -99,6 +101,7 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: (router.snmpVersion as "1" | "2c") || "2c",
           snmpPort: router.snmpPort || 161,
+          includeDynamicInterfaces: router.includeDynamicInterfaces || false,
         });
       } else {
         form.reset({
@@ -114,6 +117,7 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
           snmpCommunity: "public",
           snmpVersion: "2c" as "1" | "2c",
           snmpPort: 161,
+          includeDynamicInterfaces: false,
         });
       }
     }
@@ -433,6 +437,32 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
                   />
                 </div>
               )}
+            </div>
+
+            <Separator className="my-4" />
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-medium">Include Dynamic Interfaces</h4>
+                <p className="text-sm text-muted-foreground">
+                  Monitor dynamic interfaces (PPPoE, L2TP) in addition to static interfaces
+                </p>
+              </div>
+              <FormField
+                control={form.control}
+                name="includeDynamicInterfaces"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-include-dynamic"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
             </div>
 
             <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
