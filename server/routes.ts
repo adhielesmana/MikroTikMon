@@ -577,10 +577,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId = data.userId;
           
           // Add connection to user's set
-          if (!userConnections.has(userId)) {
-            userConnections.set(userId, new Set());
+          const uid = userId as string;
+          if (!userConnections.has(uid)) {
+            userConnections.set(uid, new Set());
           }
-          userConnections.get(userId)!.add(ws);
+          userConnections.get(uid)!.add(ws);
           
           console.log(`[WebSocket] User ${userId} authenticated`);
           ws.send(JSON.stringify({ type: "auth_success" }));

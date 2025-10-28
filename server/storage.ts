@@ -75,7 +75,7 @@ export interface IStorage {
   getRecentTraffic(routerId: string, since: Date): Promise<TrafficData[]>;
 
   // Alert operations
-  getAlerts(userId: string): Promise<Alert[]>;
+  getAlerts(userId: string): Promise<(Alert & { routerName: string })[]>;
   getAllAlerts(): Promise<Alert[]>;
   getLatestAlertForPort(portId: string): Promise<Alert | undefined>;
   getLatestUnacknowledgedAlertForPort(portId: string): Promise<Alert | undefined>;
@@ -316,12 +316,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Alert operations
-  async getAlerts(userId: string): Promise<Alert[]> {
-    return db
-      .select()
+  async getAlerts(userId: string): Promise<(Alert & { routerName: string })[]> {
+    const results = await db
+      .select({
+        alert: alerts,
+        routerName: routers.name,
+      })
       .from(alerts)
+      .leftJoin(routers, eq(alerts.routerId, routers.id))
       .where(eq(alerts.userId, userId))
       .orderBy(desc(alerts.createdAt));
+    
+    return results.map(r => ({
+      ...r.alert,
+      routerName: r.routerName || "Unknown Router",
+    }));
   }
 
   async getLatestAlertForPort(portId: string): Promise<Alert | undefined> {

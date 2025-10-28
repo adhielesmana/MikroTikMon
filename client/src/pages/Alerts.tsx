@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import type { Alert } from "@shared/schema";
-import { formatRelativeTime, formatBytesPerSecond } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,9 +18,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+type AlertWithRouter = Alert & { routerName: string };
+
 export default function Alerts() {
   const { toast } = useToast();
-  const { data: alerts, isLoading } = useQuery<Alert[]>({
+  const { data: alerts, isLoading } = useQuery<AlertWithRouter[]>({
     queryKey: ["/api/alerts"],
   });
 
@@ -49,28 +51,45 @@ export default function Alerts() {
 
   const getSeverityBadge = (severity: string) => {
     const config = {
-      critical: { variant: "destructive" as const, color: "text-destructive" },
-      warning: { variant: "secondary" as const, color: "text-yellow-500" },
-      info: { variant: "secondary" as const, color: "text-blue-500" },
+      critical: { variant: "destructive" as const },
+      warning: { variant: "secondary" as const },
+      info: { variant: "secondary" as const },
     };
     return config[severity as keyof typeof config] || config.info;
   };
 
-  const AlertTable = ({ alertsList }: { alertsList: Alert[] }) => (
+  const getSimplifiedMessage = (alert: AlertWithRouter) => {
+    if (alert.message.includes("is DOWN")) {
+      return "Port Down";
+    }
+    return "Traffic Low";
+  };
+
+  const formatDateTime = (date: Date | string | undefined) => {
+    if (!date) return "N/A";
+    const d = new Date(date);
+    return d.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const AlertTable = ({ alertsList }: { alertsList: AlertWithRouter[] }) => (
     <Card>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Port</TableHead>
                 <TableHead>Severity</TableHead>
+                <TableHead>Port - Router Name</TableHead>
                 <TableHead>Message</TableHead>
-                <TableHead>Current Traffic</TableHead>
-                <TableHead>Threshold</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Date & Time</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -78,22 +97,16 @@ export default function Alerts() {
                 const severityConfig = getSeverityBadge(alert.severity);
                 return (
                   <TableRow key={alert.id} data-testid={`alert-row-${alert.id}`}>
-                    <TableCell className="font-medium" data-testid={`text-alert-port-${alert.id}`}>
-                      {alert.portName}
-                    </TableCell>
                     <TableCell>
                       <Badge variant={severityConfig.variant}>
                         {alert.severity}
                       </Badge>
                     </TableCell>
-                    <TableCell className="max-w-md" data-testid={`text-alert-message-${alert.id}`}>
-                      <p className="text-sm truncate">{alert.message}</p>
+                    <TableCell className="font-medium" data-testid={`text-alert-port-${alert.id}`}>
+                      {alert.portName} - {alert.routerName}
                     </TableCell>
-                    <TableCell className="font-mono text-sm" data-testid={`text-alert-current-${alert.id}`}>
-                      {formatBytesPerSecond(alert.currentTrafficBps)}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {formatBytesPerSecond(alert.thresholdBps)}
+                    <TableCell data-testid={`text-alert-message-${alert.id}`}>
+                      {getSimplifiedMessage(alert)}
                     </TableCell>
                     <TableCell>
                       {alert.acknowledged ? (
@@ -115,8 +128,8 @@ export default function Alerts() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatRelativeTime(alert.createdAt!)}
+                    <TableCell className="text-sm">
+                      {formatDateTime(alert.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       {!alert.acknowledged && (
