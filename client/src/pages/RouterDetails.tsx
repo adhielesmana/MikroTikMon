@@ -54,10 +54,12 @@ export default function RouterDetails() {
   });
 
   // Fetch all available interfaces
-  const { data: allInterfaces, isLoading: loadingInterfaces } = useQuery<string[]>({
+  const { data: interfacesData, isLoading: loadingInterfaces } = useQuery<{ interfaces: string[] }>({
     queryKey: ["/api/routers", id, "interfaces"],
     enabled: !!id,
   });
+  
+  const allInterfaces = interfacesData?.interfaces || [];
 
   // Use real-time endpoint for 15m and 1h ranges, database for longer ranges
   const useRealtimeEndpoint = timeRange === "15m" || timeRange === "1h";
