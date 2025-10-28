@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { LayoutDashboard, Server, Bell, Settings, Users, LogOut, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -20,9 +21,12 @@ import { Badge } from "@/components/ui/badge";
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, isAdmin } = useAuth();
+  const [logoError, setLogoError] = useState(false);
   
   const { data: settings } = useQuery({
     queryKey: ["/api/settings"],
+    // Reset logo error state when settings change
+    onSuccess: () => setLogoError(false),
   });
 
   const menuItems = [
@@ -60,16 +64,13 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2" data-testid="sidebar-header-logo">
-          {settings?.logo_url ? (
+          {settings?.logo_url && !logoError ? (
             <img
               src={settings.logo_url}
               alt="Application logo"
               className="h-8 object-contain max-w-[180px]"
               data-testid="img-sidebar-logo"
-              onError={(e) => {
-                // Fallback to text if logo fails to load
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
+              onError={() => setLogoError(true)}
             />
           ) : (
             <>

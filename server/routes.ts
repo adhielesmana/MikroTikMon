@@ -622,8 +622,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/settings", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const { logoUrl } = req.body;
-      const settings = await storage.updateAppSettings(logoUrl);
+      const { logo_url } = req.body;
+      const settings = await storage.updateAppSettings(logo_url);
       res.json(settings);
     } catch (error) {
       console.error("Error updating app settings:", error);
