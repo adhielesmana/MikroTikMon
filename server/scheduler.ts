@@ -43,6 +43,25 @@ interface RealtimeTrafficData {
 const realtimeTrafficStore = new Map<string, Map<string, RealtimeTrafficData[]>>();
 const MAX_ENTRIES_PER_INTERFACE = 7200; // 2 hours at 1 second intervals per interface
 
+// Track consecutive threshold violations per port for 3-check confirmation
+// Map<portId, { count: number, lastCheck: Date }>
+const consecutiveViolations = new Map<string, { count: number; lastCheck: Date }>();
+
+function incrementViolationCount(portId: string): number {
+  const existing = consecutiveViolations.get(portId);
+  const newCount = existing ? existing.count + 1 : 1;
+  consecutiveViolations.set(portId, { count: newCount, lastCheck: new Date() });
+  return newCount;
+}
+
+function resetViolationCount(portId: string): void {
+  consecutiveViolations.delete(portId);
+}
+
+function getViolationCount(portId: string): number {
+  return consecutiveViolations.get(portId)?.count || 0;
+}
+
 export function getRealtimeTraffic(routerId: string, since?: Date): RealtimeTrafficData[] {
   const routerData = realtimeTrafficStore.get(routerId);
   if (!routerData) return [];
@@ -81,10 +100,9 @@ function addRealtimeTraffic(routerId: string, data: Omit<RealtimeTrafficData, 'r
   }
 }
 
+// Traffic data collection (runs every 1 second)
 async function pollRouterTraffic() {
   try {
-    console.log("[Scheduler] Polling router traffic data...");
-
     // Get all enabled monitored ports with their routers
     const monitoredPorts = await storage.getAllEnabledPorts();
 
@@ -151,6 +169,107 @@ async function pollRouterTraffic() {
           });
         }
 
+        // Only store traffic data for monitored ports (alert checking done separately)
+        for (const port of ports) {
+          const stat = stats.find(s => s.name === port.portName);
+          if (!stat) {
+            console.warn(`[Scheduler] Port ${port.portName} not found in router stats`);
+            continue;
+          }
+
+          // Store traffic data (only for ports that are up)
+          if (stat.running) {
+            await storage.insertTrafficData({
+              routerId: port.routerId,
+              portId: port.id,
+              portName: port.portName,
+              rxBytesPerSecond: stat.rxBytesPerSecond,
+              txBytesPerSecond: stat.txBytesPerSecond,
+              totalBytesPerSecond: stat.totalBytesPerSecond,
+            });
+          }
+        }
+      } catch (error: any) {
+        console.error(`Failed to get interface stats via native API: ${error.constructor.name}`);
+        console.error(error);
+
+        // Update router connection status
+        await storage.updateRouterConnection(routerId, false);
+        
+        // Try to check reachability even on error
+        try {
+          const credentials = await storage.getRouterCredentials(routerId);
+          if (credentials) {
+            const client = new MikrotikClient({
+              host: router.ipAddress,
+              port: router.port,
+              user: credentials.username,
+              password: credentials.password,
+              restEnabled: router.restEnabled || false,
+              restPort: router.restPort || 443,
+              snmpEnabled: router.snmpEnabled || false,
+              snmpCommunity: router.snmpCommunity || "public",
+              snmpVersion: router.snmpVersion || "2c",
+              snmpPort: router.snmpPort || 161,
+            });
+            const isReachable = await client.checkReachability();
+            console.log(`[Scheduler] Reachability result for ${router.name} (after error): ${isReachable}`);
+            await storage.updateRouterReachability(routerId, isReachable);
+          }
+        } catch (reachError) {
+          console.log(`[Scheduler] Reachability check failed for ${router.name}, marking as unreachable`);
+          await storage.updateRouterReachability(routerId, false);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[Scheduler] Error in traffic polling:", error);
+  }
+}
+
+// Alert checking with 3-consecutive-checks confirmation (runs every 60 seconds)
+async function checkAlerts() {
+  try {
+    console.log("[Scheduler] Checking alerts...");
+
+    // Get all enabled monitored ports with their routers
+    const monitoredPorts = await storage.getAllEnabledPorts();
+
+    // Group ports by router to minimize connections
+    const portsByRouter = new Map<string, typeof monitoredPorts>();
+    for (const port of monitoredPorts) {
+      const existing = portsByRouter.get(port.router.id) || [];
+      existing.push(port);
+      portsByRouter.set(port.router.id, existing);
+    }
+
+    for (const [routerId, ports] of Array.from(portsByRouter)) {
+      const router = ports[0].router;
+
+      try {
+        // Get router credentials
+        const credentials = await storage.getRouterCredentials(routerId);
+        if (!credentials) {
+          console.error(`[Scheduler] No credentials for router ${routerId}`);
+          continue;
+        }
+
+        // Connect to MikroTik and get stats
+        const client = new MikrotikClient({
+          host: router.ipAddress,
+          port: router.port,
+          user: credentials.username,
+          password: credentials.password,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || "public",
+          snmpVersion: router.snmpVersion || "2c",
+          snmpPort: router.snmpPort || 161,
+        });
+
+        const stats = await client.getInterfaceStats();
+
         // Process each monitored port for alerting
         for (const port of ports) {
           const stat = stats.find(s => s.name === port.portName);
@@ -167,9 +286,11 @@ async function pollRouterTraffic() {
 
           // Check port status (down/up)
           if (!stat.running) {
-            // Port is DOWN - create port down alert (skip traffic threshold check)
-            // Only skip if there's already an active PORT DOWN alert (not traffic alert)
-            if (!hasActiveAlert || !isPortDownAlert) {
+            // Port is DOWN - increment violation count
+            const violationCount = incrementViolationCount(`port_down_${port.id}`);
+            
+            // Create port down alert only after 3 consecutive checks
+            if (violationCount >= 3 && (!hasActiveAlert || !isPortDownAlert)) {
               const alert = await storage.createAlert({
                 routerId: port.routerId,
                 portId: port.id,
@@ -200,151 +321,125 @@ async function pollRouterTraffic() {
                 portName: port.portName,
               });
 
-              console.log(`[Scheduler] Port down alert created for ${router.name} - ${port.portName}`);
+              console.log(`[Scheduler] Port down alert created for ${router.name} - ${port.portName} (confirmed after 3 checks)`);
+              resetViolationCount(`port_down_${port.id}`); // Reset after alert created
             }
+            resetViolationCount(`traffic_${port.id}`); // Reset traffic violation count
             continue; // Skip traffic threshold check for down ports
           }
 
-          // Port is UP - auto-acknowledge port down alert if exists
+          // Port is UP - reset port down violation count
+          resetViolationCount(`port_down_${port.id}`);
+          
+          // Auto-acknowledge port down alert if exists
           if (hasActiveAlert && isPortDownAlert) {
             await storage.acknowledgeAlert(latestAlert!.id);
             console.log(`[Scheduler] Auto-acknowledged port down alert for ${router.name} - ${port.portName} (port came back up)`);
             
-            // Re-fetch latest unacknowledged alert to check if there's now a different active alert (e.g., traffic alert)
+            // Re-fetch latest unacknowledged alert
             latestAlert = await storage.getLatestUnacknowledgedAlertForPort(port.id);
             hasActiveAlert = !!latestAlert;
             isPortDownAlert = latestAlert && latestAlert.message.includes("is DOWN");
             isTrafficAlert = latestAlert && !latestAlert.message.includes("is DOWN");
           }
 
-          // Store traffic data (only for ports that are up)
-          await storage.insertTrafficData({
-            routerId: port.routerId,
-            portId: port.id,
-            portName: port.portName,
-            rxBytesPerSecond: stat.rxBytesPerSecond,
-            txBytesPerSecond: stat.txBytesPerSecond,
-            totalBytesPerSecond: stat.totalBytesPerSecond,
-          });
-
-          // Check traffic threshold and create alert if necessary
+          // Check traffic threshold
           const isBelowThreshold = stat.totalBytesPerSecond < port.minThresholdBps;
 
-          // Auto-acknowledge traffic alert if traffic returned to normal
-          if (!isBelowThreshold && hasActiveAlert && isTrafficAlert) {
-            await storage.acknowledgeAlert(latestAlert!.id);
-            console.log(`[Scheduler] Auto-acknowledged alert for ${router.name} - ${port.portName} (traffic returned to normal)`);
-          }
+          if (isBelowThreshold) {
+            // Increment violation count
+            const violationCount = incrementViolationCount(`traffic_${port.id}`);
+            
+            // Only create alert after 3 consecutive checks AND no active traffic alert
+            if (violationCount >= 3 && (!hasActiveAlert || isPortDownAlert)) {
+              // Determine severity based on how far below threshold
+              const percentBelow = ((port.minThresholdBps - stat.totalBytesPerSecond) / port.minThresholdBps) * 100;
+              let severity = "warning";
+              if (percentBelow > 50) severity = "critical";
+              else if (percentBelow > 25) severity = "warning";
+              else severity = "info";
 
-          // Only create a new traffic alert if:
-          // 1. Traffic is below threshold AND there's no active TRAFFIC alert (first breach)
-          // 2. Port down alerts don't prevent traffic alerts (they're separate)
-          if (isBelowThreshold && (!hasActiveAlert || isPortDownAlert)) {
-            // Determine severity based on how far below threshold
-            const percentBelow = ((port.minThresholdBps - stat.totalBytesPerSecond) / port.minThresholdBps) * 100;
-            let severity = "warning";
-            if (percentBelow > 50) severity = "critical";
-            else if (percentBelow > 25) severity = "warning";
-            else severity = "info";
+              // Create alert
+              const alert = await storage.createAlert({
+                routerId: port.routerId,
+                portId: port.id,
+                portName: port.portName,
+                userId: router.userId,
+                severity,
+                message: `Traffic on ${port.portName} is below threshold: ${(stat.totalBytesPerSecond / 1024).toFixed(2)} KB/s < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
+                currentTrafficBps: stat.totalBytesPerSecond,
+                thresholdBps: port.minThresholdBps,
+              });
 
-            // Create alert
-            const alert = await storage.createAlert({
-              routerId: port.routerId,
-              portId: port.id,
-              portName: port.portName,
-              userId: router.userId,
-              severity,
-              message: `Traffic on ${port.portName} is below threshold: ${(stat.totalBytesPerSecond / 1024).toFixed(2)} KB/s < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
-              currentTrafficBps: stat.totalBytesPerSecond,
-              thresholdBps: port.minThresholdBps,
-            });
+              // Create notification
+              const notification = await storage.createNotification({
+                userId: router.userId,
+                alertId: alert.id,
+                type: "popup",
+                title: `Traffic Alert: ${router.name}`,
+                message: alert.message,
+              });
 
-            // Create notification
-            const notification = await storage.createNotification({
-              userId: router.userId,
-              alertId: alert.id,
-              type: "popup",
-              title: `Traffic Alert: ${router.name}`,
-              message: alert.message,
-            });
+              // Broadcast real-time notification via WebSocket
+              broadcastNotification(router.userId, {
+                id: notification.id,
+                title: notification.title,
+                message: notification.message,
+                severity: alert.severity,
+                routerName: router.name,
+                portName: port.portName,
+              });
 
-            // Broadcast real-time notification via WebSocket
-            broadcastNotification(router.userId, {
-              id: notification.id,
-              title: notification.title,
-              message: notification.message,
-              severity: alert.severity,
-              routerName: router.name,
-              portName: port.portName,
-            });
+              // Send email notification if enabled
+              if (port.emailNotifications) {
+                const user = await storage.getUser(router.userId);
+                if (user && user.email) {
+                  try {
+                    await emailService.sendAlertEmail(user.email, {
+                      routerName: router.name,
+                      portName: port.portName,
+                      currentTraffic: `${(stat.totalBytesPerSecond / 1024).toFixed(2)} KB/s`,
+                      threshold: `${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
+                      severity: alert.severity,
+                    });
 
-            // Send email notification if enabled
-            if (port.emailNotifications) {
-              const user = await storage.getUser(router.userId);
-              if (user && user.email) {
-                try {
-                  await emailService.sendAlertEmail(user.email, {
-                    routerName: router.name,
-                    portName: port.portName,
-                    currentTraffic: `${(stat.totalBytesPerSecond / 1024).toFixed(2)} KB/s`,
-                    threshold: `${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
-                    severity: alert.severity,
-                  });
-
-                  // Record email notification
-                  await storage.createNotification({
-                    userId: router.userId,
-                    alertId: alert.id,
-                    type: "email",
-                    title: notification.title,
-                    message: notification.message,
-                  });
-                } catch (error) {
-                  console.error(`[Scheduler] Failed to send email for alert ${alert.id}:`, error);
+                    // Record email notification
+                    await storage.createNotification({
+                      userId: router.userId,
+                      alertId: alert.id,
+                      type: "email",
+                      title: notification.title,
+                      message: notification.message,
+                    });
+                  } catch (error) {
+                    console.error(`[Scheduler] Failed to send email for alert ${alert.id}:`, error);
+                  }
                 }
               }
-            }
 
-            console.log(`[Scheduler] Alert created for ${router.name} - ${port.portName}`);
+              console.log(`[Scheduler] Alert created for ${router.name} - ${port.portName} (confirmed after 3 checks)`);
+              resetViolationCount(`traffic_${port.id}`); // Reset after alert created
+            }
+          } else {
+            // Traffic is above threshold - reset violation count
+            resetViolationCount(`traffic_${port.id}`);
+            
+            // Auto-acknowledge traffic alert if traffic returned to normal
+            if (hasActiveAlert && isTrafficAlert) {
+              await storage.acknowledgeAlert(latestAlert!.id);
+              console.log(`[Scheduler] Auto-acknowledged alert for ${router.name} - ${port.portName} (traffic returned to normal)`);
+            }
           }
         }
-      } catch (error) {
-        console.error(`[Scheduler] Error polling router ${routerId}:`, error);
-        // Update router as disconnected
+      } catch (error: any) {
+        console.error(`[Scheduler] Error checking alerts for router ${routerId}:`, error);
         await storage.updateRouterConnection(routerId, false);
-        
-        // Still try to check reachability even if connection fails
-        try {
-          console.log(`[Scheduler] Connection failed for ${router.name}, checking reachability...`);
-          const credentials = await storage.getRouterCredentials(routerId);
-          if (credentials) {
-            const client = new MikrotikClient({
-              host: router.ipAddress,
-              port: router.port,
-              user: credentials.username,
-              password: credentials.password,
-              restEnabled: router.restEnabled || false,
-              restPort: router.restPort || 443,
-              snmpEnabled: router.snmpEnabled || false,
-              snmpCommunity: router.snmpCommunity || "public",
-              snmpVersion: router.snmpVersion || "2c",
-              snmpPort: router.snmpPort || 161,
-            });
-            const isReachable = await client.checkReachability();
-            console.log(`[Scheduler] Reachability result for ${router.name} (after error): ${isReachable}`);
-            await storage.updateRouterReachability(routerId, isReachable);
-          }
-        } catch (reachError) {
-          console.log(`[Scheduler] Reachability check failed for ${router.name}, marking as unreachable`);
-          // If reachability check fails, mark as unreachable
-          await storage.updateRouterReachability(routerId, false);
-        }
       }
     }
 
-    console.log("[Scheduler] Traffic polling completed");
+    console.log("[Scheduler] Alert check completed");
   } catch (error) {
-    console.error("[Scheduler] Error in traffic polling:", error);
+    console.error("[Scheduler] Error in alert checking:", error);
   }
 }
 
@@ -405,10 +500,17 @@ async function cleanupOldData() {
 export function startScheduler() {
   console.log("[Scheduler] Starting traffic monitoring scheduler...");
 
-  // Poll traffic every 1 second for real-time updates
+  // Poll traffic every 1 second for real-time updates (data collection only)
   cron.schedule("* * * * * *", () => {
     pollRouterTraffic().catch(error => {
       console.error("[Scheduler] Unhandled error in real-time polling:", error);
+    });
+  });
+
+  // Check alerts every 60 seconds with 3-consecutive-checks confirmation
+  cron.schedule("*/60 * * * * *", () => {
+    checkAlerts().catch(error => {
+      console.error("[Scheduler] Unhandled error in alert checking:", error);
     });
   });
 
@@ -431,7 +533,10 @@ export function startScheduler() {
     pollRouterTraffic().catch(error => {
       console.error("[Scheduler] Error in initial traffic poll:", error);
     });
+    checkAlerts().catch(error => {
+      console.error("[Scheduler] Error in initial alert check:", error);
+    });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully (1s real-time polling, 5min database persistence, daily cleanup)");
+  console.log("[Scheduler] Scheduler started successfully (1s real-time polling, 60s alert checking with 3-check confirmation, 5min database persistence, daily cleanup)");
 }
