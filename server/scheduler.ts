@@ -168,10 +168,17 @@ async function pollRouterTraffic() {
         const isReachable = await client.checkReachability();
         console.log(`[Scheduler] Reachability result for ${router.name}: ${isReachable}`);
         await storage.updateRouterReachability(routerId, isReachable);
+        
+        // If not reachable, mark as disconnected and skip data collection
+        if (!isReachable) {
+          console.log(`[Scheduler] Router ${router.name} is unreachable, marking as disconnected`);
+          await storage.updateRouterConnection(routerId, false);
+          continue;
+        }
 
         const stats = await client.getInterfaceStats();
 
-        // Update router connection status
+        // Update router connection status (only if reachable AND data retrieved successfully)
         await storage.updateRouterConnection(routerId, true);
 
         // Check if hostname was extracted from SSL certificate (when connecting via IP)
