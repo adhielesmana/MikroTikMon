@@ -32,8 +32,9 @@ function filterInterfaces(interfaces: string[], displayMode: 'none' | 'static' |
   const dynamicPrefixes = ['pppoe-', 'l2tp-', 'pptp-', 'sstp-', 'ovpn-'];
   
   return interfaces.filter(name => {
-    const lowerName = name.toLowerCase();
-    return !dynamicPrefixes.some(prefix => lowerName.startsWith(prefix));
+    // Remove angle brackets if present (e.g., <pppoe-xxx> becomes pppoe-xxx)
+    const cleanName = name.replace(/^<|>$/g, '').toLowerCase();
+    return !dynamicPrefixes.some(prefix => cleanName.startsWith(prefix));
   });
 }
 
@@ -275,7 +276,13 @@ export class MikrotikClient {
       });
     }
 
-    resolve(results);
+    // Filter interfaces based on display mode
+    const allowedNames = filterInterfaces(
+      results.map(r => r.name),
+      this.connection.interfaceDisplayMode || 'static'
+    );
+    
+    resolve(results.filter(r => allowedNames.includes(r.name)));
   }
 
   async getInterfaceStatsViaSNMP(): Promise<InterfaceStats[]> {
@@ -561,8 +568,18 @@ export class MikrotikClient {
     try {
       console.log(`[REST API] Attempting to connect to ${this.connection.host}:${this.connection.restPort || 443}...`);
       // Get current interface stats
-      const interfaces = await this.restRequest('/rest/interface');
-      console.log(`[REST API] Successfully retrieved ${interfaces.length} interfaces`);
+      const allInterfaces = await this.restRequest('/rest/interface');
+      console.log(`[REST API] Successfully retrieved ${allInterfaces.length} interfaces (before filtering)`);
+      
+      // Filter interfaces based on display mode
+      const interfaceNames = filterInterfaces(
+        allInterfaces.map((i: any) => i.name).filter(Boolean),
+        this.connection.interfaceDisplayMode || 'static'
+      );
+      
+      // Filter to only include interfaces that passed the filter
+      const interfaces = allInterfaces.filter((iface: any) => interfaceNames.includes(iface.name));
+      console.log(`[REST API] After filtering: ${interfaces.length} interfaces`);
       console.log(`[REST API] Interface names:`, interfaces.map((i: any) => i.name).join(', '));
       
       const result: InterfaceStats[] = [];
@@ -666,7 +683,7 @@ export class MikrotikClient {
       await api.close();
 
       // Transform the data into our format
-      const result: InterfaceStats[] = [];
+      const allResults: InterfaceStats[] = [];
       
       if (Array.isArray(stats)) {
         for (const stat of stats) {
@@ -674,7 +691,7 @@ export class MikrotikClient {
           const rxRate = parseInt(stat["rx-bits-per-second"] || "0") / 8; // Convert bits to bytes
           const txRate = parseInt(stat["tx-bits-per-second"] || "0") / 8;
 
-          result.push({
+          allResults.push({
             name,
             rxBytesPerSecond: rxRate,
             txBytesPerSecond: txRate,
@@ -684,7 +701,13 @@ export class MikrotikClient {
         }
       }
 
-      return result;
+      // Filter interfaces based on display mode
+      const allowedNames = filterInterfaces(
+        allResults.map(s => s.name),
+        this.connection.interfaceDisplayMode || 'static'
+      );
+      
+      return allResults.filter(s => allowedNames.includes(s.name));
     } catch (error: any) {
       console.error("Failed to get interface stats via native API:", error);
       if (api) {
