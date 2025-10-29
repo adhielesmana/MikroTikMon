@@ -32,8 +32,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 const routerFormSchema = z.object({
   name: z.string().min(1, "Router name is required"),
@@ -48,7 +49,7 @@ const routerFormSchema = z.object({
   snmpCommunity: z.string().default("public"),
   snmpVersion: z.enum(["1", "2c"]).default("2c"), // Only v1 and v2c supported (v3 requires additional auth params)
   snmpPort: z.coerce.number().min(1).max(65535).default(161),
-  includeDynamicInterfaces: z.boolean().default(false),
+  interfaceDisplayMode: z.enum(["none", "static", "all"]).default("static"),
 });
 
 type RouterFormData = z.infer<typeof routerFormSchema>;
@@ -80,7 +81,7 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
       snmpCommunity: "public",
       snmpVersion: "2c" as "1" | "2c",
       snmpPort: 161,
-      includeDynamicInterfaces: false,
+      interfaceDisplayMode: "static" as "none" | "static" | "all",
     },
   });
 
@@ -101,7 +102,7 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: (router.snmpVersion as "1" | "2c") || "2c",
           snmpPort: router.snmpPort || 161,
-          includeDynamicInterfaces: router.includeDynamicInterfaces || false,
+          interfaceDisplayMode: (router.interfaceDisplayMode as "none" | "static" | "all") || "static",
         });
       } else {
         form.reset({
@@ -117,7 +118,7 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
           snmpCommunity: "public",
           snmpVersion: "2c" as "1" | "2c",
           snmpPort: 161,
-          includeDynamicInterfaces: false,
+          interfaceDisplayMode: "static" as "none" | "static" | "all",
         });
       }
     }
@@ -441,29 +442,55 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
 
             <Separator className="my-4" />
 
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-medium">Include Dynamic Interfaces</h4>
-                <p className="text-sm text-muted-foreground">
-                  Monitor dynamic interfaces (PPPoE, L2TP) in addition to static interfaces
-                </p>
-              </div>
-              <FormField
-                control={form.control}
-                name="includeDynamicInterfaces"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        data-testid="switch-include-dynamic"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="interfaceDisplayMode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Interface Display Mode</FormLabel>
+                  <FormDescription>
+                    Choose which interfaces to display and monitor
+                  </FormDescription>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      className="flex flex-col gap-3 pt-2"
+                      data-testid="radio-interface-display-mode"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="none" id="mode-none" data-testid="radio-mode-none" />
+                        <Label htmlFor="mode-none" className="font-normal cursor-pointer">
+                          <span className="font-medium">Hide All</span>
+                          <span className="block text-sm text-muted-foreground">
+                            Don't display any interfaces
+                          </span>
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="static" id="mode-static" data-testid="radio-mode-static" />
+                        <Label htmlFor="mode-static" className="font-normal cursor-pointer">
+                          <span className="font-medium">Static Only (Recommended)</span>
+                          <span className="block text-sm text-muted-foreground">
+                            Show only static interfaces (Ethernet, VLAN, Bridge, etc.)
+                          </span>
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="all" id="mode-all" data-testid="radio-mode-all" />
+                        <Label htmlFor="mode-all" className="font-normal cursor-pointer">
+                          <span className="font-medium">Show All</span>
+                          <span className="block text-sm text-muted-foreground">
+                            Include dynamic interfaces (PPPoE, L2TP, etc.)
+                          </span>
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
               <Button
