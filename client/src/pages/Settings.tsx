@@ -23,11 +23,8 @@ export default function Settings() {
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (data: { logo_url: string }) => {
-      return apiRequest("/api/settings", {
-        method: "PUT",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      const res = await apiRequest("PUT", "/api/settings", data);
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
