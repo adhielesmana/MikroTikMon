@@ -77,8 +77,8 @@ export const routers = pgTable("routers", {
   snmpCommunity: varchar("snmp_community", { length: 255 }).default("public"),
   snmpVersion: varchar("snmp_version", { length: 10 }).default("2c"), // "1", "2c", or "3"
   snmpPort: integer("snmp_port").notNull().default(161),
-  // Interface filtering - include dynamic interfaces (pppoe, l2tp) or only static (ethernet, vlan)
-  includeDynamicInterfaces: boolean("include_dynamic_interfaces").notNull().default(false),
+  // Interface filtering - 'none' (hide all), 'static' (show static only), 'all' (show all including dynamic)
+  interfaceDisplayMode: varchar("interface_display_mode", { length: 20 }).notNull().default("static"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -131,7 +131,7 @@ export const insertRouterSchema = z.object({
   snmpCommunity: z.string().default("public"),
   snmpVersion: z.enum(["1", "2c"]).default("2c"), // Only v1 and v2c supported (v3 requires additional auth params)
   snmpPort: z.number().min(1).max(65535).default(161),
-  includeDynamicInterfaces: z.boolean().default(false),
+  interfaceDisplayMode: z.enum(["none", "static", "all"]).default("static"),
 });
 
 export type InsertRouter = z.infer<typeof insertRouterSchema>;
