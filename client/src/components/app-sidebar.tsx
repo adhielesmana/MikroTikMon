@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LayoutDashboard, Server, Bell, Settings, Users, LogOut, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -17,17 +17,21 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import type { AppSettings } from "@shared/schema";
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, isAdmin } = useAuth();
   const [logoError, setLogoError] = useState(false);
   
-  const { data: settings } = useQuery({
+  const { data: settings } = useQuery<AppSettings>({
     queryKey: ["/api/settings"],
-    // Reset logo error state when settings change
-    onSuccess: () => setLogoError(false),
   });
+
+  // Reset logo error state when settings change
+  useEffect(() => {
+    setLogoError(false);
+  }, [settings?.logoUrl]);
 
   const menuItems = [
     {
@@ -64,9 +68,9 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2" data-testid="sidebar-header-logo">
-          {settings?.logo_url && !logoError ? (
+          {settings?.logoUrl && !logoError ? (
             <img
-              src={settings.logo_url}
+              src={settings.logoUrl}
               alt="Application logo"
               className="h-8 object-contain max-w-[180px]"
               data-testid="img-sidebar-logo"
