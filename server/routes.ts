@@ -513,7 +513,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const trafficData = getRealtimeTraffic(req.params.id);
       
       // Extract unique port names
-      const interfaceNames = Array.from(new Set(trafficData.map(d => d.portName)));
+      let interfaceNames = Array.from(new Set(trafficData.map(d => d.portName)));
+      
+      // Filter based on router's includeDynamicInterfaces setting
+      if (!router.includeDynamicInterfaces) {
+        // Exclude dynamic interfaces like pppoe-*, l2tp-*, pptp-*, sstp-*, ovpn-*
+        const dynamicPrefixes = ['pppoe-', 'l2tp-', 'pptp-', 'sstp-', 'ovpn-'];
+        interfaceNames = interfaceNames.filter(name => {
+          const lowerName = name.toLowerCase();
+          return !dynamicPrefixes.some(prefix => lowerName.startsWith(prefix));
+        });
+      }
       
       res.json({ interfaces: interfaceNames });
     } catch (error) {
