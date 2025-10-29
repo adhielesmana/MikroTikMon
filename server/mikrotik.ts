@@ -14,16 +14,20 @@ export interface MikrotikConnection {
   snmpCommunity?: string;
   snmpVersion?: string;
   snmpPort?: number;
-  includeDynamicInterfaces?: boolean;
+  interfaceDisplayMode?: 'none' | 'static' | 'all';
 }
 
-// Helper function to filter interfaces based on type
-function filterInterfaces(interfaces: string[], includeDynamic: boolean): string[] {
-  if (includeDynamic) {
+// Helper function to filter interfaces based on display mode
+function filterInterfaces(interfaces: string[], displayMode: 'none' | 'static' | 'all' = 'static'): string[] {
+  if (displayMode === 'none') {
+    return []; // Hide all interfaces
+  }
+  
+  if (displayMode === 'all') {
     return interfaces; // Return all interfaces
   }
   
-  // Filter to only static interfaces (ethernet, vlan, bridge, etc.)
+  // displayMode === 'static': Filter to only static interfaces (ethernet, vlan, bridge, etc.)
   // Exclude dynamic interfaces like pppoe-*, l2tp-*, pptp-*, etc.
   const dynamicPrefixes = ['pppoe-', 'l2tp-', 'pptp-', 'sstp-', 'ovpn-'];
   
@@ -408,7 +412,7 @@ export class MikrotikClient {
           }
         }
 
-        const filtered = filterInterfaces(interfaces, this.connection.includeDynamicInterfaces || false);
+        const filtered = filterInterfaces(interfaces, this.connection.interfaceDisplayMode || 'static');
         resolve(filtered);
       });
     });
@@ -542,7 +546,7 @@ export class MikrotikClient {
     try {
       const interfaces = await this.restRequest('/rest/interface');
       const allInterfaces = interfaces.map((iface: any) => iface.name).filter(Boolean);
-      return filterInterfaces(allInterfaces, this.connection.includeDynamicInterfaces || false);
+      return filterInterfaces(allInterfaces, this.connection.interfaceDisplayMode || 'static');
     } catch (error) {
       console.error("Failed to get interface list via REST:", error);
       return [];
@@ -730,7 +734,7 @@ export class MikrotikClient {
 
       if (Array.isArray(interfaces)) {
         const allInterfaces = interfaces.map((iface: any) => iface.name).filter(Boolean);
-        return filterInterfaces(allInterfaces, this.connection.includeDynamicInterfaces || false);
+        return filterInterfaces(allInterfaces, this.connection.interfaceDisplayMode || 'static');
       }
 
       return [];

@@ -515,15 +515,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract unique port names
       let interfaceNames = Array.from(new Set(trafficData.map(d => d.portName)));
       
-      // Filter based on router's includeDynamicInterfaces setting
-      if (!router.includeDynamicInterfaces) {
-        // Exclude dynamic interfaces like pppoe-*, l2tp-*, pptp-*, sstp-*, ovpn-*
+      // Filter based on router's interfaceDisplayMode setting
+      if (router.interfaceDisplayMode === 'none') {
+        // Hide all interfaces
+        interfaceNames = [];
+      } else if (router.interfaceDisplayMode === 'static') {
+        // Show only static interfaces (exclude dynamic ones)
         const dynamicPrefixes = ['pppoe-', 'l2tp-', 'pptp-', 'sstp-', 'ovpn-'];
         interfaceNames = interfaceNames.filter(name => {
           const lowerName = name.toLowerCase();
           return !dynamicPrefixes.some(prefix => lowerName.startsWith(prefix));
         });
       }
+      // else 'all' - show all interfaces (no filtering)
       
       res.json({ interfaces: interfaceNames });
     } catch (error) {
