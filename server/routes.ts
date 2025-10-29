@@ -9,6 +9,9 @@ import { emailService } from "./emailService";
 import { startScheduler, setWebSocketServer } from "./scheduler";
 import { insertRouterSchema } from "@shared/schema";
 import { z } from "zod";
+import fs from "fs/promises";
+import path from "path";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -623,7 +626,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/settings", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { logo_url } = req.body;
-      const settings = await storage.updateAppSettings(logo_url);
+      
+      let localLogoPath = "";
+      
+      if (logo_url && logo_url.trim() !== "") {
+        // Download and save the logo locally
+        try {
+          console.log(`[Settings] Downloading logo from: ${logo_url}`);
+          
+          // Fetch the image
+          const response = await fetch(logo_url);
+          if (!response.ok) {
+            throw new Error(`Failed to download image: ${response.statusText}`);
+          }
+          
+          // Get the content type to determine file extension
+          const contentType = response.headers.get('content-type') || '';
+          let extension = '.png'; // default
+          if (contentType.includes('svg')) extension = '.svg';
+          else if (contentType.includes('jpeg') || contentType.includes('jpg')) extension = '.jpg';
+          else if (contentType.includes('png')) extension = '.png';
+          else if (contentType.includes('gif')) extension = '.gif';
+          else if (contentType.includes('webp')) extension = '.webp';
+          
+          // Generate a unique filename
+          const filename = `logo-${crypto.randomBytes(8).toString('hex')}${extension}`;
+          const logoDir = path.join(process.cwd(), 'attached_assets', 'logos');
+          const localPath = path.join(logoDir, filename);
+          
+          // Ensure directory exists
+          await fs.mkdir(logoDir, { recursive: true });
+          
+          // Download and save the file
+          const buffer = await response.arrayBuffer();
+          await fs.writeFile(localPath, Buffer.from(buffer));
+          
+          // Store the relative path that can be served by the frontend
+          localLogoPath = `/attached_assets/logos/${filename}`;
+          
+          console.log(`[Settings] Logo saved to: ${localLogoPath}`);
+          
+          // Delete old logo if exists
+          const currentSettings = await storage.getAppSettings();
+          if (currentSettings?.logoUrl && currentSettings.logoUrl.startsWith('/attached_assets/logos/')) {
+            try {
+              const oldPath = path.join(process.cwd(), currentSettings.logoUrl);
+              await fs.unlink(oldPath);
+              console.log(`[Settings] Deleted old logo: ${oldPath}`);
+            } catch (err) {
+              // Ignore errors when deleting old logo
+              console.log(`[Settings] Could not delete old logo (might not exist)`);
+            }
+          }
+        } catch (downloadError: any) {
+          console.error("[Settings] Error downloading logo:", downloadError);
+          return res.status(400).json({ message: `Failed to download logo: ${downloadError.message}` });
+        }
+      }
+      
+      const settings = await storage.updateAppSettings(localLogoPath);
       res.json(settings);
     } catch (error) {
       console.error("Error updating app settings:", error);
