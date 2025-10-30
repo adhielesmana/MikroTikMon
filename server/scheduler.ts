@@ -201,37 +201,21 @@ async function pollRouterTraffic() {
           interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
         });
 
-        // Use the last successful connection method to avoid retesting fallbacks every time
+        // Use the last successful connection method (cached)
+        // We do NOT re-test fallbacks during background operations to reduce API calls
+        // Re-testing only happens when viewing/editing routers
         let stats: any[] = [];
         const storedMethod = router.lastSuccessfulConnectionMethod as 'native' | 'rest' | 'snmp' | null;
         
         if (storedMethod) {
-          try {
-            console.log(`[Scheduler] Using stored method '${storedMethod}' for ${router.name}`);
-            stats = await client.getInterfaceStatsWithMethod(storedMethod);
-          } catch (error: any) {
-            console.log(`[Scheduler] Stored method '${storedMethod}' failed for ${router.name}, finding working method...`);
-            // Stored method failed, find a new working method
-            const workingMethod = await client.findWorkingConnectionMethod();
-            if (workingMethod) {
-              console.log(`[Scheduler] Found working method '${workingMethod}' for ${router.name}`);
-              await storage.updateLastSuccessfulConnectionMethod(router.id, workingMethod);
-              stats = await client.getInterfaceStatsWithMethod(workingMethod);
-            } else {
-              throw new Error("All connection methods failed");
-            }
-          }
+          // Use the cached method directly - if it fails, skip this router
+          console.log(`[Scheduler] Using stored method '${storedMethod}' for ${router.name}`);
+          stats = await client.getInterfaceStatsWithMethod(storedMethod);
         } else {
-          // No stored method, find and use a working method
-          console.log(`[Scheduler] No stored method for ${router.name}, finding working method...`);
-          const workingMethod = await client.findWorkingConnectionMethod();
-          if (workingMethod) {
-            console.log(`[Scheduler] Found working method '${workingMethod}' for ${router.name}`);
-            await storage.updateLastSuccessfulConnectionMethod(router.id, workingMethod);
-            stats = await client.getInterfaceStatsWithMethod(workingMethod);
-          } else {
-            throw new Error("All connection methods failed");
-          }
+          // No stored method - this means the router hasn't been tested yet
+          // Skip this router - it will be tested when user views/edits it
+          console.log(`[Scheduler] No stored method for ${router.name}, skipping (will be tested on view/edit)`);
+          continue;
         }
 
         // Update router connection status (only if reachable AND data retrieved successfully)
