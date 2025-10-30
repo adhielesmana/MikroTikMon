@@ -710,63 +710,80 @@ export class MikrotikClient {
     return null;
   }
 
-  async getInterfaceStats(): Promise<InterfaceStats[]> {
+  /**
+   * Get interface stats using a specific connection method (no fallback).
+   * Used by scheduler to avoid retesting fallbacks every time.
+   */
+  async getInterfaceStatsWithMethod(method: 'native' | 'rest' | 'snmp'): Promise<InterfaceStats[]> {
+    switch (method) {
+      case 'native':
+        return await this.getInterfaceStatsViaNative();
+      case 'rest':
+        return await this.getInterfaceStatsViaREST();
+      case 'snmp':
+        return await this.getInterfaceStatsViaSNMP();
+      default:
+        throw new Error(`Unknown connection method: ${method}`);
+    }
+  }
+
+  /**
+   * Get interface stats via Native API only (no fallback).
+   */
+  private async getInterfaceStatsViaNative(): Promise<InterfaceStats[]> {
     let api: RouterOSAPI | null = null;
 
-    try {
-      api = new RouterOSAPI({
-        host: this.connection.host,
-        user: this.connection.user,
-        password: this.connection.password,
-        port: this.connection.port,
-        timeout: 10,
-      });
+    api = new RouterOSAPI({
+      host: this.connection.host,
+      user: this.connection.user,
+      password: this.connection.password,
+      port: this.connection.port,
+      timeout: 10,
+    });
 
-      await api.connect();
+    await api.connect();
 
-      // Get interface traffic statistics
-      const stats = await api.write("/interface/monitor-traffic", [
-        "=interface=all",
-        "=once="
-      ]);
+    // Get interface traffic statistics
+    const stats = await api.write("/interface/monitor-traffic", [
+      "=interface=all",
+      "=once="
+    ]);
 
-      await api.close();
+    await api.close();
 
-      // Transform the data into our format
-      const allResults: InterfaceStats[] = [];
-      
-      if (Array.isArray(stats)) {
-        for (const stat of stats) {
-          const name = stat.name || stat.interface || "unknown";
-          const rxRate = parseInt(stat["rx-bits-per-second"] || "0") / 8; // Convert bits to bytes
-          const txRate = parseInt(stat["tx-bits-per-second"] || "0") / 8;
+    // Transform the data into our format
+    const allResults: InterfaceStats[] = [];
+    
+    if (Array.isArray(stats)) {
+      for (const stat of stats) {
+        const name = stat.name || stat.interface || "unknown";
+        const rxRate = parseInt(stat["rx-bits-per-second"] || "0") / 8; // Convert bits to bytes
+        const txRate = parseInt(stat["tx-bits-per-second"] || "0") / 8;
 
-          allResults.push({
-            name,
-            rxBytesPerSecond: rxRate,
-            txBytesPerSecond: txRate,
-            totalBytesPerSecond: rxRate + txRate,
-            running: stat.running === "true" || stat.running === true, // Port status
-          });
-        }
+        allResults.push({
+          name,
+          rxBytesPerSecond: rxRate,
+          txBytesPerSecond: txRate,
+          totalBytesPerSecond: rxRate + txRate,
+          running: stat.running === "true" || stat.running === true, // Port status
+        });
       }
+    }
 
-      // Filter interfaces based on display mode
-      const allowedNames = filterInterfaces(
-        allResults.map(s => s.name),
-        this.connection.interfaceDisplayMode || 'static'
-      );
-      
-      return allResults.filter(s => allowedNames.includes(s.name));
+    // Filter interfaces based on display mode
+    const allowedNames = filterInterfaces(
+      allResults.map(s => s.name),
+      this.connection.interfaceDisplayMode || 'static'
+    );
+    
+    return allResults.filter(s => allowedNames.includes(s.name));
+  }
+
+  async getInterfaceStats(): Promise<InterfaceStats[]> {
+    try {
+      return await this.getInterfaceStatsViaNative();
     } catch (error: any) {
       console.error("Failed to get interface stats via native API:", error);
-      if (api) {
-        try {
-          await api.close();
-        } catch (e) {
-          // Ignore close errors
-        }
-      }
       
       // Try REST API if enabled
       if (this.connection.restEnabled) {

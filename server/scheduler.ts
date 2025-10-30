@@ -201,7 +201,38 @@ async function pollRouterTraffic() {
           interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
         });
 
-        const stats = await client.getInterfaceStats();
+        // Use the last successful connection method to avoid retesting fallbacks every time
+        let stats: any[] = [];
+        const storedMethod = router.lastSuccessfulConnectionMethod as 'native' | 'rest' | 'snmp' | null;
+        
+        if (storedMethod) {
+          try {
+            console.log(`[Scheduler] Using stored method '${storedMethod}' for ${router.name}`);
+            stats = await client.getInterfaceStatsWithMethod(storedMethod);
+          } catch (error: any) {
+            console.log(`[Scheduler] Stored method '${storedMethod}' failed for ${router.name}, finding working method...`);
+            // Stored method failed, find a new working method
+            const workingMethod = await client.findWorkingConnectionMethod();
+            if (workingMethod) {
+              console.log(`[Scheduler] Found working method '${workingMethod}' for ${router.name}`);
+              await storage.updateLastSuccessfulConnectionMethod(router.id, workingMethod);
+              stats = await client.getInterfaceStatsWithMethod(workingMethod);
+            } else {
+              throw new Error("All connection methods failed");
+            }
+          }
+        } else {
+          // No stored method, find and use a working method
+          console.log(`[Scheduler] No stored method for ${router.name}, finding working method...`);
+          const workingMethod = await client.findWorkingConnectionMethod();
+          if (workingMethod) {
+            console.log(`[Scheduler] Found working method '${workingMethod}' for ${router.name}`);
+            await storage.updateLastSuccessfulConnectionMethod(router.id, workingMethod);
+            stats = await client.getInterfaceStatsWithMethod(workingMethod);
+          } else {
+            throw new Error("All connection methods failed");
+          }
+        }
 
         // Update router connection status (only if reachable AND data retrieved successfully)
         await storage.updateRouterConnection(router.id, true);
