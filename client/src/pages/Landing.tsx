@@ -1,17 +1,43 @@
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, BarChart3, Bell, Server, Shield, Users } from "lucide-react";
+import type { AppSettings } from "@shared/schema";
 
 export default function Landing() {
+  const [logoError, setLogoError] = useState(false);
+  
+  const { data: settings } = useQuery<AppSettings>({
+    queryKey: ["/api/settings"],
+  });
+
+  // Reset logo error state when settings change (enables dynamic update)
+  useEffect(() => {
+    setLogoError(false);
+  }, [settings?.logoUrl]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <Server className="h-6 w-6 text-primary" />
-              <span className="text-lg font-semibold">MikroTik Monitor</span>
+            <div className="flex items-center gap-2" data-testid="landing-header-logo">
+              {settings?.logoUrl && !logoError ? (
+                <img
+                  src={settings.logoUrl}
+                  alt="Application logo"
+                  className="h-8 object-contain max-w-[180px]"
+                  data-testid="img-landing-logo"
+                  onError={() => setLogoError(true)}
+                />
+              ) : (
+                <>
+                  <Server className="h-6 w-6 text-primary" />
+                  <span className="text-lg font-semibold" data-testid="text-landing-title">MikroTik Monitor</span>
+                </>
+              )}
             </div>
             <Button asChild data-testid="button-login">
               <a href="/api/login">Log In</a>

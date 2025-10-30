@@ -3,9 +3,9 @@
 ## Overview
 A comprehensive, enterprise-grade network monitoring platform for MikroTik routers. It offers real-time traffic analysis, intelligent threshold-based alerting, and multi-user role-based access control. The platform is designed for professional network administrators, providing a production-ready solution for efficient network oversight. The project aims to provide a robust, scalable, and user-friendly system for monitoring MikroTik router performance and health.
 
-## Recent Changes (Oct 29, 2025)
--   **Three-State Interface Filtering:** Enhanced interface display control with three modes per router: "Hide All" (no interfaces), "Static Only" (default - Ethernet, VLAN, Bridge, VRRP, Bonding), and "Show All" (includes dynamic PPPoE, L2TP). Replaced previous binary toggle with radio button UI. Filtering applied at MikrotikClient level across all three connection methods (Native API, REST API, SNMP).
--   **Custom Logo Support:** Administrators can now upload a custom logo via URL in Settings, which replaces "MikroTik Monitor" text in the sidebar. Fallback to text if logo fails to load.
+## Recent Changes (Oct 30, 2025)
+-   **Interface Filtering Bug Fix:** Fixed critical filtering bug where angle brackets in interface names (e.g., `<pppoe-xxx>`) bypassed the dynamic interface filter. Updated `filterInterfaces()` function to strip angle brackets before checking prefixes. Filtering now properly applied across all three connection methods at the `getInterfaceStats()` level (Native API, REST API, SNMP). Result: POP Soba Spasico now correctly shows 16 static interfaces instead of 135 total interfaces in "Static Only" mode.
+-   **Dynamic Logo on Homepage:** Extended custom logo support to the Landing page (homepage). Logo now updates automatically on both the sidebar and homepage when a custom logo URL is set in Settings. Implements same error handling and dynamic update pattern using `useEffect` to reset error state when logo changes, ensuring seamless updates when logo becomes available.
 
 ## User Preferences
 - Professional, data-dense monitoring interface
