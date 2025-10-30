@@ -79,6 +79,8 @@ export const routers = pgTable("routers", {
   snmpPort: integer("snmp_port").notNull().default(161),
   // Interface filtering - 'none' (hide all), 'static' (show static only), 'all' (show all including dynamic)
   interfaceDisplayMode: varchar("interface_display_mode", { length: 20 }).notNull().default("static"),
+  // Last successful connection method - used by scheduler to avoid retesting fallbacks every time
+  lastSuccessfulConnectionMethod: varchar("last_successful_connection_method", { length: 20 }).default("native"), // 'native', 'rest', or 'snmp'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
