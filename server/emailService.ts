@@ -22,7 +22,7 @@ class EmailService {
       from: process.env.SMTP_FROM_EMAIL || "noreply@mikrotik-monitor.local",
     };
 
-    this.from = config.from;
+    this.from = config.from || "noreply@mikrotik-monitor.local";
 
     // Check if SMTP is configured
     if (config.host && config.port && config.user && config.pass) {
@@ -58,10 +58,10 @@ Router: ${alert.routerName}
 Port: ${alert.portName}
 Severity: ${alert.severity}
 
-Current Traffic: ${alert.currentTraffic}
+Current RX Traffic: ${alert.currentTraffic}
 Threshold: ${alert.threshold}
 
-The traffic on ${alert.portName} has fallen below the configured threshold.
+The RX (download) traffic on ${alert.portName} has fallen below the configured threshold.
 Please check your router configuration and network connectivity.
 
 ---
@@ -92,9 +92,9 @@ MikroTik Monitor
         <p><strong>Port:</strong> ${alert.portName}</p>
         <p><strong>Severity:</strong> ${alert.severity}</p>
       </div>
-      <p><strong>Current Traffic:</strong> ${alert.currentTraffic}</p>
+      <p><strong>Current RX Traffic:</strong> ${alert.currentTraffic}</p>
       <p><strong>Configured Threshold:</strong> ${alert.threshold}</p>
-      <p>The traffic on <strong>${alert.portName}</strong> has fallen below the configured threshold. Please check your router configuration and network connectivity.</p>
+      <p>The RX (download) traffic on <strong>${alert.portName}</strong> has fallen below the configured threshold. Please check your router configuration and network connectivity.</p>
     </div>
     <div class="footer">
       <p>MikroTik Monitor - Network Traffic Monitoring Platform</p>

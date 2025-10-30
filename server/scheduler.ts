@@ -151,7 +151,7 @@ async function pollRouterTraffic() {
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: router.snmpVersion || "2c",
           snmpPort: router.snmpPort || 161,
-          interfaceDisplayMode: router.interfaceDisplayMode || 'static',
+          interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
         });
 
         const isReachable = await client.checkReachability();
@@ -198,7 +198,7 @@ async function pollRouterTraffic() {
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: router.snmpVersion || "2c",
           snmpPort: router.snmpPort || 161,
-          interfaceDisplayMode: router.interfaceDisplayMode || 'static',
+          interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
         });
 
         const stats = await client.getInterfaceStats();
@@ -310,7 +310,7 @@ async function checkAlerts() {
           snmpCommunity: router.snmpCommunity || "public",
           snmpVersion: router.snmpVersion || "2c",
           snmpPort: router.snmpPort || 161,
-          interfaceDisplayMode: router.interfaceDisplayMode || 'static',
+          interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
         });
 
         const stats = await client.getInterfaceStats();
@@ -393,10 +393,10 @@ async function checkAlerts() {
             isTrafficAlert = latestAlert && !latestAlert.message.includes("is DOWN");
           }
 
-          // Check traffic threshold
-          const isBelowThreshold = stat.totalBytesPerSecond < port.minThresholdBps;
+          // Check traffic threshold (RX only - download traffic)
+          const isBelowThreshold = stat.rxBytesPerSecond < port.minThresholdBps;
           
-          console.log(`[Scheduler] ${router.name} - ${port.portName}: Traffic ${(stat.totalBytesPerSecond / 1024).toFixed(2)} KB/s vs Threshold ${(port.minThresholdBps / 1024).toFixed(2)} KB/s (${isBelowThreshold ? 'BELOW' : 'ABOVE'})`);
+          console.log(`[Scheduler] ${router.name} - ${port.portName}: RX Traffic ${(stat.rxBytesPerSecond / 1024).toFixed(2)} KB/s vs Threshold ${(port.minThresholdBps / 1024).toFixed(2)} KB/s (${isBelowThreshold ? 'BELOW' : 'ABOVE'})`);
 
           if (isBelowThreshold) {
             // Increment violation count
@@ -405,7 +405,7 @@ async function checkAlerts() {
             // Only create alert after 3 consecutive checks AND no active traffic alert
             if (violationCount >= 3 && (!hasActiveAlert || isPortDownAlert)) {
               // Determine severity based on how far below threshold
-              const percentBelow = ((port.minThresholdBps - stat.totalBytesPerSecond) / port.minThresholdBps) * 100;
+              const percentBelow = ((port.minThresholdBps - stat.rxBytesPerSecond) / port.minThresholdBps) * 100;
               let severity = "warning";
               if (percentBelow > 50) severity = "critical";
               else if (percentBelow > 25) severity = "warning";
@@ -418,8 +418,8 @@ async function checkAlerts() {
                 portName: port.portName,
                 userId: router.userId,
                 severity,
-                message: `Traffic on ${port.portName} is below threshold: ${(stat.totalBytesPerSecond / 1024).toFixed(2)} KB/s < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
-                currentTrafficBps: stat.totalBytesPerSecond,
+                message: `RX traffic on ${port.portName} is below threshold: ${(stat.rxBytesPerSecond / 1024).toFixed(2)} KB/s < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
+                currentTrafficBps: stat.rxBytesPerSecond,
                 thresholdBps: port.minThresholdBps,
               });
 
@@ -450,7 +450,7 @@ async function checkAlerts() {
                     await emailService.sendAlertEmail(user.email, {
                       routerName: router.name,
                       portName: port.portName,
-                      currentTraffic: `${(stat.totalBytesPerSecond / 1024).toFixed(2)} KB/s`,
+                      currentTraffic: `${(stat.rxBytesPerSecond / 1024).toFixed(2)} KB/s (RX)`,
                       threshold: `${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
                       severity: alert.severity,
                     });
