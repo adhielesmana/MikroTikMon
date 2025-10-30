@@ -667,8 +667,9 @@ export class MikrotikClient {
    */
   async findWorkingConnectionMethod(): Promise<'native' | 'rest' | 'snmp' | null> {
     // Try native API first
+    let api: RouterOSAPI | null = null;
     try {
-      const api = new RouterOSAPI({
+      api = new RouterOSAPI({
         host: this.connection.host,
         user: this.connection.user,
         password: this.connection.password,
@@ -676,34 +677,55 @@ export class MikrotikClient {
         timeout: 10,
       });
 
+      // Add error event listener to prevent unhandled errors from crashing the app
+      api.on('error', (error: any) => {
+        console.error("[Connection Test Native API] Error event:", error.message);
+      });
+
       await api.connect();
       await api.close();
       console.log("[Connection Test] Native API succeeded");
       return 'native';
     } catch (error: any) {
-      console.log("[Connection Test] Native API failed:", error.message);
+      console.log("[Connection Test] Native API failed:", error.message || "Unknown error");
+      // Ensure API is closed on error
+      if (api) {
+        try {
+          await api.close();
+        } catch (e) {
+          // Ignore close errors
+        }
+      }
     }
     
     // Try REST API if enabled
     if (this.connection.restEnabled) {
       console.log("[Connection Test] Testing REST API...");
-      const restSuccess = await this.testRESTConnection();
-      if (restSuccess) {
-        console.log("[Connection Test] REST API succeeded");
-        return 'rest';
+      try {
+        const restSuccess = await this.testRESTConnection();
+        if (restSuccess) {
+          console.log("[Connection Test] REST API succeeded");
+          return 'rest';
+        }
+        console.log("[Connection Test] REST API failed");
+      } catch (error: any) {
+        console.log("[Connection Test] REST API failed:", error.message || "Unknown error");
       }
-      console.log("[Connection Test] REST API failed");
     }
     
     // Try SNMP if enabled
     if (this.connection.snmpEnabled) {
       console.log("[Connection Test] Testing SNMP...");
-      const snmpSuccess = await this.testSNMPConnection();
-      if (snmpSuccess) {
-        console.log("[Connection Test] SNMP succeeded");
-        return 'snmp';
+      try {
+        const snmpSuccess = await this.testSNMPConnection();
+        if (snmpSuccess) {
+          console.log("[Connection Test] SNMP succeeded");
+          return 'snmp';
+        }
+        console.log("[Connection Test] SNMP failed");
+      } catch (error: any) {
+        console.log("[Connection Test] SNMP failed:", error.message || "Unknown error");
       }
-      console.log("[Connection Test] SNMP failed");
     }
     
     console.log("[Connection Test] All methods failed");
@@ -731,9 +753,7 @@ export class MikrotikClient {
    * Get interface stats via Native API only (no fallback).
    */
   private async getInterfaceStatsViaNative(): Promise<InterfaceStats[]> {
-    let api: RouterOSAPI | null = null;
-
-    api = new RouterOSAPI({
+    const api = new RouterOSAPI({
       host: this.connection.host,
       user: this.connection.user,
       password: this.connection.password,
@@ -741,42 +761,57 @@ export class MikrotikClient {
       timeout: 10,
     });
 
-    await api.connect();
+    // Add error event listener to prevent unhandled errors from crashing the app
+    api.on('error', (error: any) => {
+      console.error("[Native API] Error event:", error.message);
+    });
 
-    // Get interface traffic statistics
-    const stats = await api.write("/interface/monitor-traffic", [
-      "=interface=all",
-      "=once="
-    ]);
+    try {
+      await api.connect();
 
-    await api.close();
+      // Get interface traffic statistics
+      const stats = await api.write("/interface/monitor-traffic", [
+        "=interface=all",
+        "=once="
+      ]);
 
-    // Transform the data into our format
-    const allResults: InterfaceStats[] = [];
-    
-    if (Array.isArray(stats)) {
-      for (const stat of stats) {
-        const name = stat.name || stat.interface || "unknown";
-        const rxRate = parseInt(stat["rx-bits-per-second"] || "0") / 8; // Convert bits to bytes
-        const txRate = parseInt(stat["tx-bits-per-second"] || "0") / 8;
+      await api.close();
 
-        allResults.push({
-          name,
-          rxBytesPerSecond: rxRate,
-          txBytesPerSecond: txRate,
-          totalBytesPerSecond: rxRate + txRate,
-          running: stat.running === "true" || stat.running === true, // Port status
-        });
+      // Transform the data into our format
+      const allResults: InterfaceStats[] = [];
+      
+      if (Array.isArray(stats)) {
+        for (const stat of stats) {
+          const name = stat.name || stat.interface || "unknown";
+          const rxRate = parseInt(stat["rx-bits-per-second"] || "0") / 8; // Convert bits to bytes
+          const txRate = parseInt(stat["tx-bits-per-second"] || "0") / 8;
+
+          allResults.push({
+            name,
+            rxBytesPerSecond: rxRate,
+            txBytesPerSecond: txRate,
+            totalBytesPerSecond: rxRate + txRate,
+            running: stat.running === "true" || stat.running === true, // Port status
+          });
+        }
       }
-    }
 
-    // Filter interfaces based on display mode
-    const allowedNames = filterInterfaces(
-      allResults.map(s => s.name),
-      this.connection.interfaceDisplayMode || 'static'
-    );
-    
-    return allResults.filter(s => allowedNames.includes(s.name));
+      // Filter interfaces based on display mode
+      const allowedNames = filterInterfaces(
+        allResults.map(s => s.name),
+        this.connection.interfaceDisplayMode || 'static'
+      );
+      
+      return allResults.filter(s => allowedNames.includes(s.name));
+    } catch (error) {
+      // Ensure API is closed on error
+      try {
+        await api.close();
+      } catch (e) {
+        // Ignore close errors
+      }
+      throw error;
+    }
   }
 
   async getInterfaceStats(): Promise<InterfaceStats[]> {
