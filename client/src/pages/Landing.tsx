@@ -21,7 +21,7 @@ export default function Landing() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2" data-testid="landing-header-logo">
               {settings?.logoUrl && !logoError ? (
@@ -48,7 +48,7 @@ export default function Landing() {
 
       {/* Hero Section */}
       <section className="relative py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto space-y-6">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight">
               Professional MikroTik
@@ -72,7 +72,7 @@ export default function Landing() {
 
       {/* Features Grid */}
       <section className="py-16 sm:py-24 bg-card/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
             <h2 className="text-3xl sm:text-4xl font-semibold">
               Everything you need to monitor your network
@@ -82,7 +82,7 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {/* Feature Cards */}
             <Card>
               <CardHeader className="gap-2">
@@ -167,7 +167,7 @@ export default function Landing() {
 
       {/* CTA Section */}
       <section className="py-20 sm:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <Card className="bg-primary text-primary-foreground border-primary">
             <CardContent className="py-12 text-center space-y-6">
               <h2 className="text-3xl sm:text-4xl font-semibold">
@@ -192,7 +192,7 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="border-t py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-muted-foreground">
             © {new Date().getFullYear()} MikroTik Monitor. Professional network monitoring
             for MikroTik infrastructure.
