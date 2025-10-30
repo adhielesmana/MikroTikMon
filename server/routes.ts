@@ -186,14 +186,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         snmpCommunity: router.snmpCommunity || "public",
         snmpVersion: router.snmpVersion || "2c",
         snmpPort: router.snmpPort || 161,
-        includeDynamicInterfaces: router.includeDynamicInterfaces || false,
+        interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
       });
       
-      const success = await client.testConnection();
+      // Test all connection methods and find which one works
+      const workingMethod = await client.findWorkingConnectionMethod();
       
-      if (success) {
+      if (workingMethod) {
         await storage.updateRouterConnection(req.params.id, true);
-        res.json({ success: true, message: "Connection successful" });
+        await storage.updateLastSuccessfulConnectionMethod(req.params.id, workingMethod);
+        res.json({ 
+          success: true, 
+          message: "Connection successful",
+          method: workingMethod
+        });
       } else {
         await storage.updateRouterConnection(req.params.id, false);
         res.status(400).json({ success: false, message: "Connection failed" });
