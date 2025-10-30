@@ -660,6 +660,56 @@ export class MikrotikClient {
     }
   }
 
+  /**
+   * Test all connection methods and return which one succeeded.
+   * This is used when viewing/editing a router to determine the best method.
+   * Returns 'native', 'rest', 'snmp', or null if all failed.
+   */
+  async findWorkingConnectionMethod(): Promise<'native' | 'rest' | 'snmp' | null> {
+    // Try native API first
+    try {
+      const api = new RouterOSAPI({
+        host: this.connection.host,
+        user: this.connection.user,
+        password: this.connection.password,
+        port: this.connection.port,
+        timeout: 10,
+      });
+
+      await api.connect();
+      await api.close();
+      console.log("[Connection Test] Native API succeeded");
+      return 'native';
+    } catch (error: any) {
+      console.log("[Connection Test] Native API failed:", error.message);
+    }
+    
+    // Try REST API if enabled
+    if (this.connection.restEnabled) {
+      console.log("[Connection Test] Testing REST API...");
+      const restSuccess = await this.testRESTConnection();
+      if (restSuccess) {
+        console.log("[Connection Test] REST API succeeded");
+        return 'rest';
+      }
+      console.log("[Connection Test] REST API failed");
+    }
+    
+    // Try SNMP if enabled
+    if (this.connection.snmpEnabled) {
+      console.log("[Connection Test] Testing SNMP...");
+      const snmpSuccess = await this.testSNMPConnection();
+      if (snmpSuccess) {
+        console.log("[Connection Test] SNMP succeeded");
+        return 'snmp';
+      }
+      console.log("[Connection Test] SNMP failed");
+    }
+    
+    console.log("[Connection Test] All methods failed");
+    return null;
+  }
+
   async getInterfaceStats(): Promise<InterfaceStats[]> {
     let api: RouterOSAPI | null = null;
 
