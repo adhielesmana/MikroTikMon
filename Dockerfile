@@ -43,7 +43,6 @@ COPY --from=builder --chown=nodejs:nodejs /app/client/dist ./client/dist
 
 # Copy necessary files
 COPY --chown=nodejs:nodejs shared ./shared
-COPY --chown=nodejs:nodejs migrations ./migrations
 COPY --chown=nodejs:nodejs drizzle.config.ts ./
 
 # Switch to non-root user
