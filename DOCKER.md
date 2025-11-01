@@ -158,6 +158,22 @@ Docker automatically monitors this endpoint every 30 seconds.
 
 ---
 
+## Port Conflicts
+
+### PostgreSQL Port Already in Use
+
+If you see this error:
+```
+failed to bind host port for 0.0.0.0:5432:172.18.0.2:5432/tcp: address already in use
+```
+
+**Solution:** This is normal and not a problem! The database port is not exposed externally by default for security. The app connects internally via Docker networking.
+
+If you need external database access:
+1. Uncomment the `ports` section in `docker-compose.yml` under the `postgres` service
+2. Set `POSTGRES_PORT=5433` in `.env` (or another unused port)
+3. Restart: `./deploy.sh restart`
+
 ## Troubleshooting
 
 ### Container Won't Start

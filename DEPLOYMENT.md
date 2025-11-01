@@ -87,6 +87,10 @@ This will:
 ./deploy.sh up
 ```
 
+**Note:** If you get a "port already in use" error on port 5432, this is normal in development environments. The database port is not exposed externally by default for security. The application container connects to the database internally via Docker networking.
+
+If you need external database access for debugging, see the "Database Access" section below.
+
 ### 4. Access the Application
 
 Open your browser and navigate to:
@@ -228,6 +232,52 @@ Then access via: http://localhost:8080
 # Access via:
 # http://localhost (Nginx)
 # http://localhost:5000 (Direct)
+```
+
+---
+
+## Database Access
+
+### Security Note
+By default, the PostgreSQL database is **NOT exposed** on any external port for security. The application container connects to the database internally via Docker networking.
+
+### For Debugging/Development
+
+If you need direct database access for debugging:
+
+1. **Edit docker-compose.yml** - Uncomment the ports section for the `postgres` service:
+   ```yaml
+   ports:
+     - "${POSTGRES_PORT:-5432}:5432"
+   ```
+
+2. **Edit .env** - Set a different port if 5432 is already in use:
+   ```env
+   POSTGRES_PORT=5433
+   ```
+
+3. **Restart containers:**
+   ```bash
+   ./deploy.sh restart
+   ```
+
+4. **Connect with any PostgreSQL client:**
+   ```bash
+   psql -h localhost -p 5433 -U mikrotik_user -d mikrotik_monitor
+   ```
+
+### Using Docker Shell (Recommended)
+
+Instead of exposing ports, use the built-in shell access:
+
+```bash
+# Open database shell directly
+./deploy.sh db-shell
+
+# Then run SQL commands
+\dt              # List tables
+\d users         # Describe users table
+SELECT * FROM users;
 ```
 
 ---
