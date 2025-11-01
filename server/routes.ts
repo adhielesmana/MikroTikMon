@@ -65,6 +65,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check which authentication methods are available
+  app.get('/api/auth/methods', async (_req, res) => {
+    try {
+      const methods = {
+        local: true, // Always available
+        google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+        replit: !!(process.env.REPL_ID && process.env.ISSUER_URL),
+      };
+      res.json(methods);
+    } catch (error) {
+      console.error("Error checking auth methods:", error);
+      res.status(500).json({ message: "Failed to check auth methods" });
+    }
+  });
+
   // Router routes
   app.get("/api/routers", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
