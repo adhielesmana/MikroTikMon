@@ -207,11 +207,11 @@ export async function setupAuth(app: Express) {
     passwordField: 'password'
   }, async (username, password, done) => {
     try {
-      // Check if this is a local admin user
-      const dbUser = await storage.getUserByEmail(`${username}@local`);
+      // First, try to find user by username (for invited users)
+      const dbUser = await storage.getUserByUsername(username);
       
       if (dbUser && dbUser.passwordHash) {
-        // User has custom password - verify against their stored hash
+        // User found - verify password against their stored hash
         const passwordMatch = await bcrypt.compare(password, dbUser.passwordHash);
         
         if (passwordMatch) {
@@ -234,6 +234,7 @@ export async function setupAuth(app: Express) {
           // Create/update default admin user with all required fields
           const createdUser = await storage.upsertUser({
             id: DEFAULT_ADMIN_ID,
+            username: DEFAULT_ADMIN_USERNAME,
             email: `${DEFAULT_ADMIN_USERNAME}@local`,
             firstName: "Admin",
             lastName: "User",

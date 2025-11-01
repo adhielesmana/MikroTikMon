@@ -648,6 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create user with mustChangePassword flag
       const newUser = await storage.upsertUser({
         id: crypto.randomUUID(),
+        username,
         email,
         firstName,
         lastName,
