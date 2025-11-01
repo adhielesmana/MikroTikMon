@@ -1,0 +1,21 @@
+ => ERROR [stage-1  8/10] COPY --from=builder --chown=nodejs:nodejs /app/client/dist ./client/dist                                                                                                                                                       0.0s 
+------                                                                                                                                                                                                                                                        
+ > [stage-1  8/10] COPY --from=builder --chown=nodejs:nodejs /app/client/dist ./client/dist:                                                                                                                                                                  
+------                                                                                                                                                                                                                                                        
+Dockerfile:42                                                                                                                                                                                                                                                 
+                                                                                                                                                                                                                                                              
+--------------------                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                                              
+  40 |     # Copy built application from builder stage                                                                                                                                                                                                        
+
+  41 |     COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+
+  42 | >>> COPY --from=builder --chown=nodejs:nodejs /app/client/dist ./client/dist
+
+  43 |     
+
+  44 |     # Copy necessary files
+
+--------------------
+
+failed to solve: failed to compute cache key: failed to calculate checksum of ref efb8231f-fbfe-4627-8a43-5da748388bf3::jhg0xvvnp4swb2v6lpw69mjxn: "/app/client/dist": not found
