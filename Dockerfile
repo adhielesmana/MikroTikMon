@@ -34,15 +34,16 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
-
-# Copy built application from builder stage
+# Copy built application from builder stage first
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
 # Copy necessary files
 COPY --chown=nodejs:nodejs shared ./shared
 COPY --chown=nodejs:nodejs drizzle.config.ts ./
+
+# Install ALL dependencies (including dev) because esbuild uses --packages=external
+# This means the bundled code still imports packages from node_modules
+RUN npm ci && npm cache clean --force
 
 # Switch to non-root user
 USER nodejs
