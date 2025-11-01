@@ -108,6 +108,7 @@ function Router() {
         <>
           <Route path="/" component={Landing} />
           <Route path="/login" component={Login} />
+          <Route path="/change-password" component={ChangePassword} />
         </>
       ) : mustChangePassword ? (
         <Route path="*" component={ChangePassword} />
