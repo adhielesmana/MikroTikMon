@@ -3,7 +3,14 @@
 ## Overview
 A comprehensive, enterprise-grade network monitoring platform for MikroTik routers. It offers real-time traffic analysis, intelligent threshold-based alerting, and multi-user role-based access control. The platform is designed for professional network administrators, providing a production-ready solution for efficient network oversight. The project aims to provide a robust, scalable, and user-friendly system for monitoring MikroTik router performance and health.
 
-## Recent Changes (Oct 30, 2025)
+## Recent Changes (Nov 1, 2025)
+-   **Multi-Provider Authentication:** Implemented comprehensive authentication system supporting three methods: Google OAuth (for public access), static super admin (username/password for guaranteed admin access), and Replit Auth (for Replit-hosted deployments). All methods can work simultaneously. Session management now uses universal serialize/deserialize handlers for all providers. Session cookie security is conditional on production environment (secure in production, permissive in development).
+-   **Google OAuth Integration:** Added Passport.js Google OAuth strategy for public user sign-in. Users authenticate with Google accounts, profiles auto-populated (name, email, photo). New users are disabled by default and require admin approval.
+-   **Static Super Admin:** Implemented local authentication with bcrypt-hashed passwords (10 salt rounds). Super admin account has guaranteed admin access, always enabled, stored in environment variables. Password hash generator script (`scripts/hash-password.js`) included for easy setup.
+-   **Enhanced setup.sh:** Setup script now includes interactive super admin creation with automatic password hashing and secure .env configuration.
+-   **Comprehensive Documentation:** Added detailed guides: `GOOGLE-OAUTH-SETUP.md` (step-by-step Google OAuth configuration), `SELF-HOSTED-AUTH.md` (all authentication options and troubleshooting), including security best practices, FAQ, and deployment workflows.
+
+## Previous Changes (Oct 30, 2025)
 -   **Background Fallback Optimization:** Major performance optimization for background scheduler! Connection method fallback testing (Native API → REST API → SNMP) now only happens when viewing/editing a router or when the cached method fails. Added `lastSuccessfulConnectionMethod` field to routers table to store the last working method. Background scheduler now uses the cached method directly, dramatically reducing unnecessary connection attempts. Result: ~66% reduction in background API calls and faster traffic data collection.
 -   **RX-Only Threshold Monitoring:** Changed traffic threshold monitoring to check only RX (download/received) traffic instead of total traffic. Alert messages and emails now clearly indicate "RX traffic" for better clarity. This provides more accurate monitoring focused on incoming bandwidth consumption.
 -   **Interface Filtering Bug Fix:** Fixed critical filtering bug where angle brackets in interface names (e.g., `<pppoe-xxx>`) bypassed the dynamic interface filter. Updated `filterInterfaces()` function to strip angle brackets before checking prefixes. Filtering now properly applied across all three connection methods at the `getInterfaceStats()` level (Native API, REST API, SNMP). Result: POP Soba Spasico now correctly shows 16 static interfaces instead of 135 total interfaces in "Static Only" mode.
@@ -26,7 +33,7 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 
 ### Technology Stack
 **Frontend:** React with TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn UI + Tailwind CSS for components, Recharts for traffic visualization, WebSocket for real-time updates.
-**Backend:** Express.js with TypeScript, PostgreSQL (Neon serverless) with Drizzle ORM, Replit Auth (OpenID Connect) for authentication, MikroTik RouterOS API client, Node-cron for scheduled traffic polling, Nodemailer for email notifications, WebSocket server.
+**Backend:** Express.js with TypeScript, PostgreSQL (Neon serverless) with Drizzle ORM, Passport.js multi-provider authentication (Google OAuth, Local Strategy, Replit OIDC), MikroTik RouterOS API client, Node-cron for scheduled traffic polling, Nodemailer for email notifications, WebSocket server.
 
 ### Database Schema
 **Core Tables:** `users` (with roles), `router_groups`, `routers` (with encrypted credentials), `monitored_ports` (with thresholds), `traffic_data` (time-series), `alerts` (with acknowledged status), `notifications`, `sessions`.
@@ -42,7 +49,7 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 - Memory footprint: ~0.6 MB per router (9 interfaces × 7200 × ~80 bytes)
 
 ### Key Features
--   **User Management:** Multi-user authentication (Replit Auth), Administrator/Normal User roles, admin approval for new users.
+-   **User Management:** Multi-provider authentication (Google OAuth, Static Super Admin, Replit Auth), Administrator/Normal User roles, admin approval for new users (Google OAuth accounts disabled by default), guaranteed admin access via static super admin account.
 -   **Router Management:** Add/manage MikroTik routers with secure credential storage, connection status monitoring, test connection functionality, user-specific router collections.
     -   **Router Groups:** Organize routers into customizable groups with filtering capabilities.
     -   **Three-Tier Fallback System:** Automatic failover between Native MikroTik API, HTTPS REST API (RouterOS v7.1+ with 64-bit counter support), and SNMP (v1/v2c with 64-bit counter support) for maximum connectivity and data accuracy. Each method is independently configurable.
@@ -69,9 +76,10 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 
 ## External Dependencies
 -   **PostgreSQL Database:** Utilized via Neon (serverless) for data persistence.
--   **Replit Auth:** For user authentication and session management (OpenID Connect).
+-   **Authentication Providers:** Google OAuth (optional, for public access), Replit Auth (optional, for Replit-hosted deployments). Static super admin uses local bcrypt authentication.
 -   **MikroTik RouterOS API:** Primary method for router interaction.
 -   **Node-cron:** For scheduling background tasks like traffic polling.
 -   **Nodemailer:** For sending email notifications (currently configured for console logging).
+-   **Passport.js:** Authentication middleware supporting multiple strategies (Google OAuth, Local, Replit OIDC).
 -   **WebSocket:** For real-time, user-scoped notifications.
 -   **net-snmp library:** For SNMP fallback functionality.
