@@ -37,6 +37,11 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  
+  // Only use secure cookies if explicitly enabled via env var
+  // This allows self-hosted deployments without HTTPS to work properly
+  const useSecureCookies = process.env.USE_SECURE_COOKIES === "true";
+  
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -44,7 +49,7 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: useSecureCookies,
       maxAge: sessionTtl,
     },
   });
