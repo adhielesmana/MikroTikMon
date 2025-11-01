@@ -187,7 +187,7 @@ case $COMMAND in
     backup)
         print_info "Creating database backup..."
         BACKUP_FILE="backup_$(date +%Y%m%d_%H%M%S).sql"
-        $DOCKER_COMPOSE exec -T postgres pg_dump -U mikrotik_user mikrotik_monitor > "$BACKUP_FILE"
+        $DOCKER_COMPOSE exec -T mikrotik-monitor-db pg_dump -U mikrotik_user mikrotik_monitor > "$BACKUP_FILE"
         print_success "Backup created: $BACKUP_FILE"
         ;;
         
@@ -201,7 +201,7 @@ case $COMMAND in
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             print_info "Restoring database..."
-            cat "$2" | $DOCKER_COMPOSE exec -T postgres psql -U mikrotik_user mikrotik_monitor
+            cat "$2" | $DOCKER_COMPOSE exec -T mikrotik-monitor-db psql -U mikrotik_user mikrotik_monitor
             print_success "Database restored"
         fi
         ;;
@@ -213,7 +213,7 @@ case $COMMAND in
         
     db-shell)
         print_info "Opening PostgreSQL shell..."
-        $DOCKER_COMPOSE exec postgres psql -U mikrotik_user mikrotik_monitor
+        $DOCKER_COMPOSE exec mikrotik-monitor-db psql -U mikrotik_user mikrotik_monitor
         ;;
         
     reset-password)
@@ -227,6 +227,45 @@ case $COMMAND in
             $DOCKER_COMPOSE exec app node scripts/reset-admin-password.js
         else
             print_info "Password reset cancelled"
+        fi
+        ;;
+        
+    setup-admin)
+        print_info "Setting up admin user in production database..."
+        ./scripts/setup-production.sh
+        ;;
+        
+    fix-db)
+        print_warning "This command fixes common database connection issues"
+        echo ""
+        print_info "Checking .env file..."
+        
+        if [ ! -f .env ]; then
+            print_error ".env file not found!"
+            print_info "Creating .env from .env.example..."
+            cp .env.example .env
+            print_warning "Please edit .env and set your database password!"
+            print_info "Then run: ./deploy.sh restart"
+            exit 1
+        fi
+        
+        # Check if DATABASE_URL uses correct hostname
+        if grep -q "@postgres:5432" .env; then
+            print_warning "Found incorrect DATABASE_URL hostname (@postgres)"
+            print_info "Fixing to use @mikrotik-monitor-db..."
+            sed -i.bak 's/@postgres:5432/@mikrotik-monitor-db:5432/g' .env
+            sed -i.bak 's/PGHOST=postgres/PGHOST=mikrotik-monitor-db/g' .env
+            print_success "Fixed DATABASE_URL in .env"
+            print_info "Backup saved to .env.bak"
+            echo ""
+            print_info "Restarting containers to apply changes..."
+            $DOCKER_COMPOSE restart
+            echo ""
+            print_success "Database connection fixed!"
+            print_info "Now run: ./deploy.sh setup-admin"
+        else
+            print_success ".env file looks correct"
+            print_info "DATABASE_URL is using the correct hostname"
         fi
         ;;
         
@@ -246,6 +285,8 @@ case $COMMAND in
         echo "  shell            Open shell in app container"
         echo "  db-shell         Open PostgreSQL shell"
         echo "  reset-password   Reset admin password (generates random temp password)"
+        echo "  setup-admin      Create admin user in production database"
+        echo "  fix-db           Fix database connection issues (.env configuration)"
         echo ""
         echo "Options:"
         echo "  --with-nginx    Include Nginx reverse proxy"

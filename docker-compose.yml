@@ -1,6 +1,7 @@
 services:
   # PostgreSQL Database
-  postgres:
+  # Service name MUST match the host in DATABASE_URL
+  mikrotik-monitor-db:
     image: postgres:16-alpine
     container_name: mikrotik-monitor-db
     restart: unless-stopped
@@ -31,12 +32,12 @@ services:
     container_name: mikrotik-monitor-app
     restart: unless-stopped
     depends_on:
-      postgres:
+      mikrotik-monitor-db:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${PGUSER}:${PGPASSWORD}@postgres:5432/${PGDATABASE}
-      PGHOST: postgres
+      DATABASE_URL: postgresql://${PGUSER}:${PGPASSWORD}@mikrotik-monitor-db:5432/${PGDATABASE}
+      PGHOST: mikrotik-monitor-db
       PGPORT: 5432
       PGUSER: ${PGUSER}
       PGPASSWORD: ${PGPASSWORD}
