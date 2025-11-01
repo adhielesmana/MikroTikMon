@@ -231,8 +231,8 @@ export async function setupAuth(app: Express) {
         const passwordMatch = await bcrypt.compare(password, DEFAULT_ADMIN_PASSWORD_HASH);
         
         if (passwordMatch) {
-          // Create/update default admin user with mustChangePassword flag
-          await storage.upsertUser({
+          // Create/update default admin user with all required fields
+          const createdUser = await storage.upsertUser({
             id: DEFAULT_ADMIN_ID,
             email: `${DEFAULT_ADMIN_USERNAME}@local`,
             firstName: "Admin",
@@ -240,22 +240,17 @@ export async function setupAuth(app: Express) {
             profileImageUrl: "",
             passwordHash: DEFAULT_ADMIN_PASSWORD_HASH,
             mustChangePassword: true,
-          });
-          
-          // Force admin role and enabled status
-          await storage.updateUser(DEFAULT_ADMIN_ID, { 
             role: "admin",
             enabled: true,
-            mustChangePassword: true,
           });
           
           const user = {
-            id: DEFAULT_ADMIN_ID,
-            email: `${DEFAULT_ADMIN_USERNAME}@local`,
-            firstName: "Admin",
-            lastName: "User",
-            role: "admin",
-            mustChangePassword: true,
+            id: createdUser.id,
+            email: createdUser.email,
+            firstName: createdUser.firstName,
+            lastName: createdUser.lastName,
+            role: createdUser.role,
+            mustChangePassword: createdUser.mustChangePassword,
           };
           
           return done(null, user);
@@ -264,6 +259,7 @@ export async function setupAuth(app: Express) {
       
       return done(null, false, { message: "Invalid credentials" });
     } catch (error) {
+      console.error("LocalStrategy error:", error);
       return done(error);
     }
   }));
@@ -272,6 +268,7 @@ export async function setupAuth(app: Express) {
   app.post("/api/auth/local/login", (req, res, next) => {
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
+        console.error("Authentication error:", err);
         return res.status(500).json({ message: "Authentication error" });
       }
       if (!user) {

@@ -13,6 +13,19 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 
+// Helper function to get user ID from request (handles both OIDC and local/Google auth)
+function getUserId(req: any): string {
+  // For OIDC/Replit Auth users, the ID is in claims.sub
+  if (req.user.claims?.sub) {
+    return req.user.claims.sub;
+  }
+  // For local admin and Google OAuth users, the ID is directly on the user object
+  if (req.user.id) {
+    return req.user.id;
+  }
+  throw new Error("User ID not found in session");
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -29,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const user = await storage.getUser(userId);
       res.json(user);
     } catch (error) {
@@ -41,7 +54,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Router routes
   app.get("/api/routers", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const routers = await storage.getRouters(userId);
       res.json(routers);
     } catch (error) {
@@ -52,7 +65,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/routers", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const data = insertRouterSchema.parse(req.body);
       
       const router = await storage.createRouter(data, userId);
@@ -69,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/routers/:id", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const router = await storage.getRouter(req.params.id);
       
       if (!router) {
@@ -93,7 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/routers/:id", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const router = await storage.getRouter(req.params.id);
       
       if (!router) {
@@ -115,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/routers/:id", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const router = await storage.getRouter(req.params.id);
       
       if (!router) {
@@ -167,7 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/routers/:id/test", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const router = await storage.getRouter(req.params.id);
       
       if (!router) {
@@ -222,7 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Router Groups routes
   app.get("/api/router-groups", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const groups = await storage.getRouterGroups(userId);
       res.json(groups);
     } catch (error) {
@@ -233,7 +246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/router-groups", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const group = await storage.createRouterGroup(req.body, userId);
       res.json(group);
     } catch (error: any) {
@@ -248,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/router-groups/:id", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const group = await storage.getRouterGroup(req.params.id);
       
       if (!group) {
@@ -269,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/router-groups/:id", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const group = await storage.getRouterGroup(req.params.id);
       
       if (!group) {
@@ -291,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Monitored Ports routes
   app.get("/api/routers/:id/ports", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const router = await storage.getRouter(req.params.id);
       
       if (!router) {
@@ -315,7 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/routers/:id/ports", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const router = await storage.getRouter(req.params.id);
       
       if (!router) {
@@ -351,7 +364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       if (router.userId !== userId) {
         return res.status(403).json({ message: "Forbidden" });
       }
@@ -377,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       if (router.userId !== userId) {
         return res.status(403).json({ message: "Forbidden" });
       }
@@ -394,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Real-time traffic data (from in-memory store) - for current/recent viewing
   app.get("/api/routers/:id/traffic/realtime", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const router = await storage.getRouter(req.params.id);
       
       if (!router) {
@@ -441,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Historical traffic data (from database) - for long-term analysis
   app.get("/api/routers/:id/traffic", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const router = await storage.getRouter(req.params.id);
       
       if (!router) {
@@ -508,7 +521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all available interfaces for a router (from real-time traffic store)
   app.get("/api/routers/:id/interfaces", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const router = await storage.getRouter(req.params.id);
       
       if (!router) {
@@ -553,7 +566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Alert routes
   app.get("/api/alerts", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const alerts = await storage.getAlerts(userId);
       res.json(alerts);
     } catch (error) {
@@ -564,7 +577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/alerts/:id/acknowledge", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const alerts = await storage.getAlerts(userId);
       const alert = alerts.find(a => a.id === req.params.id);
       
