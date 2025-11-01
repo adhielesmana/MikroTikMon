@@ -88,16 +88,19 @@ print_info "Generating secure credentials..."
 DB_PASSWORD=$(generate_password)
 SESSION_SECRET=$(generate_session_secret)
 
+# Escape values for sed (replace / with \/)
+DB_PASSWORD_ESCAPED=$(echo "$DB_PASSWORD" | sed 's/[\/&]/\\&/g')
+SESSION_SECRET_ESCAPED=$(echo "$SESSION_SECRET" | sed 's/[\/&]/\\&/g')
+
 # Update .env file with generated values
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS
-    sed -i '' "s/your_secure_database_password_here/${DB_PASSWORD}/g" .env
-    sed -i '' "s/your_random_secret_key_minimum_32_characters_long/${SESSION_SECRET}/g" .env
-    sed -i '' "s/your_secure_database_password_here/${DB_PASSWORD}/g" .env
+    sed -i '' "s/your_secure_database_password_here/${DB_PASSWORD_ESCAPED}/g" .env
+    sed -i '' "s/your_random_secret_key_minimum_32_characters_long/${SESSION_SECRET_ESCAPED}/g" .env
 else
     # Linux
-    sed -i "s/your_secure_database_password_here/${DB_PASSWORD}/g" .env
-    sed -i "s/your_random_secret_key_minimum_32_characters_long/${SESSION_SECRET}/g" .env
+    sed -i "s/your_secure_database_password_here/${DB_PASSWORD_ESCAPED}/g" .env
+    sed -i "s/your_random_secret_key_minimum_32_characters_long/${SESSION_SECRET_ESCAPED}/g" .env
 fi
 
 print_success "Secure credentials generated"

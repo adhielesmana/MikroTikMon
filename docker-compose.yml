@@ -7,9 +7,9 @@ services:
     container_name: mikrotik-monitor-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${PGDATABASE:-mikrotik_monitor}
-      POSTGRES_USER: ${PGUSER:-mikrotik_user}
-      POSTGRES_PASSWORD: ${PGPASSWORD:-changeme}
+      POSTGRES_DB: ${PGDATABASE:?PGDATABASE not set - run setup.sh first}
+      POSTGRES_USER: ${PGUSER:?PGUSER not set - run setup.sh first}
+      POSTGRES_PASSWORD: ${PGPASSWORD:?PGPASSWORD not set - run setup.sh first}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
@@ -35,13 +35,13 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${PGUSER:-mikrotik_user}:${PGPASSWORD:-changeme}@postgres:5432/${PGDATABASE:-mikrotik_monitor}
+      DATABASE_URL: postgresql://${PGUSER}:${PGPASSWORD}@postgres:5432/${PGDATABASE}
       PGHOST: postgres
       PGPORT: 5432
-      PGUSER: ${PGUSER:-mikrotik_user}
-      PGPASSWORD: ${PGPASSWORD:-changeme}
-      PGDATABASE: ${PGDATABASE:-mikrotik_monitor}
-      SESSION_SECRET: ${SESSION_SECRET}
+      PGUSER: ${PGUSER}
+      PGPASSWORD: ${PGPASSWORD}
+      PGDATABASE: ${PGDATABASE}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET not set - run setup.sh first}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}

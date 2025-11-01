@@ -79,6 +79,8 @@ This will:
 - Set up required directories
 - Optionally configure email notifications
 
+⚠️ **Important:** You **must** run `./setup.sh` before deploying. The Docker Compose configuration requires a properly configured `.env` file and will fail with clear error messages if environment variables are missing.
+
 ### 3. Deploy the Application
 
 ```bash
