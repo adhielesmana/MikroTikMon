@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { SiGoogle } from "react-icons/si";
 import { Shield } from "lucide-react";
@@ -20,6 +20,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
+  const [showDefaultCredentials, setShowDefaultCredentials] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<LoginFormData>({
@@ -29,6 +30,23 @@ export default function Login() {
       password: "",
     },
   });
+
+  // Check if default credentials should be displayed
+  useEffect(() => {
+    const checkDefaultCredentials = async () => {
+      try {
+        const response = await fetch("/api/auth/show-default-credentials");
+        if (response.ok) {
+          const data = await response.json();
+          setShowDefaultCredentials(data.showDefaultCredentials);
+        }
+      } catch (error) {
+        // If error, default to showing credentials (fail-safe for new installations)
+        setShowDefaultCredentials(true);
+      }
+    };
+    checkDefaultCredentials();
+  }, []);
 
   const handleLocalLogin = async (data: LoginFormData) => {
     setIsLoading(true);
@@ -152,10 +170,12 @@ export default function Login() {
             Sign in with Google
           </Button>
 
-          <div className="text-center text-sm text-muted-foreground mt-4">
-            <p>Default admin credentials:</p>
-            <p className="font-mono text-xs">username: admin | password: admin</p>
-          </div>
+          {showDefaultCredentials && (
+            <div className="text-center text-sm text-muted-foreground mt-4" data-testid="default-credentials-info">
+              <p>Default admin credentials:</p>
+              <p className="font-mono text-xs">username: admin | password: admin</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

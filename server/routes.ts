@@ -51,6 +51,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check if default admin credentials should be shown on login page
+  app.get('/api/auth/show-default-credentials', async (_req, res) => {
+    try {
+      const adminUser = await storage.getUser('super-admin-001');
+      // Show default credentials only if admin still needs to change password
+      const showCredentials = adminUser ? adminUser.mustChangePassword === true : true;
+      res.json({ showDefaultCredentials: showCredentials });
+    } catch (error) {
+      // If admin user doesn't exist yet, show default credentials
+      res.json({ showDefaultCredentials: true });
+    }
+  });
+
   // Router routes
   app.get("/api/routers", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
