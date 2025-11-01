@@ -4,6 +4,7 @@
 A comprehensive, enterprise-grade network monitoring platform for MikroTik routers. It offers real-time traffic analysis, intelligent threshold-based alerting, and multi-user role-based access control. The platform is designed for professional network administrators, providing a production-ready solution for efficient network oversight. The project aims to provide a robust, scalable, and user-friendly system for monitoring MikroTik router performance and health.
 
 ## Recent Changes (Nov 1, 2025)
+-   **User Invitation System:** Implemented comprehensive user invitation system for super admins. Admins can now invite new users through the Users management page (`/users`). New users receive a cryptographically secure temporary password (16-character random string) via email. All invited users have `mustChangePassword=true` by default and must change their password on first login. Added `username` field to users table schema (VARCHAR UNIQUE) to support local authentication for invited users. Created `getUserByUsername()` storage method and updated LocalStrategy to authenticate users by username. Frontend includes Users.tsx admin page with invitation form, user list table, and temporary password display for admins to share if email fails.
 -   **Role-Based Router Access:** Implemented role-based visibility for routers. Super admin users (role="admin") can now see ALL routers from all users across the entire system, while normal users (role="user") can only see their own routers. Admin users can also view, modify, and delete any router regardless of ownership. Normal users are restricted to their own routers only.
 -   **Login Page and Routing:** Created dedicated login page at `/login` with local admin and Google OAuth options. Updated landing page links from `/api/login` to `/login`. Added server-side redirect from `/api/login` to `/login` for backward compatibility in non-Replit environments. Login page features form validation, error handling, and intelligent display of default admin credentials (hidden once password is changed).
 -   **Simplified Default Admin Authentication:** Implemented default local admin account with username "admin" and password "admin" - no environment configuration required! On first login, users are forced to change both username and password with bcrypt hashing (10 salt rounds). This eliminates the complexity of pre-generating password hashes while maintaining security. Login page automatically hides default credentials display once admin has changed their password.
@@ -40,7 +41,7 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 **Backend:** Express.js with TypeScript, PostgreSQL (Neon serverless) with Drizzle ORM, Passport.js multi-provider authentication (Google OAuth, Local Strategy, Replit OIDC), MikroTik RouterOS API client, Node-cron for scheduled traffic polling, Nodemailer for email notifications, WebSocket server.
 
 ### Database Schema
-**Core Tables:** `users` (with roles), `router_groups`, `routers` (with encrypted credentials), `monitored_ports` (with thresholds), `traffic_data` (time-series), `alerts` (with acknowledged status), `notifications`, `sessions`.
+**Core Tables:** `users` (with roles, username for local auth), `router_groups`, `routers` (with encrypted credentials), `monitored_ports` (with thresholds), `traffic_data` (time-series), `alerts` (with acknowledged status), `notifications`, `sessions`.
 
 **Key Storage Methods:**
 - `getLatestUnacknowledgedAlertForPort`: Returns only unacknowledged alerts for proper alert independence and auto-acknowledgment logic.
@@ -54,6 +55,7 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 
 ### Key Features
 -   **User Management:** Multi-provider authentication (Google OAuth, Static Super Admin, Replit Auth), Administrator/Normal User roles, admin approval for new users (Google OAuth accounts disabled by default), guaranteed admin access via static super admin account.
+    -   **User Invitation System:** Admins can invite new users via `/users` page. System generates secure temporary passwords (16-char cryptographic random), sends invitation emails (console logging when SMTP not configured), and enforces password change on first login. Username-based authentication for invited users with bcrypt password hashing (10 salt rounds).
     -   **Role-Based Access Control:** Admins have full visibility and control over all routers system-wide. Normal users can only view, edit, and delete their own routers. Authorization checks enforce ownership validation on all router operations.
 -   **Router Management:** Add/manage MikroTik routers with secure credential storage, connection status monitoring, test connection functionality, user-specific router collections.
     -   **Router Groups:** Organize routers into customizable groups with filtering capabilities.
