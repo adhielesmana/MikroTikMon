@@ -134,6 +134,11 @@ export async function setupAuth(app: Express) {
         );
       });
     });
+  } else {
+    // Fallback: redirect /api/login to /login when Replit Auth is not available
+    app.get("/api/login", (req, res) => {
+      res.redirect("/login");
+    });
   }
 
   // Always setup Google OAuth if configured

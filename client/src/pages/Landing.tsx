@@ -40,7 +40,7 @@ export default function Landing() {
               )}
             </div>
             <Button asChild data-testid="button-login">
-              <a href="/api/login">Log In</a>
+              <a href="/login">Log In</a>
             </Button>
           </div>
         </div>
@@ -60,7 +60,7 @@ export default function Landing() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <Button size="lg" asChild data-testid="button-get-started">
-                <a href="/api/login">Get Started</a>
+                <a href="/login">Get Started</a>
               </Button>
               <Button size="lg" variant="outline">
                 Learn More
@@ -183,7 +183,7 @@ export default function Landing() {
                 asChild
                 data-testid="button-cta-login"
               >
-                <a href="/api/login">Start Monitoring Now</a>
+                <a href="/login">Start Monitoring Now</a>
               </Button>
             </CardContent>
           </Card>
