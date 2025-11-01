@@ -12,6 +12,7 @@ import { z } from "zod";
 import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
+import bcrypt from "bcrypt";
 
 // Helper function to get user ID from request (handles both OIDC and local/Google auth)
 function getUserId(req: any): string {
@@ -626,6 +627,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/admin/users", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { username, email, firstName, lastName, role, temporaryPassword } = req.body;
+
+      // Validate required fields
+      if (!username || !email || !firstName || !lastName) {
+        return res.status(400).json({ message: "Username, email, first name, and last name are required" });
+      }
+
+      // Generate temporary password if not provided
+      const tempPassword = temporaryPassword || crypto.randomBytes(8).toString('base64').slice(0, 12);
+      
+      // Hash the temporary password
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+      // Create user with mustChangePassword flag
+      const newUser = await storage.upsertUser({
+        id: crypto.randomUUID(),
+        email,
+        firstName,
+        lastName,
+        role: role || "user",
+        enabled: true,
+        passwordHash,
+        mustChangePassword: true,
+      });
+
+      // Send invitation email with temporary credentials
+      try {
+        await emailService.sendUserInvitationEmail(
+          email,
+          firstName,
+          username,
+          tempPassword
+        );
+      } catch (emailError) {
+        console.error("Failed to send invitation email:", emailError);
+        // Continue even if email fails - user is still created
+      }
+
+      // Return user info and temporary password (for admin to share if email fails)
+      res.json({
+        user: newUser,
+        temporaryPassword: tempPassword,
+        message: "User created successfully. Invitation email sent."
+      });
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: error.message || "Failed to create user" });
     }
   });
 

@@ -128,6 +128,102 @@ MikroTik Monitor
     }
   }
 
+  async sendUserInvitationEmail(
+    to: string, 
+    firstName: string, 
+    username: string, 
+    temporaryPassword: string
+  ): Promise<void> {
+    const loginUrl = process.env.REPLIT_DOMAINS 
+      ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/login`
+      : 'http://localhost:5000/login';
+
+    const subject = "You've Been Invited to MikroTik Monitor";
+    const text = `
+Hello ${firstName},
+
+You have been invited to join MikroTik Monitor, a network monitoring platform for MikroTik routers.
+
+Your login credentials:
+Username: ${username}
+Temporary Password: ${temporaryPassword}
+
+Login at: ${loginUrl}
+
+IMPORTANT: You will be required to change your password on first login for security purposes.
+
+---
+MikroTik Monitor Team
+    `.trim();
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #2196F3; color: white; padding: 20px; border-radius: 4px; }
+    .content { background: #f9f9f9; padding: 20px; margin-top: 20px; border-radius: 4px; }
+    .credentials { background: white; border: 2px solid #2196F3; padding: 15px; margin: 15px 0; font-family: monospace; }
+    .warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; }
+    .button { display: inline-block; background: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 15px 0; }
+    .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Welcome to MikroTik Monitor</h2>
+    </div>
+    <div class="content">
+      <p>Hello ${firstName},</p>
+      <p>You have been invited to join <strong>MikroTik Monitor</strong>, a network monitoring platform for MikroTik routers.</p>
+      
+      <div class="credentials">
+        <p><strong>Username:</strong> ${username}</p>
+        <p><strong>Temporary Password:</strong> ${temporaryPassword}</p>
+      </div>
+
+      <div class="warning">
+        <strong>⚠️ Security Notice:</strong> You will be required to change your password on first login.
+      </div>
+
+      <a href="${loginUrl}" class="button">Log In Now</a>
+    </div>
+    <div class="footer">
+      <p>MikroTik Monitor - Network Traffic Monitoring Platform</p>
+    </div>
+  </div>
+</body>
+</html>
+    `.trim();
+
+    if (this.enabled) {
+      try {
+        await this.transporter.sendMail({
+          from: this.from,
+          to,
+          subject,
+          text,
+          html,
+        });
+        console.log(`Invitation email sent to ${to}`);
+      } catch (error) {
+        console.error("Failed to send invitation email:", error);
+        throw new Error("Failed to send invitation email");
+      }
+    } else {
+      // For testing without SMTP: log to console
+      console.log("=== INVITATION EMAIL (Testing Mode) ===");
+      console.log(`To: ${to}`);
+      console.log(`Subject: ${subject}`);
+      console.log(`Username: ${username}`);
+      console.log(`Temporary Password: ${temporaryPassword}`);
+      console.log("=======================================");
+    }
+  }
+
   async sendWelcomeEmail(to: string, name: string): Promise<void> {
     const subject = "Welcome to MikroTik Monitor";
     const text = `
