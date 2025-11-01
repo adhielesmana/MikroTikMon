@@ -479,6 +479,44 @@ docker compose exec app npm run db:push --force
 ./deploy.sh up
 ```
 
+### Forgot Admin Password
+
+If you forget your admin password or need to reset it, use the password reset script:
+
+```bash
+# Reset admin password with random generated password
+docker compose exec app node scripts/reset-admin-password.js
+```
+
+This will:
+- Generate a secure random temporary password (16 characters)
+- Reset the admin account with the new password
+- Force a password change on next login
+- Display the temporary credentials in the terminal
+
+**Example output:**
+```
+🔑 TEMPORARY LOGIN CREDENTIALS:
+   Username: admin
+   Password: X7k@9mP2nQ5wY8tL
+
+⚠️  This is a TEMPORARY password
+    You will be forced to change it on first login
+```
+
+**Next steps:**
+1. Write down the temporary password
+2. Login to the application
+3. You'll be automatically redirected to change your password
+4. Choose a new secure password (minimum 8 characters)
+5. Optionally change your username during password reset
+
+**Security Notes:**
+- The temporary password is displayed only once
+- Clear your terminal history after copying: `history -c`
+- The old password will no longer work immediately
+- Sessions are invalidated after password reset
+
 ### SSL Certificate Issues
 
 ```bash

@@ -216,21 +216,36 @@ case $COMMAND in
         $DOCKER_COMPOSE exec postgres psql -U mikrotik_user mikrotik_monitor
         ;;
         
+    reset-password)
+        print_warning "This will reset the admin password with a random generated password"
+        print_warning "The current admin password will no longer work"
+        echo ""
+        read -p "Continue? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Resetting admin password..."
+            $DOCKER_COMPOSE exec app node scripts/reset-admin-password.js
+        else
+            print_info "Password reset cancelled"
+        fi
+        ;;
+        
     *)
         echo "Usage: ./deploy.sh [command] [options]"
         echo ""
         echo "Commands:"
-        echo "  up, start       Start the application (default)"
-        echo "  down, stop      Stop the application"
-        echo "  restart         Restart the application"
-        echo "  logs            View application logs"
-        echo "  status          Show container status"
-        echo "  update          Update and rebuild the application"
-        echo "  clean           Remove all containers and volumes"
-        echo "  backup          Create database backup"
-        echo "  restore <file>  Restore database from backup"
-        echo "  shell           Open shell in app container"
-        echo "  db-shell        Open PostgreSQL shell"
+        echo "  up, start        Start the application (default)"
+        echo "  down, stop       Stop the application"
+        echo "  restart          Restart the application"
+        echo "  logs             View application logs"
+        echo "  status           Show container status"
+        echo "  update           Update and rebuild the application"
+        echo "  clean            Remove all containers and volumes"
+        echo "  backup           Create database backup"
+        echo "  restore <file>   Restore database from backup"
+        echo "  shell            Open shell in app container"
+        echo "  db-shell         Open PostgreSQL shell"
+        echo "  reset-password   Reset admin password (generates random temp password)"
         echo ""
         echo "Options:"
         echo "  --with-nginx    Include Nginx reverse proxy"
