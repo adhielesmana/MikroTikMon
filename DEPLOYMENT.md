@@ -96,6 +96,8 @@ If you need external database access for debugging, see the "Database Access" se
 Open your browser and navigate to:
 - **http://localhost:5000** (or your server IP)
 
+⚠️ **Authentication Notice:** For self-hosted deployments, authentication is disabled by default. The application will start and work, but anyone with access to the URL can use it. See **SELF-HOSTED-AUTH.md** for security options and how to configure authentication.
+
 ---
 
 ## Detailed Setup
