@@ -68,7 +68,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/routers", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
       const userId = getUserId(req);
-      const routers = await storage.getRouters(userId);
+      const user = await storage.getUser(userId);
+      
+      // Admin users can see all routers, normal users only see their own
+      const routers = user?.role === "admin" 
+        ? await storage.getAllRouters() 
+        : await storage.getRouters(userId);
+      
       res.json(routers);
     } catch (error) {
       console.error("Error fetching routers:", error);
@@ -126,9 +132,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      // Check ownership
+      // Check ownership - admin can modify any router, normal users only their own
       if (router.userId !== userId) {
-        return res.status(403).json({ message: "Forbidden" });
+        const user = await storage.getUser(userId);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "Forbidden" });
+        }
       }
       
       const updated = await storage.updateRouter(req.params.id, req.body);
@@ -148,9 +157,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      // Check ownership
+      // Check ownership - admin can delete any router, normal users only their own
       if (router.userId !== userId) {
-        return res.status(403).json({ message: "Forbidden" });
+        const user = await storage.getUser(userId);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "Forbidden" });
+        }
       }
       
       await storage.deleteRouter(req.params.id);
