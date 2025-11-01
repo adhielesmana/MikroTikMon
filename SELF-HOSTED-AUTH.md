@@ -1,200 +1,164 @@
-# Authentication for Self-Hosted Deployments
+# Self-Hosted Authentication Guide
 
-## Current Status
-
-Your MikroTik Monitor is now configured to run **without authentication** when deployed outside of Replit.
-
-### What This Means
-
-✅ **Application will start successfully** on self-hosted servers  
-⚠️ **Authentication is bypassed** - anyone can access the application  
-⚠️ **For testing/development only** - not secure for production use  
+This guide covers all authentication options available for self-hosted deployments of the MikroTik Network Monitor.
 
 ---
 
-## Security Notice
+## Authentication Options
 
-**WARNING:** The current configuration bypasses all authentication checks when `REPLIT_DOMAINS` environment variable is not set.
+Your MikroTik Monitor supports three authentication methods that can be used simultaneously:
 
-When you see these warnings in the logs:
-```
-⚠️  Replit Auth not configured - REPLIT_DOMAINS environment variable not set
-⚠️  Authentication endpoints will return informational messages
-⚠️  For production use, configure an alternative authentication method
-⚠️  Authentication bypassed - not in Replit environment
-```
+### 1. Google OAuth (Recommended for most users)
+- ✅ Public sign-in for any Google account
+- ✅ Secure OAuth 2.0 flow
+- ✅ Auto-populate user profiles
+- ❌ Requires Google Cloud Console setup
 
-This means **anyone with access to the URL can use the application**.
+### 2. Super Admin (Emergency access)
+- ✅ Static username/password login
+- ✅ Always works (no external dependencies)
+- ✅ Guaranteed admin access
+- ❌ Manual password hashing required
+
+### 3. Replit Auth (Optional, Replit-hosted only)
+- ✅ Automatic on Replit platform
+- ❌ Only works when hosted on Replit
+- ❌ Requires REPLIT_DOMAINS environment variable
 
 ---
 
-## Production Authentication Options
+## Quick Setup Guide
 
-For production self-hosted deployments, you should implement one of these authentication methods:
+### Option A: Google OAuth + Super Admin (Recommended)
 
-### Option 1: Use Replit Auth (Recommended for Replit-hosted)
+**Best for:** Production deployments with both convenience and emergency access
 
-If you want to use Replit's OAuth authentication on your self-hosted server:
-
-1. **Set environment variables in `.env`:**
+1. **Get Google OAuth credentials** (see [GOOGLE-OAUTH-SETUP.md](./GOOGLE-OAUTH-SETUP.md))
+2. **Configure .env:**
    ```env
-   REPL_ID=your-repl-id-here
-   ISSUER_URL=https://replit.com/oidc
-   REPLIT_DOMAINS=yourdomain.com,www.yourdomain.com
-   ```
-
-2. **Configure your domain** to point to your server
-
-3. **Restart the application:**
-   ```bash
-   ./deploy.sh restart
-   ```
-
-### Option 2: Implement Custom Authentication
-
-You can implement your own authentication system:
-
-- **Email/Password** - Traditional username and password
-- **OAuth 2.0** - Google, GitHub, Microsoft, etc.
-- **SAML** - Enterprise SSO
-- **LDAP** - Corporate directory integration
-
-### Option 3: Reverse Proxy Authentication
-
-Use Nginx or Apache as a reverse proxy with authentication:
-
-**Example with Nginx Basic Auth:**
-
-1. Create password file:
-   ```bash
-   sudo apt-get install apache2-utils
-   sudo htpasswd -c /etc/nginx/.htpasswd admin
-   ```
-
-2. Update `nginx.conf`:
-   ```nginx
-   location / {
-       auth_basic "MikroTik Monitor";
-       auth_basic_user_file /etc/nginx/.htpasswd;
-       proxy_pass http://app:5000;
-   }
-   ```
-
-3. Deploy with Nginx:
-   ```bash
-   ./deploy.sh up --with-nginx
-   ```
-
-### Option 4: VPN/Private Network
-
-Deploy the application on a private network or VPN:
-
-- Accessible only via VPN connection
-- Use firewall rules to restrict access
-- Network-level authentication
-
----
-
-## Quick Security Measures (Temporary)
-
-If you need to deploy **now** but want basic security:
-
-### 1. Firewall Rules
-
-```bash
-# Allow only specific IP addresses
-sudo ufw allow from YOUR_IP_ADDRESS to any port 5000
-sudo ufw deny 5000
-sudo ufw enable
-```
-
-### 2. Change Default Port
-
-```bash
-# Edit .env
-APP_PORT=8765  # Use non-standard port
-
-./deploy.sh restart
-```
-
-### 3. Use SSH Tunnel
-
-Instead of exposing the application publicly:
-
-```bash
-# On your server
-./deploy.sh up
-
-# On your local machine
-ssh -L 8080:localhost:5000 user@your-server.com
-
-# Access via http://localhost:8080
-```
-
----
-
-## Testing the Current Setup
-
-The application is currently running without authentication. You can test it:
-
-1. **Access the application:**
-   ```
-   http://your-server-ip:5000
-   ```
-
-2. **Check authentication status:**
-   ```
-   curl http://your-server-ip:5000/api/login
-   ```
+   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=GOCSPX-your-secret
+   APP_URL=https://yourdomain.com
    
-   Should return:
-   ```json
-   {
-     "message": "Authentication not configured",
-     "info": "This is a self-hosted deployment without Replit Auth...",
-     "hint": "Set REPLIT_DOMAINS and REPL_ID environment variables..."
-   }
+   SUPER_ADMIN_USERNAME=admin
+   SUPER_ADMIN_PASSWORD=$2b$10$...hash-from-script...
    ```
-
-3. **Use the application:**
-   - All features are accessible without login
-   - No user management
-   - All data is shared (no multi-user support without auth)
+3. **Generate super admin password:**
+   ```bash
+   node scripts/hash-password.js YourSecurePassword123
+   ```
+4. **Deploy:**
+   ```bash
+   docker-compose down && docker-compose up -d
+   ```
 
 ---
 
-## Recommended Next Steps
+### Option B: Super Admin Only (Simplest)
 
-1. ✅ **Get the application running** (you're here!)
-2. ⚠️ **Secure with firewall** (restrict access immediately)
-3. 🔒 **Implement authentication** (choose from options above)
-4. 📊 **Test thoroughly** before production use
-5. 🔐 **Enable SSL/TLS** with Let's Encrypt
+**Best for:** Private deployments or testing
+
+1. **Generate password hash:**
+   ```bash
+   node scripts/hash-password.js YourPassword123
+   ```
+2. **Configure .env:**
+   ```env
+   SUPER_ADMIN_USERNAME=admin
+   SUPER_ADMIN_PASSWORD=$2b$10$...copied-hash...
+   ```
+3. **Deploy:**
+   ```bash
+   docker-compose down && docker-compose up -d
+   ```
+
+---
+
+## Security Best Practices
+
+### ✅ Before Production
+
+- [ ] Use strong database password
+- [ ] Use secure session secret (32+ random characters)
+- [ ] Enable HTTPS (use reverse proxy with SSL)
+- [ ] Use strong super admin password (12+ characters)
+- [ ] Configure firewall to block PostgreSQL port externally
+
+### ✅ After Deployment
+
+- [ ] Test login flows
+- [ ] Verify new users are disabled by default
+- [ ] Test user approval workflow
+- [ ] Monitor logs for auth errors
+
+---
+
+## User Management
+
+### Default Behavior
+- **New Google users:** Account created but **disabled**
+- **Super admin:** Always **enabled** with **admin** role
+- **Approval required:** Admin must enable new accounts
+
+### Enabling New Users
+
+1. Login as super admin
+2. Navigate to "User Management"
+3. Find the new user
+4. Toggle "Enabled" switch
+5. (Optional) Change role to "Administrator"
+
+---
+
+## Troubleshooting
+
+### Google OAuth Not Working
+
+**Check environment variables:**
+```bash
+docker exec mikrotik-monitor-app env | grep GOOGLE
+```
+
+Expected: `✓ Google OAuth configured` in logs
+
+### Super Admin Login Fails
+
+**Re-generate password hash:**
+```bash
+node scripts/hash-password.js YourPassword
+# Copy hash to .env SUPER_ADMIN_PASSWORD
+docker-compose restart app
+```
+
+### Session Doesn't Persist
+
+1. Check `SESSION_SECRET` is set
+2. Verify PostgreSQL connection
+3. For HTTPS: Ensure reverse proxy passes headers
 
 ---
 
 ## FAQ
 
-### Q: Can I use the app without authentication?
-**A:** Yes, but **only for testing/development**. For production, implement proper authentication.
+**Q: Can I use both Google and Super Admin?**  
+A: Yes! Recommended for production.
 
-### Q: Will my routers be secure?
-**A:** Router credentials are encrypted in the database, but without authentication, anyone can access and view them.
+**Q: What if I forget super admin password?**  
+A: Run hash-password.js, update .env, restart.
 
-### Q: Can I add users manually?
-**A:** Without authentication, the user management features won't work. You'll need to implement authentication first.
+**Q: Can anyone with Google account sign in?**  
+A: Yes, but accounts are disabled until admin approves.
 
-### Q: Is there a simple auth plugin I can use?
-**A:** Yes! Consider using Nginx Basic Auth (Option 3) for a quick solution, or implement Passport.js with local strategy for email/password authentication.
+**Q: Do I need email configured for auth?**  
+A: No, email is only for alert notifications.
 
 ---
 
-## Support
+## Additional Resources
 
-For authentication implementation help:
-- See: `DEPLOYMENT.md` for production setup
-- See: `DOCKER.md` for Docker configuration
-- See: `TROUBLESHOOTING.md` for common issues
+- **Google OAuth Setup:** [GOOGLE-OAUTH-SETUP.md](./GOOGLE-OAUTH-SETUP.md)
+- **Deployment Guide:** [DEPLOYMENT.md](./DEPLOYMENT.md)
+- **Password Generator:** [scripts/hash-password.js](./scripts/hash-password.js)
 
 ---
 

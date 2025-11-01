@@ -44,7 +44,7 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       maxAge: sessionTtl,
     },
   });
@@ -78,6 +78,10 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Register universal serialize/deserialize handlers for all auth providers
+  passport.serializeUser((user: any, cb) => cb(null, user));
+  passport.deserializeUser((user: any, cb) => cb(null, user));
+
   // Only setup Replit Auth if in Replit environment
   if (isReplitEnvironment) {
     const config = await getOidcConfig();
@@ -105,9 +109,6 @@ export async function setupAuth(app: Express) {
       );
       passport.use(strategy);
     }
-
-    passport.serializeUser((user: Express.User, cb) => cb(null, user));
-    passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
     app.get("/api/login", (req, res, next) => {
       passport.authenticate(`replitauth:${req.hostname}`, {
@@ -174,9 +175,6 @@ export async function setupAuth(app: Express) {
       }
     }));
 
-    passport.serializeUser((user: any, cb) => cb(null, user));
-    passport.deserializeUser((user: any, cb) => cb(null, user));
-
     // Google OAuth routes
     app.get("/api/auth/google", 
       passport.authenticate("google", { scope: ["profile", "email"] })
@@ -240,11 +238,6 @@ export async function setupAuth(app: Express) {
         return done(error);
       }
     }));
-
-    if (!passport.serializeUser.length) {
-      passport.serializeUser((user: any, cb) => cb(null, user));
-      passport.deserializeUser((user: any, cb) => cb(null, user));
-    }
 
     // Local admin login routes
     app.post("/api/auth/local/login", (req, res, next) => {
