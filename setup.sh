@@ -141,6 +141,42 @@ mkdir -p logs
 mkdir -p ssl
 print_success "Directories created"
 
+# Setup Super Admin
+echo ""
+print_info "Super Admin account setup"
+read -p "Create a super admin account? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    read -p "Super admin username (default: admin): " admin_username
+    admin_username=${admin_username:-admin}
+    
+    read -sp "Super admin password (min 8 characters): " admin_password
+    echo
+    
+    if [ ${#admin_password} -lt 8 ]; then
+        print_error "Password must be at least 8 characters"
+        print_warning "Skipping super admin setup"
+    else
+        print_info "Generating password hash..."
+        ADMIN_HASH=$(node scripts/hash-password.js "$admin_password" 2>/dev/null | grep '^$2b' || echo "")
+        
+        if [ -n "$ADMIN_HASH" ]; then
+            ADMIN_HASH_ESCAPED=$(echo "$ADMIN_HASH" | sed 's/[\/&]/\\&/g')
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+                sed -i '' "s/SUPER_ADMIN_USERNAME=.*/SUPER_ADMIN_USERNAME=${admin_username}/" .env
+                sed -i '' "s/SUPER_ADMIN_PASSWORD=.*/SUPER_ADMIN_PASSWORD=${ADMIN_HASH_ESCAPED}/" .env
+            else
+                sed -i "s/SUPER_ADMIN_USERNAME=.*/SUPER_ADMIN_USERNAME=${admin_username}/" .env
+                sed -i "s/SUPER_ADMIN_PASSWORD=.*/SUPER_ADMIN_PASSWORD=${ADMIN_HASH_ESCAPED}/" .env
+            fi
+            print_success "Super admin account configured"
+            print_info "Username: ${admin_username}"
+        else
+            print_error "Failed to generate password hash"
+        fi
+    fi
+fi
+
 # Summary
 echo ""
 echo "========================================="
@@ -154,6 +190,12 @@ echo ""
 print_warning "IMPORTANT: Keep your .env file secure and never commit it to git!"
 echo ""
 print_info "Next steps:"
-echo "  1. Review and customize .env if needed"
-echo "  2. Run: ./deploy.sh to start the application"
+echo "  1. (Optional) Configure Google OAuth in .env for public login"
+echo "  2. Review and customize .env if needed"
+echo "  3. Run: ./deploy.sh to start the application"
+echo ""
+print_info "Authentication options available:"
+echo "  • Google OAuth (configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)"
+echo "  • Super Admin (username/password login)"
+echo "  • Replit Auth (if running on Replit)"
 echo ""

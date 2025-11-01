@@ -1,12 +1,15 @@
-// Replit Auth setup - Referenced from javascript_log_in_with_replit blueprint
+// Multi-provider Auth setup (Replit, Google OAuth, Local Admin)
 import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Strategy as LocalStrategy } from "passport-local";
 
 import passport from "passport";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
+import bcrypt from "bcrypt";
 import { storage } from "./storage";
 
 // Check if running in Replit environment
@@ -130,74 +133,234 @@ export async function setupAuth(app: Express) {
         );
       });
     });
-  } else {
-    // For self-hosted/local deployments without Replit Auth
-    // Provide stub endpoints that explain auth is not configured
-    console.warn("⚠️  Replit Auth not configured - REPLIT_DOMAINS environment variable not set");
-    console.warn("⚠️  Authentication endpoints will return informational messages");
-    console.warn("⚠️  For production use, configure an alternative authentication method");
-    
-    passport.serializeUser((user: Express.User, cb) => cb(null, user));
-    passport.deserializeUser((user: Express.User, cb) => cb(null, user));
-    
-    app.get("/api/login", (req, res) => {
-      res.status(501).json({ 
-        message: "Authentication not configured",
-        info: "This is a self-hosted deployment without Replit Auth. Please configure an alternative authentication method.",
-        hint: "Set REPLIT_DOMAINS and REPL_ID environment variables to enable Replit Auth, or implement custom authentication."
-      });
-    });
-    
-    app.get("/api/callback", (req, res) => {
-      res.status(501).json({ message: "Authentication not configured" });
-    });
-    
-    app.get("/api/logout", (req, res) => {
-      req.logout(() => {
-        res.json({ message: "Logged out (no authentication configured)" });
-      });
-    });
   }
+
+  // Always setup Google OAuth if configured
+  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    console.log("✓ Google OAuth configured");
+    
+    passport.use(new GoogleStrategy({
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || `${process.env.APP_URL || 'http://localhost:5000'}/api/auth/google/callback`,
+    }, async (accessToken, refreshToken, profile, done) => {
+      try {
+        // Extract user info from Google profile
+        const email = profile.emails?.[0]?.value || '';
+        const firstName = profile.name?.givenName || '';
+        const lastName = profile.name?.familyName || '';
+        const profileImageUrl = profile.photos?.[0]?.value || '';
+        
+        // Upsert user in database
+        await storage.upsertUser({
+          id: profile.id,
+          email,
+          firstName,
+          lastName,
+          profileImageUrl,
+        });
+        
+        const user = {
+          id: profile.id,
+          email,
+          firstName,
+          lastName,
+          profileImageUrl,
+        };
+        
+        done(null, user);
+      } catch (error) {
+        done(error);
+      }
+    }));
+
+    passport.serializeUser((user: any, cb) => cb(null, user));
+    passport.deserializeUser((user: any, cb) => cb(null, user));
+
+    // Google OAuth routes
+    app.get("/api/auth/google", 
+      passport.authenticate("google", { scope: ["profile", "email"] })
+    );
+
+    app.get("/api/auth/google/callback",
+      passport.authenticate("google", { failureRedirect: "/api/login" }),
+      (req, res) => {
+        res.redirect("/");
+      }
+    );
+  }
+
+  // Always setup local admin authentication
+  const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME || "admin";
+  const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
+  const SUPER_ADMIN_ID = "super-admin-001";
+  
+  if (SUPER_ADMIN_PASSWORD) {
+    console.log("✓ Super Admin account configured");
+    
+    passport.use(new LocalStrategy({
+      usernameField: 'username',
+      passwordField: 'password'
+    }, async (username, password, done) => {
+      try {
+        // Check if this is the super admin
+        if (username === SUPER_ADMIN_USERNAME) {
+          const passwordMatch = await bcrypt.compare(password, SUPER_ADMIN_PASSWORD);
+          
+          if (passwordMatch) {
+            // Ensure super admin exists in database with admin role
+            await storage.upsertUser({
+              id: SUPER_ADMIN_ID,
+              email: `${SUPER_ADMIN_USERNAME}@local`,
+              firstName: "Super",
+              lastName: "Admin",
+              profileImageUrl: "",
+            });
+            
+            // Force admin role and enabled status
+            await storage.updateUser(SUPER_ADMIN_ID, { 
+              role: "admin",
+              enabled: true 
+            });
+            
+            const user = {
+              id: SUPER_ADMIN_ID,
+              email: `${SUPER_ADMIN_USERNAME}@local`,
+              firstName: "Super",
+              lastName: "Admin",
+              role: "admin",
+            };
+            
+            return done(null, user);
+          }
+        }
+        
+        return done(null, false, { message: "Invalid credentials" });
+      } catch (error) {
+        return done(error);
+      }
+    }));
+
+    if (!passport.serializeUser.length) {
+      passport.serializeUser((user: any, cb) => cb(null, user));
+      passport.deserializeUser((user: any, cb) => cb(null, user));
+    }
+
+    // Local admin login routes
+    app.post("/api/auth/local/login", (req, res, next) => {
+      passport.authenticate("local", (err: any, user: any, info: any) => {
+        if (err) {
+          return res.status(500).json({ message: "Authentication error" });
+        }
+        if (!user) {
+          return res.status(401).json({ message: info?.message || "Invalid credentials" });
+        }
+        req.logIn(user, (err) => {
+          if (err) {
+            return res.status(500).json({ message: "Login error" });
+          }
+          return res.json({ 
+            message: "Login successful",
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+            }
+          });
+        });
+      })(req, res, next);
+    });
+  } else {
+    console.warn("⚠️  Super Admin not configured - set SUPER_ADMIN_PASSWORD environment variable");
+  }
+
+  // Unified logout endpoint
+  app.get("/api/logout", (req, res) => {
+    req.logout(() => {
+      if (isReplitEnvironment) {
+        // Redirect to Replit logout
+        const config = getOidcConfig();
+        config.then(c => {
+          res.redirect(
+            client.buildEndSessionUrl(c, {
+              client_id: process.env.REPL_ID!,
+              post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+            }).href
+          );
+        }).catch(() => {
+          res.redirect("/");
+        });
+      } else {
+        res.redirect("/");
+      }
+    });
+  });
+
+  // Auth status endpoint
+  app.get("/api/auth/status", (req, res) => {
+    res.json({
+      authenticated: req.isAuthenticated(),
+      providers: {
+        replit: isReplitEnvironment,
+        google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+        local: !!process.env.SUPER_ADMIN_PASSWORD,
+      },
+      user: req.isAuthenticated() ? {
+        id: (req.user as any)?.id,
+        email: (req.user as any)?.email,
+        firstName: (req.user as any)?.firstName,
+        lastName: (req.user as any)?.lastName,
+      } : null
+    });
+  });
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  // If not in Replit environment, bypass auth for local testing
-  if (!isReplitEnvironment) {
-    console.warn("⚠️  Authentication bypassed - not in Replit environment");
-    return next();
+  // Check if user is authenticated via any provider
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
+  // For Google OAuth and Local auth, no token refresh needed
+  const SUPER_ADMIN_ID = "super-admin-001";
+  if (user.id && (user.id === SUPER_ADMIN_ID || user.id.startsWith('1'))) {
     return next();
   }
 
-  const refreshToken = user.refresh_token;
-  if (!refreshToken) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
+  // For Replit Auth, handle token refresh
+  if (isReplitEnvironment && user.expires_at) {
+    const now = Math.floor(Date.now() / 1000);
+    if (now <= user.expires_at) {
+      return next();
+    }
+
+    const refreshToken = user.refresh_token;
+    if (!refreshToken) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const config = await getOidcConfig();
+      const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
+      updateUserSession(user, tokenResponse);
+      return next();
+    } catch (error) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
   }
 
-  try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
-    updateUserSession(user, tokenResponse);
-    return next();
-  } catch (error) {
-    res.status(401).json({ message: "Unauthorized" });
-    return;
-  }
+  // Default: allow if authenticated
+  return next();
 };
 
 // Middleware to check if user is admin
 export const isAdmin: RequestHandler = async (req, res, next) => {
-  const userId = (req.user as any)?.claims?.sub;
+  const userId = (req.user as any)?.id || (req.user as any)?.claims?.sub;
   if (!userId) {
     return res.status(401).json({ message: "Unauthorized" });
   }
@@ -212,7 +375,7 @@ export const isAdmin: RequestHandler = async (req, res, next) => {
 
 // Middleware to check if user is enabled
 export const isEnabled: RequestHandler = async (req, res, next) => {
-  const userId = (req.user as any)?.claims?.sub;
+  const userId = (req.user as any)?.id || (req.user as any)?.claims?.sub;
   if (!userId) {
     return res.status(401).json({ message: "Unauthorized" });
   }
