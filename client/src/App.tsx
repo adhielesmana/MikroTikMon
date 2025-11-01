@@ -16,6 +16,7 @@ import GraphHistory from "@/pages/GraphHistory";
 import Alerts from "@/pages/Alerts";
 import Settings from "@/pages/Settings";
 import AdminUsers from "@/pages/AdminUsers";
+import Users from "@/pages/Users";
 import ChangePassword from "@/pages/ChangePassword";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -158,6 +159,13 @@ function Router() {
             {() => (
               <AuthenticatedLayout>
                 <AdminUsers />
+              </AuthenticatedLayout>
+            )}
+          </Route>
+          <Route path="/users">
+            {() => (
+              <AuthenticatedLayout>
+                <Users />
               </AuthenticatedLayout>
             )}
           </Route>

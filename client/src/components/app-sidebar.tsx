@@ -59,7 +59,7 @@ export function AppSidebar() {
   const adminItems = [
     {
       title: "User Management",
-      url: "/admin/users",
+      url: "/users",
       icon: Users,
     },
   ];
