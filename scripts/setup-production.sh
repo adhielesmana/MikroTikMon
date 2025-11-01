@@ -16,7 +16,8 @@ DB_NAME="mikrotik_monitor"
 DB_HOST="postgres"  # Docker container name
 
 echo "🔍 Finding PostgreSQL container..."
-POSTGRES_CONTAINER=$(docker ps --format '{{.Names}}' | grep -i postgres | head -1)
+# Try to find postgres container by name or image
+POSTGRES_CONTAINER=$(docker ps --format '{{.Names}}\t{{.Image}}' | grep -i postgres | awk '{print $1}' | head -1)
 
 if [ -z "$POSTGRES_CONTAINER" ]; then
     echo "❌ Error: Could not find postgres container!"
@@ -25,6 +26,8 @@ if [ -z "$POSTGRES_CONTAINER" ]; then
     docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
     echo ""
     echo "Please set manually: export POSTGRES_CONTAINER=<your_container_name>"
+    echo "Example: export POSTGRES_CONTAINER=mikrotik-monitor-db"
+    echo "Then run this script again."
     exit 1
 fi
 
