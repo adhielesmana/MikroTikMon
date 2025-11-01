@@ -15,6 +15,7 @@ import GraphHistory from "@/pages/GraphHistory";
 import Alerts from "@/pages/Alerts";
 import Settings from "@/pages/Settings";
 import AdminUsers from "@/pages/AdminUsers";
+import ChangePassword from "@/pages/ChangePassword";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Bell, Wifi, WifiOff } from "lucide-react";
@@ -97,12 +98,14 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 }
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, mustChangePassword } = useAuth();
 
   return (
     <Switch>
       {isLoading || !isAuthenticated ? (
         <Route path="/" component={Landing} />
+      ) : mustChangePassword ? (
+        <Route path="*" component={ChangePassword} />
       ) : (
         <>
           <Route path="/">

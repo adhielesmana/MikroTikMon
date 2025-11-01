@@ -35,6 +35,8 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role", { length: 20 }).notNull().default("user"), // 'admin' or 'user'
   enabled: boolean("enabled").notNull().default(false), // New users disabled by default
+  passwordHash: text("password_hash"), // For local authentication (super admin)
+  mustChangePassword: boolean("must_change_password").notNull().default(false), // Force password change on first login
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

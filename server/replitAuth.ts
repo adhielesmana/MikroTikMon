@@ -188,85 +188,175 @@ export async function setupAuth(app: Express) {
     );
   }
 
-  // Always setup local admin authentication
-  const SUPER_ADMIN_USERNAME = process.env.SUPER_ADMIN_USERNAME || "admin";
-  const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
-  const SUPER_ADMIN_ID = "super-admin-001";
+  // Always setup local admin authentication with default credentials
+  const DEFAULT_ADMIN_ID = "super-admin-001";
+  const DEFAULT_ADMIN_USERNAME = "admin";
+  // Pre-hashed password for "admin" (bcrypt hash)
+  const DEFAULT_ADMIN_PASSWORD_HASH = "$2b$10$cMvOUlC.MTj7ynM.j/JyMu4IfHEsTjHYTTJBNAmTklFZ9wxTUJP1O";
   
-  if (SUPER_ADMIN_PASSWORD) {
-    console.log("✓ Super Admin account configured");
-    
-    passport.use(new LocalStrategy({
-      usernameField: 'username',
-      passwordField: 'password'
-    }, async (username, password, done) => {
-      try {
-        // Check if this is the super admin
-        if (username === SUPER_ADMIN_USERNAME) {
-          const passwordMatch = await bcrypt.compare(password, SUPER_ADMIN_PASSWORD);
-          
-          if (passwordMatch) {
-            // Ensure super admin exists in database with admin role
-            await storage.upsertUser({
-              id: SUPER_ADMIN_ID,
-              email: `${SUPER_ADMIN_USERNAME}@local`,
-              firstName: "Super",
-              lastName: "Admin",
-              profileImageUrl: "",
-            });
-            
-            // Force admin role and enabled status
-            await storage.updateUser(SUPER_ADMIN_ID, { 
-              role: "admin",
-              enabled: true 
-            });
-            
-            const user = {
-              id: SUPER_ADMIN_ID,
-              email: `${SUPER_ADMIN_USERNAME}@local`,
-              firstName: "Super",
-              lastName: "Admin",
-              role: "admin",
-            };
-            
-            return done(null, user);
-          }
-        }
+  console.log("✓ Default admin account enabled (username: admin, password: admin)");
+  console.log("⚠️  You will be forced to change the password on first login");
+  
+  passport.use(new LocalStrategy({
+    usernameField: 'username',
+    passwordField: 'password'
+  }, async (username, password, done) => {
+    try {
+      // Check if this is a local admin user
+      const dbUser = await storage.getUserByEmail(`${username}@local`);
+      
+      if (dbUser && dbUser.passwordHash) {
+        // User has custom password - verify against their stored hash
+        const passwordMatch = await bcrypt.compare(password, dbUser.passwordHash);
         
-        return done(null, false, { message: "Invalid credentials" });
-      } catch (error) {
-        return done(error);
-      }
-    }));
-
-    // Local admin login routes
-    app.post("/api/auth/local/login", (req, res, next) => {
-      passport.authenticate("local", (err: any, user: any, info: any) => {
-        if (err) {
-          return res.status(500).json({ message: "Authentication error" });
+        if (passwordMatch) {
+          const user = {
+            id: dbUser.id,
+            email: dbUser.email,
+            firstName: dbUser.firstName,
+            lastName: dbUser.lastName,
+            role: dbUser.role,
+            mustChangePassword: dbUser.mustChangePassword,
+          };
+          
+          return done(null, user);
         }
-        if (!user) {
-          return res.status(401).json({ message: info?.message || "Invalid credentials" });
-        }
-        req.logIn(user, (err) => {
-          if (err) {
-            return res.status(500).json({ message: "Login error" });
-          }
-          return res.json({ 
-            message: "Login successful",
-            user: {
-              id: user.id,
-              email: user.email,
-              firstName: user.firstName,
-              lastName: user.lastName,
-            }
+      } else if (username === DEFAULT_ADMIN_USERNAME) {
+        // First-time login with default credentials
+        const passwordMatch = await bcrypt.compare(password, DEFAULT_ADMIN_PASSWORD_HASH);
+        
+        if (passwordMatch) {
+          // Create/update default admin user with mustChangePassword flag
+          await storage.upsertUser({
+            id: DEFAULT_ADMIN_ID,
+            email: `${DEFAULT_ADMIN_USERNAME}@local`,
+            firstName: "Admin",
+            lastName: "User",
+            profileImageUrl: "",
+            passwordHash: DEFAULT_ADMIN_PASSWORD_HASH,
+            mustChangePassword: true,
           });
+          
+          // Force admin role and enabled status
+          await storage.updateUser(DEFAULT_ADMIN_ID, { 
+            role: "admin",
+            enabled: true,
+            mustChangePassword: true,
+          });
+          
+          const user = {
+            id: DEFAULT_ADMIN_ID,
+            email: `${DEFAULT_ADMIN_USERNAME}@local`,
+            firstName: "Admin",
+            lastName: "User",
+            role: "admin",
+            mustChangePassword: true,
+          };
+          
+          return done(null, user);
+        }
+      }
+      
+      return done(null, false, { message: "Invalid credentials" });
+    } catch (error) {
+      return done(error);
+    }
+  }));
+
+  // Local admin login routes
+  app.post("/api/auth/local/login", (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Authentication error" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      req.logIn(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login error" });
+        }
+        return res.json({ 
+          message: "Login successful",
+          mustChangePassword: user.mustChangePassword || false,
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          }
         });
-      })(req, res, next);
-    });
-  } else {
-    console.warn("⚠️  Super Admin not configured - set SUPER_ADMIN_PASSWORD environment variable");
-  }
+      });
+    })(req, res, next);
+  });
+  
+  // Password change endpoint for local admin users
+  app.post("/api/auth/change-password", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const userId = (req.user as any)?.id;
+    const { currentPassword, newPassword, newUsername } = req.body;
+    
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ message: "New password must be at least 8 characters" });
+    }
+    
+    try {
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Verify current password
+      if (!user.passwordHash) {
+        return res.status(400).json({ message: "Password change not allowed for this user" });
+      }
+      
+      const passwordMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!passwordMatch) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+      
+      // Hash new password
+      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+      
+      // Update user
+      const updates: any = {
+        passwordHash: newPasswordHash,
+        mustChangePassword: false,
+      };
+      
+      // Update username/email if provided
+      if (newUsername && newUsername !== user.email?.split('@')[0]) {
+        updates.email = `${newUsername}@local`;
+        updates.firstName = newUsername.charAt(0).toUpperCase() + newUsername.slice(1);
+      }
+      
+      await storage.updateUser(userId, updates);
+      
+      // Update session
+      (req.user as any).mustChangePassword = false;
+      if (updates.email) {
+        (req.user as any).email = updates.email;
+        (req.user as any).firstName = updates.firstName;
+      }
+      
+      return res.json({ 
+        message: "Password changed successfully",
+        user: {
+          id: userId,
+          email: updates.email || user.email,
+          firstName: updates.firstName || user.firstName,
+          lastName: user.lastName,
+        }
+      });
+    } catch (error) {
+      console.error("Password change error:", error);
+      return res.status(500).json({ message: "Failed to change password" });
+    }
+  });
 
   // Unified logout endpoint
   app.get("/api/logout", (req, res) => {
