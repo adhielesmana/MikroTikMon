@@ -1,0 +1,61 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Development files
+*.log
+logs
+*.pid
+*.seed
+*.pid.lock
+
+# Build output
+dist
+.vite
+client/dist
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.nyc_output
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Misc
+.replit
+replit.nix
+.cache
+tmp
+temp
+
+# Replit specific
+.config
