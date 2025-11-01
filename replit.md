@@ -1,26 +1,7 @@
 # MikroTik Network Monitoring Platform
 
 ## Overview
-A comprehensive, enterprise-grade network monitoring platform for MikroTik routers. It offers real-time traffic analysis, intelligent threshold-based alerting, and multi-user role-based access control. The platform is designed for professional network administrators, providing a production-ready solution for efficient network oversight. The project aims to provide a robust, scalable, and user-friendly system for monitoring MikroTik router performance and health.
-
-## Recent Changes (Nov 1, 2025)
--   **Database Migration Scripts:** Created comprehensive migration tooling for safely copying development database to production. Three bash scripts: `export-dev-db.sh` (exports dev DB to compressed backup), `import-to-prod.sh` (restores backup to production with safety confirmations), and `verify-prod-db.sh` (validates production data after import). Includes detailed `MIGRATION_GUIDE.md` with step-by-step instructions. All scripts use pg_dump/pg_restore with proper flags for Neon PostgreSQL compatibility.
--   **User Invitation System:** Implemented comprehensive user invitation system for super admins. Admins can now invite new users through the Users management page (`/users`). New users receive a cryptographically secure temporary password (16-character random string) via email. All invited users have `mustChangePassword=true` by default and must change their password on first login. Added `username` field to users table schema (VARCHAR UNIQUE) to support local authentication for invited users. Created `getUserByUsername()` storage method and updated LocalStrategy to authenticate users by username. Frontend includes Users.tsx admin page with invitation form, user list table, and temporary password display for admins to share if email fails.
--   **Role-Based Router Access:** Implemented role-based visibility for routers. Super admin users (role="admin") can now see ALL routers from all users across the entire system, while normal users (role="user") can only see their own routers. Admin users can also view, modify, and delete any router regardless of ownership. Normal users are restricted to their own routers only.
--   **Login Page and Routing:** Created dedicated login page at `/login` with local admin and Google OAuth options. Updated landing page links from `/api/login` to `/login`. Added server-side redirect from `/api/login` to `/login` for backward compatibility in non-Replit environments. Login page features form validation, error handling, and intelligent display of default admin credentials (hidden once password is changed).
--   **Simplified Default Admin Authentication:** Implemented default local admin account with username "admin" and password "admin" - no environment configuration required! On first login, users are forced to change both username and password with bcrypt hashing (10 salt rounds). This eliminates the complexity of pre-generating password hashes while maintaining security. Login page automatically hides default credentials display once admin has changed their password.
--   **Admin Password Recovery:** Added password reset script (`scripts/reset-admin-password.js`) for recovery when admin forgets password. Generates cryptographically secure random temporary password (16 characters) using Node.js crypto module. Can be run via `./deploy.sh reset-password` command. Sets `mustChangePassword` flag to force password change on next login. Includes detailed console output with security warnings and next steps.
--   **Forced Password Change Flow:** Added `mustChangePassword` flag to users table. Default admin account automatically triggers password change screen on first login. New dedicated ChangePassword page with form validation ensures secure password update (minimum 8 characters). Once password is changed, users gain full access to the platform.
--   **Multi-Provider Authentication:** Comprehensive authentication system supporting three methods: Google OAuth (for public access), local admin (default admin/admin credentials), and Replit Auth (for Replit-hosted deployments). All methods can work simultaneously. Session management uses universal serialize/deserialize handlers for all providers.
--   **Google OAuth Integration:** Added Passport.js Google OAuth strategy for public user sign-in. Users authenticate with Google accounts, profiles auto-populated (name, email, photo). New users are disabled by default and require admin approval.
--   **Enhanced Security:** Session cookie security is conditional on production environment (secure in production, permissive in development for local testing). Passwords stored as bcrypt hashes with 10 salt rounds. Old password verification required before changing to new password. Password generation uses cryptographically secure random number generator (crypto.randomInt).
--   **Multi-Auth User ID Handling:** Added `getUserId()` helper function in routes.ts to handle user ID extraction for all authentication providers. Function supports both OIDC users (ID in `req.user.claims.sub`) and local/Google users (ID in `req.user.id`). All API routes updated to use this helper instead of direct property access, ensuring compatibility across all authentication methods.
-
-## Previous Changes (Oct 30, 2025)
--   **Background Fallback Optimization:** Major performance optimization for background scheduler! Connection method fallback testing (Native API → REST API → SNMP) now only happens when viewing/editing a router or when the cached method fails. Added `lastSuccessfulConnectionMethod` field to routers table to store the last working method. Background scheduler now uses the cached method directly, dramatically reducing unnecessary connection attempts. Result: ~66% reduction in background API calls and faster traffic data collection.
--   **RX-Only Threshold Monitoring:** Changed traffic threshold monitoring to check only RX (download/received) traffic instead of total traffic. Alert messages and emails now clearly indicate "RX traffic" for better clarity. This provides more accurate monitoring focused on incoming bandwidth consumption.
--   **Interface Filtering Bug Fix:** Fixed critical filtering bug where angle brackets in interface names (e.g., `<pppoe-xxx>`) bypassed the dynamic interface filter. Updated `filterInterfaces()` function to strip angle brackets before checking prefixes. Filtering now properly applied across all three connection methods at the `getInterfaceStats()` level (Native API, REST API, SNMP). Result: POP Soba Spasico now correctly shows 16 static interfaces instead of 135 total interfaces in "Static Only" mode.
--   **Dynamic Logo on Homepage:** Extended custom logo support to the Landing page (homepage). Logo now updates automatically on both the sidebar and homepage when a custom logo URL is set in Settings. Implements same error handling and dynamic update pattern using `useEffect` to reset error state when logo changes, ensuring seamless updates when logo becomes available.
+A comprehensive, enterprise-grade network monitoring platform for MikroTik routers. It offers real-time traffic analysis, intelligent threshold-based alerting, and multi-user role-based access control. The platform is designed for professional network administrators, providing a production-ready solution for efficient network oversight. The project aims to provide a robust, scalable, and user-friendly system for monitoring MikroTik router performance and health, with features like user invitation, multi-provider authentication, and a three-tier fallback system for router connectivity.
 
 ## User Preferences
 - Professional, data-dense monitoring interface
@@ -38,56 +19,37 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 ## System Architecture
 
 ### Technology Stack
-**Frontend:** React with TypeScript, Wouter for routing, TanStack Query for data fetching, Shadcn UI + Tailwind CSS for components, Recharts for traffic visualization, WebSocket for real-time updates.
-**Backend:** Express.js with TypeScript, PostgreSQL (Neon serverless) with Drizzle ORM, Passport.js multi-provider authentication (Google OAuth, Local Strategy, Replit OIDC), MikroTik RouterOS API client, Node-cron for scheduled traffic polling, Nodemailer for email notifications, WebSocket server.
+**Frontend:** React with TypeScript, Wouter, TanStack Query, Shadcn UI + Tailwind CSS, Recharts, WebSocket.
+**Backend:** Express.js with TypeScript, PostgreSQL (Neon serverless) with Drizzle ORM, Passport.js (Google OAuth, Local Strategy, Replit OIDC), MikroTik RouterOS API client, Node-cron, Nodemailer, WebSocket server.
 
 ### Database Schema
 **Core Tables:** `users` (with roles, username for local auth), `router_groups`, `routers` (with encrypted credentials), `monitored_ports` (with thresholds), `traffic_data` (time-series), `alerts` (with acknowledged status), `notifications`, `sessions`.
+**In-Memory Storage:** Nested Map structure for real-time traffic data, 7,200 entries per interface (2 hours at 1-second intervals).
 
-**Key Storage Methods:**
-- `getLatestUnacknowledgedAlertForPort`: Returns only unacknowledged alerts for proper alert independence and auto-acknowledgment logic.
-- `getRealtimeTraffic`: Retrieves in-memory traffic data for real-time graphing (per-interface buffering with 7200 entries each).
-- `getRecentTraffic`: Retrieves historical traffic data from database for long-term analysis.
-
-**In-Memory Storage:**
-- Nested Map structure: `Map<routerId, Map<portName, RealtimeTrafficData[]>>`
-- 7,200 entries per interface (2 hours at 1-second intervals)
-- Memory footprint: ~0.6 MB per router (9 interfaces × 7200 × ~80 bytes)
+### System Design Choices
+- **UI/UX:** Mobile-first responsive design, dark mode support, collapsible sidebar, touch-friendly interactions, dynamic logo on homepage and sidebar, error handling and dynamic updates for custom logos.
+- **Authentication:** Multi-provider authentication (Google OAuth, Local Admin, Replit Auth) with session management. Default local admin account ("admin"/"admin") with forced password change on first login. User invitation system for super admins with secure temporary passwords and forced password change. Admin password recovery script.
+- **Authorization:** Role-Based Access Control (RBAC) with "admin" and "user" roles. Super admins have full system-wide access to all routers; normal users are restricted to their own. Authorization checks enforce ownership validation on all router operations.
+- **Router Connectivity:** Three-tier fallback system for connecting to MikroTik routers: Native MikroTik API, HTTPS REST API (RouterOS v7.1+), and SNMP (v1/v2c). Automatic host extraction for REST API via SSL certificates. Network reachability status check. Optimized background scheduler using `lastSuccessfulConnectionMethod` to reduce unnecessary connection attempts.
+- **Traffic Monitoring:** Real-time (1-second polling, in-memory) and historical (database, 30-second polling) data. Collects data for all router interfaces. Dual data sources for different time ranges. Optimized storage with database persistence every 5 minutes and intelligent sampling. 2-year data retention with daily cleanup. RX-only threshold monitoring.
+- **Alerting:** Configurable thresholds per port. Dual notification via Email and In-App Popup. Alert severity levels, acknowledgment workflow, and history tracking. Alert de-duplication, auto-acknowledgment, and independent port status monitoring. Dashboard shows only unacknowledged/active alerts.
+- **Security:** Encrypted router credentials (crypto-js AES), bcrypt password hashing (10 salt rounds), conditional session cookie security based on environment, user approval for new Google OAuth accounts (disabled by default). Multi-Auth User ID Handling for compatibility across all authentication methods.
 
 ### Key Features
--   **User Management:** Multi-provider authentication (Google OAuth, Static Super Admin, Replit Auth), Administrator/Normal User roles, admin approval for new users (Google OAuth accounts disabled by default), guaranteed admin access via static super admin account.
-    -   **User Invitation System:** Admins can invite new users via `/users` page. System generates secure temporary passwords (16-char cryptographic random), sends invitation emails (console logging when SMTP not configured), and enforces password change on first login. Username-based authentication for invited users with bcrypt password hashing (10 salt rounds).
-    -   **Role-Based Access Control:** Admins have full visibility and control over all routers system-wide. Normal users can only view, edit, and delete their own routers. Authorization checks enforce ownership validation on all router operations.
--   **Router Management:** Add/manage MikroTik routers with secure credential storage, connection status monitoring, test connection functionality, user-specific router collections.
-    -   **Router Groups:** Organize routers into customizable groups with filtering capabilities.
-    -   **Three-Tier Fallback System:** Automatic failover between Native MikroTik API, HTTPS REST API (RouterOS v7.1+ with 64-bit counter support), and SNMP (v1/v2c with 64-bit counter support) for maximum connectivity and data accuracy. Each method is independently configurable.
-    -   **Automatic Hostname Extraction:** For REST API connections via IP, extracts hostname from SSL certificates for improved reliability.
-    -   **Network Reachability Status:** Basic TCP connectivity check to distinguish network issues from configuration problems, displayed in the UI.
--   **Traffic Monitoring:** 
-    -   **Real-Time Updates:** 1-second polling interval with in-memory storage (2 hours per interface)
-    -   **All Interfaces Tracked:** Collects traffic data for ALL router interfaces (not just monitored ports)
-    -   **Multi-Interface Graphs:** Select and view multiple interfaces simultaneously with color-coded TX/RX lines
-    -   **Dual Data Sources:** Real-time endpoint for 15m/1h ranges (1s polling), database endpoint for 6h+ ranges (30s polling)
-    -   **Optimized Storage:** Database persistence every 5 minutes with intelligent sampling (~5 data points per interface per 5-minute period)
-    -   **Default Selection:** All monitored ports automatically selected on page load for immediate visualization
-    -   **Graph History Page:** Dedicated page for viewing historical data with router selection and time range controls (1h, 12h, 1d, 7d, 30d, or custom date range)
-    -   **2-Year Data Retention:** Historical traffic data stored for 2 years with automatic daily cleanup
--   **Alert System:** Configurable thresholds per port, dual notification (Email + In-App Popup), alert severity levels, acknowledgment workflow, and history tracking.
-    -   **Alert De-duplication:** Prevents spamming by only generating new alerts when status changes (port down vs traffic threshold).
-    -   **Auto-Acknowledgment:** Automatically acknowledges alerts when conditions return to normal (traffic above threshold or port comes back up).
-    -   **Port Status Monitoring:** Independent port down/up detection with critical severity alerts, separate from traffic threshold monitoring.
-    -   **Dashboard Alert Filtering:** Recent alerts section shows only unacknowledged/active alerts requiring attention.
-    -   **Table-Based Alert History:** Professional table layout for viewing and managing all alert history with sorting and filtering capabilities.
--   **Responsive Design:** Mobile-first approach with collapsible sidebar, touch-friendly interactions, auto-sizing components, and dark mode support.
--   **Security Features:** Encrypted router credentials (crypto-js AES), role-based access control, user approval workflow, session-based authentication, user-scoped WebSocket notifications, and proper authorization checks.
--   **Performance:** Background scheduler (30-second polling), indexed traffic data, efficient Drizzle ORM queries, real-time WebSocket updates, and responsive UI.
+- **User Management:** Multi-provider authentication, Admin/Normal User roles, user invitation system with secure temporary passwords, role-based access control.
+- **Router Management:** Add/manage MikroTik routers, secure credential storage, connection status monitoring, test connection functionality, router groups, three-tier fallback system, automatic hostname extraction, network reachability status.
+- **Traffic Monitoring:** Real-time updates (1-second polling), all interfaces tracked, multi-interface graphs, dual data sources (in-memory/database), graph history page, 2-year data retention.
+- **Alert System:** Configurable thresholds, dual notification (Email + In-App Popup), alert de-duplication, auto-acknowledgment, port status monitoring, dashboard alert filtering, professional table-based alert history.
+- **Responsive Design:** Mobile-first approach, collapsible sidebar, touch-friendly, auto-sizing components, dark mode.
+- **Security Features:** Encrypted credentials, role-based access control, user approval workflow, session-based authentication, user-scoped WebSocket notifications, authorization checks.
+- **Performance:** Background scheduler, indexed traffic data, efficient Drizzle ORM queries, real-time WebSocket updates, responsive UI.
 
 ## External Dependencies
--   **PostgreSQL Database:** Utilized via Neon (serverless) for data persistence.
--   **Authentication Providers:** Google OAuth (optional, for public access), Replit Auth (optional, for Replit-hosted deployments). Static super admin uses local bcrypt authentication.
--   **MikroTik RouterOS API:** Primary method for router interaction.
--   **Node-cron:** For scheduling background tasks like traffic polling.
--   **Nodemailer:** For sending email notifications (currently configured for console logging).
--   **Passport.js:** Authentication middleware supporting multiple strategies (Google OAuth, Local, Replit OIDC).
--   **WebSocket:** For real-time, user-scoped notifications.
--   **net-snmp library:** For SNMP fallback functionality.
+-   **PostgreSQL Database:** Neon (serverless) for data persistence.
+-   **Authentication Providers:** Google OAuth, Replit Auth.
+-   **MikroTik RouterOS API:** For router interaction.
+-   **Node-cron:** For scheduling background tasks.
+-   **Nodemailer:** For email notifications.
+-   **Passport.js:** Authentication middleware.
+-   **WebSocket:** For real-time notifications.
+-   **net-snmp library:** For SNMP fallback.

@@ -59,7 +59,14 @@ export default function Login() {
       });
 
       if (response.ok) {
-        window.location.href = "/";
+        const result = await response.json();
+        
+        // Check if user must change password on first login
+        if (result.mustChangePassword) {
+          window.location.href = "/change-password";
+        } else {
+          window.location.href = "/";
+        }
       } else {
         const error = await response.json();
         toast({
