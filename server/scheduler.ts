@@ -102,6 +102,34 @@ export function getRealtimeTraffic(routerId: string, since?: Date): RealtimeTraf
   return allData.filter(d => d.timestamp >= since);
 }
 
+// Get average traffic from last 3 data points for a specific port
+// This helps avoid false alerts from temporary traffic spikes/drops
+function getAverageTrafficForPort(routerId: string, portName: string, dataPoints: number = 3): {
+  rxBytesPerSecond: number;
+  txBytesPerSecond: number;
+  totalBytesPerSecond: number;
+} | null {
+  const routerData = realtimeTrafficStore.get(routerId);
+  if (!routerData) return null;
+  
+  const interfaceData = routerData.get(portName);
+  if (!interfaceData || interfaceData.length === 0) return null;
+  
+  // Get the last N data points (default 3)
+  const recentData = interfaceData.slice(-dataPoints);
+  
+  // Calculate average
+  const avgRx = recentData.reduce((sum, d) => sum + d.rxBytesPerSecond, 0) / recentData.length;
+  const avgTx = recentData.reduce((sum, d) => sum + d.txBytesPerSecond, 0) / recentData.length;
+  const avgTotal = recentData.reduce((sum, d) => sum + d.totalBytesPerSecond, 0) / recentData.length;
+  
+  return {
+    rxBytesPerSecond: avgRx,
+    txBytesPerSecond: avgTx,
+    totalBytesPerSecond: avgTotal,
+  };
+}
+
 function addRealtimeTraffic(routerId: string, data: Omit<RealtimeTrafficData, 'routerId'>) {
   // Get or create router's interface map
   let routerData = realtimeTrafficStore.get(routerId);
@@ -509,9 +537,12 @@ async function checkAlerts() {
           }
 
           // Check traffic threshold (RX only - download traffic)
-          const isBelowThreshold = stat.rxBytesPerSecond < port.minThresholdBps;
+          // Use AVERAGE of last 3 data points to avoid false alerts from temporary spikes/drops
+          const avgTraffic = getAverageTrafficForPort(routerId, port.portName, 3);
+          const currentRxTraffic = avgTraffic ? avgTraffic.rxBytesPerSecond : stat.rxBytesPerSecond;
+          const isBelowThreshold = currentRxTraffic < port.minThresholdBps;
           
-          console.log(`[Scheduler] ${router.name} - ${port.portName}: RX Traffic ${(stat.rxBytesPerSecond / 1024).toFixed(2)} KB/s vs Threshold ${(port.minThresholdBps / 1024).toFixed(2)} KB/s (${isBelowThreshold ? 'BELOW' : 'ABOVE'})`);
+          console.log(`[Scheduler] ${router.name} - ${port.portName}: RX Traffic ${(currentRxTraffic / 1024).toFixed(2)} KB/s (avg of last 3) vs Threshold ${(port.minThresholdBps / 1024).toFixed(2)} KB/s (${isBelowThreshold ? 'BELOW' : 'ABOVE'})`);
 
           if (isBelowThreshold) {
             // Increment violation count
@@ -520,7 +551,7 @@ async function checkAlerts() {
             // Only create alert after 3 consecutive checks AND no active traffic alert
             if (violationCount >= 3 && (!hasActiveAlert || isPortDownAlert)) {
               // Determine severity based on how far below threshold
-              const percentBelow = ((port.minThresholdBps - stat.rxBytesPerSecond) / port.minThresholdBps) * 100;
+              const percentBelow = ((port.minThresholdBps - currentRxTraffic) / port.minThresholdBps) * 100;
               let severity = "warning";
               if (percentBelow > 50) severity = "critical";
               else if (percentBelow > 25) severity = "warning";
@@ -533,8 +564,8 @@ async function checkAlerts() {
                 portName: port.portName,
                 userId: router.userId,
                 severity,
-                message: `RX traffic on ${port.portName} is below threshold: ${(stat.rxBytesPerSecond / 1024).toFixed(2)} KB/s < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
-                currentTrafficBps: stat.rxBytesPerSecond,
+                message: `RX traffic on ${port.portName} is below threshold: ${(currentRxTraffic / 1024).toFixed(2)} KB/s (avg) < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
+                currentTrafficBps: currentRxTraffic,
                 thresholdBps: port.minThresholdBps,
               });
 
@@ -565,7 +596,7 @@ async function checkAlerts() {
                     await emailService.sendAlertEmail(user.email, {
                       routerName: router.name,
                       portName: port.portName,
-                      currentTraffic: `${(stat.rxBytesPerSecond / 1024).toFixed(2)} KB/s (RX)`,
+                      currentTraffic: `${(currentRxTraffic / 1024).toFixed(2)} KB/s (RX avg)`,
                       threshold: `${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
                       severity: alert.severity,
                     });
