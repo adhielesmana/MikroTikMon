@@ -223,6 +223,15 @@ async function pollRouterTraffic() {
         // Update router connection status (only if reachable AND data retrieved successfully)
         await storage.updateRouterConnection(router.id, true);
 
+        // Cloud DDNS hostname auto-conversion: If connected via IP and hostname extracted from certificate
+        if (storedMethod === 'rest' && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
+          const extractedHostname = client.getExtractedHostname();
+          if (extractedHostname && extractedHostname !== router.ipAddress) {
+            console.log(`[Scheduler] Auto-converting router ${router.name} from IP ${router.ipAddress} to Cloud DDNS hostname ${extractedHostname}`);
+            await storage.updateRouterHostname(router.id, extractedHostname);
+          }
+        }
+
         // Store traffic data for ALL interfaces in memory for real-time display
         const timestamp = new Date();
         for (const stat of stats) {
