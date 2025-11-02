@@ -39,6 +39,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
 # Copy necessary files
 COPY --chown=nodejs:nodejs shared ./shared
+COPY --chown=nodejs:nodejs server ./server
 COPY --chown=nodejs:nodejs scripts ./scripts
 COPY --chown=nodejs:nodejs drizzle.config.ts ./
 
