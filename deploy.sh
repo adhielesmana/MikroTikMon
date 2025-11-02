@@ -186,6 +186,17 @@ case $COMMAND in
             $DOCKER_COMPOSE exec -T app npm run db:push --force
         }
         
+        # Run SQL migrations
+        print_info "Running SQL migrations..."
+        for migration in scripts/migrations/*.sql; do
+            if [ -f "$migration" ]; then
+                print_info "Running migration: $(basename $migration)"
+                $DOCKER_COMPOSE exec -T mikrotik-monitor-db psql -U mikrotik_user mikrotik_monitor < "$migration" || {
+                    print_warning "Migration might have failed: $(basename $migration)"
+                }
+            fi
+        done
+        
         print_success "Update complete"
         ;;
         
@@ -240,6 +251,24 @@ case $COMMAND in
         ./scripts/setup-production.sh
         ;;
         
+    migrate)
+        print_info "Running database migrations..."
+        
+        # Run all migration SQL files in order
+        for migration in scripts/migrations/*.sql; do
+            if [ -f "$migration" ]; then
+                print_info "Running migration: $(basename $migration)"
+                $DOCKER_COMPOSE exec -T mikrotik-monitor-db psql -U mikrotik_user mikrotik_monitor < "$migration" || {
+                    print_error "Migration failed: $(basename $migration)"
+                    exit 1
+                }
+                print_success "Migration completed: $(basename $migration)"
+            fi
+        done
+        
+        print_success "All migrations completed successfully"
+        ;;
+        
     fix-db)
         print_warning "This command fixes common database connection issues"
         echo ""
@@ -284,6 +313,7 @@ case $COMMAND in
         echo "  logs             View application logs"
         echo "  status           Show container status"
         echo "  update           Update and rebuild the application"
+        echo "  migrate          Run database migrations (SQL files)"
         echo "  clean            Remove all containers and volumes"
         echo "  backup           Create database backup"
         echo "  restore <file>   Restore database from backup"
