@@ -8,7 +8,7 @@ import type { Router, MonitoredPort, TrafficData } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytesPerSecond, formatRelativeTime } from "@/lib/utils";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { useState, useMemo, Fragment, useEffect } from "react";
+import { useState, useMemo, Fragment, useEffect, useRef } from "react";
 import { AddPortDialog } from "@/components/AddPortDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +42,10 @@ export default function RouterDetails() {
   const [timeRange, setTimeRange] = useState("1h");
   const [selectedInterfaces, setSelectedInterfaces] = useState<Set<string>>(new Set());
   const { toast } = useToast();
+  
+  // WebSocket-based real-time traffic data
+  const [realtimeTrafficData, setRealtimeTrafficData] = useState<TrafficData[]>([]);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const { data: router, isLoading: loadingRouter } = useQuery<Router>({
     queryKey: ["/api/routers", id],
@@ -63,16 +67,87 @@ export default function RouterDetails() {
   
   const allInterfaces = interfacesData?.interfaces.map(i => i.name) || [];
 
-  // Use real-time endpoint for 15m and 1h ranges, database for longer ranges
+  // Use WebSocket for real-time (15m and 1h), database for historical (longer ranges)
   const useRealtimeEndpoint = timeRange === "15m" || timeRange === "1h";
   
-  const { data: trafficData, isLoading: loadingTraffic } = useQuery<TrafficData[]>({
-    queryKey: useRealtimeEndpoint 
-      ? [`/api/routers/${id}/traffic/realtime?timeRange=${timeRange}`]
-      : [`/api/routers/${id}/traffic?timeRange=${timeRange}`],
-    enabled: !!id,
-    refetchInterval: useRealtimeEndpoint ? 1000 : 30000, // 1 second for real-time, 30 seconds for historical
+  // Only fetch historical data for longer time ranges
+  const { data: historicalTrafficData, isLoading: loadingTraffic } = useQuery<TrafficData[]>({
+    queryKey: [`/api/routers/${id}/traffic?timeRange=${timeRange}`],
+    enabled: !!id && !useRealtimeEndpoint,
+    refetchInterval: 30000, // 30 seconds for historical
   });
+
+  // WebSocket setup for on-demand real-time traffic
+  useEffect(() => {
+    if (!id || !useRealtimeEndpoint) {
+      // Stop real-time polling if not needed
+      if (wsRef.current) {
+        console.log("[RouterDetails] Stopping real-time polling (not in real-time mode)");
+        wsRef.current.send(JSON.stringify({ type: "stop_realtime_polling", routerId: id }));
+      }
+      return;
+    }
+
+    // Get or create WebSocket connection from global
+    const getWebSocket = () => {
+      // Check if there's already a WebSocket connection from the global hook
+      const existingWs = (window as any).__globalWebSocket as WebSocket | undefined;
+      if (existingWs && existingWs.readyState === WebSocket.OPEN) {
+        return existingWs;
+      }
+      
+      // Create new WebSocket connection
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const ws = new WebSocket(wsUrl);
+      (window as any).__globalWebSocket = ws;
+      return ws;
+    };
+
+    const ws = getWebSocket();
+    wsRef.current = ws;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === "realtime_traffic" && message.routerId === id) {
+          // Update real-time traffic data
+          console.log("[RouterDetails] Received real-time traffic data:", message.data.length, "points");
+          setRealtimeTrafficData(message.data);
+        }
+      } catch (error) {
+        console.error("[RouterDetails] Error parsing WebSocket message:", error);
+      }
+    };
+
+    const startPolling = () => {
+      console.log("[RouterDetails] Starting real-time polling for router", id);
+      ws.send(JSON.stringify({ type: "start_realtime_polling", routerId: id }));
+    };
+
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.addEventListener('message', handleMessage);
+      startPolling();
+    } else {
+      ws.addEventListener('open', () => {
+        ws.addEventListener('message', handleMessage);
+        startPolling();
+      });
+    }
+
+    // Cleanup on unmount or when switching time ranges
+    return () => {
+      console.log("[RouterDetails] Cleanup: Stopping real-time polling for router", id);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "stop_realtime_polling", routerId: id }));
+      }
+      ws.removeEventListener('message', handleMessage);
+    };
+  }, [id, useRealtimeEndpoint]);
+
+  // Use the appropriate data source based on time range
+  const trafficData = useRealtimeEndpoint ? realtimeTrafficData : historicalTrafficData;
 
   const deletePortMutation = useMutation({
     mutationFn: async (portId: string) => {
