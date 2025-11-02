@@ -179,7 +179,7 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]" data-testid="dialog-add-router">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col" data-testid="dialog-add-router">
         <DialogHeader>
           <DialogTitle>{router ? "Edit Router" : "Add New Router"}</DialogTitle>
           <DialogDescription>
@@ -189,209 +189,36 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Router Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Office Router" {...field} data-testid="input-router-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="ipAddress"
-                render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
-                    <FormLabel>IP Address</FormLabel>
-                    <FormControl>
-                      <Input placeholder="192.168.1.1" {...field} data-testid="input-router-ip" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="port"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Port</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="8728" {...field} data-testid="input-router-port" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="groupId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Group (Optional)</FormLabel>
-                  <Select 
-                    onValueChange={(value) => field.onChange(value === "none" ? undefined : value)} 
-                    value={field.value || "none"}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="select-router-group">
-                        <SelectValue placeholder="No group" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">No group</SelectItem>
-                      {groups?.map((group) => (
-                        <SelectItem key={group.id} value={group.id}>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-sm"
-                              style={{ backgroundColor: group.color || "#3b82f6" }}
-                            />
-                            {group.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Organize routers by location or function
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Username</FormLabel>
-                  <FormControl>
-                    <Input placeholder="admin" {...field} data-testid="input-router-username" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      placeholder={router ? "Leave blank to keep unchanged" : "Enter password"}
-                      {...field}
-                      data-testid="input-router-password"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Separator className="my-4" />
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-medium">REST API Fallback</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Use HTTPS REST API when native API fails (RouterOS v7.1+)
-                  </p>
-                </div>
-                <FormField
-                  control={form.control}
-                  name="restEnabled"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-rest-enabled"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {form.watch("restEnabled") && (
-                <div className="space-y-4 pl-4 border-l-2">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+            <div className="overflow-y-auto max-h-[60vh] pr-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Column - Basic Configuration */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-foreground">Basic Configuration</h3>
+                  
                   <FormField
                     control={form.control}
-                    name="restPort"
+                    name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>REST API Port (HTTPS)</FormLabel>
+                        <FormLabel>Router Name</FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="443" {...field} data-testid="input-rest-port" />
+                          <Input placeholder="Office Router" {...field} data-testid="input-router-name" />
                         </FormControl>
-                        <FormDescription>
-                          Default: 443 (HTTPS). Requires REST API enabled on router
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
-              )}
-            </div>
 
-            <Separator className="my-4" />
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-medium">SNMP Fallback</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Use SNMP when both APIs fail
-                  </p>
-                </div>
-                <FormField
-                  control={form.control}
-                  name="snmpEnabled"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-snmp-enabled"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {form.watch("snmpEnabled") && (
-                <div className="space-y-4 pl-4 border-l-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-3">
                     <FormField
                       control={form.control}
-                      name="snmpCommunity"
+                      name="ipAddress"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Community String</FormLabel>
+                        <FormItem className="col-span-2">
+                          <FormLabel>IP Address</FormLabel>
                           <FormControl>
-                            <Input placeholder="public" {...field} data-testid="input-snmp-community" />
+                            <Input placeholder="192.168.1.1" {...field} data-testid="input-router-ip" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -400,12 +227,12 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
 
                     <FormField
                       control={form.control}
-                      name="snmpPort"
+                      name="port"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>SNMP Port</FormLabel>
+                          <FormLabel>Port</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="161" {...field} data-testid="input-snmp-port" />
+                            <Input type="number" placeholder="8728" {...field} data-testid="input-router-port" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -415,85 +242,269 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
 
                   <FormField
                     control={form.control}
-                    name="snmpVersion"
+                    name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>SNMP Version</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormLabel>Username</FormLabel>
+                        <FormControl>
+                          <Input placeholder="admin" {...field} data-testid="input-router-username" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder={router ? "Leave blank to keep unchanged" : "Enter password"}
+                            {...field}
+                            data-testid="input-router-password"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="groupId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Group (Optional)</FormLabel>
+                        <Select 
+                          onValueChange={(value) => field.onChange(value === "none" ? undefined : value)} 
+                          value={field.value || "none"}
+                        >
                           <FormControl>
-                            <SelectTrigger data-testid="select-snmp-version">
-                              <SelectValue placeholder="Select SNMP version" />
+                            <SelectTrigger data-testid="select-router-group">
+                              <SelectValue placeholder="No group" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="1">SNMPv1</SelectItem>
-                            <SelectItem value="2c">SNMPv2c (Recommended)</SelectItem>
+                            <SelectItem value="none">No group</SelectItem>
+                            {groups?.map((group) => (
+                              <SelectItem key={group.id} value={group.id}>
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-3 h-3 rounded-sm"
+                                    style={{ backgroundColor: group.color || "#3b82f6" }}
+                                  />
+                                  {group.name}
+                                </div>
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          SNMPv2c is recommended for MikroTik routers
+                          Organize routers by location or function
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-              )}
+
+                {/* Right Column - Advanced Options */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-foreground">Advanced Options</h3>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium">REST API Fallback</h4>
+                        <p className="text-xs text-muted-foreground">
+                          HTTPS REST API (RouterOS v7.1+)
+                        </p>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="restEnabled"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-rest-enabled"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {form.watch("restEnabled") && (
+                      <div className="pl-4 border-l-2">
+                        <FormField
+                          control={form.control}
+                          name="restPort"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>REST API Port</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="443" {...field} data-testid="input-rest-port" />
+                              </FormControl>
+                              <FormDescription className="text-xs">
+                                Default: 443 (HTTPS)
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-medium">SNMP Fallback</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Use SNMP when both APIs fail
+                        </p>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="snmpEnabled"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                data-testid="switch-snmp-enabled"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {form.watch("snmpEnabled") && (
+                      <div className="space-y-4 pl-4 border-l-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={form.control}
+                            name="snmpCommunity"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Community</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="public" {...field} data-testid="input-snmp-community" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="snmpPort"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Port</FormLabel>
+                                <FormControl>
+                                  <Input type="number" placeholder="161" {...field} data-testid="input-snmp-port" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={form.control}
+                          name="snmpVersion"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>SNMP Version</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-snmp-version">
+                                    <SelectValue placeholder="Select version" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="1">SNMPv1</SelectItem>
+                                  <SelectItem value="2c">SNMPv2c</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormDescription className="text-xs">
+                                v2c recommended for MikroTik
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  <FormField
+                    control={form.control}
+                    name="interfaceDisplayMode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Interface Display Mode</FormLabel>
+                        <FormDescription className="text-xs">
+                          Choose which interfaces to monitor
+                        </FormDescription>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            className="flex flex-col gap-2 pt-2"
+                            data-testid="radio-interface-display-mode"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="none" id="mode-none" data-testid="radio-mode-none" />
+                              <Label htmlFor="mode-none" className="font-normal cursor-pointer text-sm">
+                                <span className="font-medium">Hide All</span>
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="static" id="mode-static" data-testid="radio-mode-static" />
+                              <Label htmlFor="mode-static" className="font-normal cursor-pointer text-sm">
+                                <span className="font-medium">Static Only</span>
+                                <span className="block text-xs text-muted-foreground">
+                                  Ethernet, VLAN, Bridge
+                                </span>
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="all" id="mode-all" data-testid="radio-mode-all" />
+                              <Label htmlFor="mode-all" className="font-normal cursor-pointer text-sm">
+                                <span className="font-medium">Show All</span>
+                                <span className="block text-xs text-muted-foreground">
+                                  Include PPPoE, L2TP, etc.
+                                </span>
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
             </div>
 
-            <Separator className="my-4" />
 
-            <FormField
-              control={form.control}
-              name="interfaceDisplayMode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Interface Display Mode</FormLabel>
-                  <FormDescription>
-                    Choose which interfaces to display and monitor
-                  </FormDescription>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      className="flex flex-col gap-3 pt-2"
-                      data-testid="radio-interface-display-mode"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="none" id="mode-none" data-testid="radio-mode-none" />
-                        <Label htmlFor="mode-none" className="font-normal cursor-pointer">
-                          <span className="font-medium">Hide All</span>
-                          <span className="block text-sm text-muted-foreground">
-                            Don't display any interfaces
-                          </span>
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="static" id="mode-static" data-testid="radio-mode-static" />
-                        <Label htmlFor="mode-static" className="font-normal cursor-pointer">
-                          <span className="font-medium">Static Only (Recommended)</span>
-                          <span className="block text-sm text-muted-foreground">
-                            Show only static interfaces (Ethernet, VLAN, Bridge, etc.)
-                          </span>
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="all" id="mode-all" data-testid="radio-mode-all" />
-                        <Label htmlFor="mode-all" className="font-normal cursor-pointer">
-                          <span className="font-medium">Show All</span>
-                          <span className="block text-sm text-muted-foreground">
-                            Include dynamic interfaces (PPPoE, L2TP, etc.)
-                          </span>
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+            {/* Action Buttons - Fixed at bottom */}
+            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2 border-t">
               <Button
                 type="button"
                 variant="outline"
