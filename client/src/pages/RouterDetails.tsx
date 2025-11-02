@@ -81,40 +81,48 @@ export default function RouterDetails() {
   useEffect(() => {
     if (!id || !useRealtimeEndpoint) {
       // Stop real-time polling if not needed
-      if (wsRef.current) {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         console.log("[RouterDetails] Stopping real-time polling (not in real-time mode)");
         wsRef.current.send(JSON.stringify({ type: "stop_realtime_polling", routerId: id }));
       }
       return;
     }
 
-    // Get or create WebSocket connection from global
-    const getWebSocket = () => {
-      // Check if there's already a WebSocket connection from the global hook
-      const existingWs = (window as any).__globalWebSocket as WebSocket | undefined;
-      if (existingWs && existingWs.readyState === WebSocket.OPEN) {
-        return existingWs;
-      }
-      
-      // Create new WebSocket connection
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      const ws = new WebSocket(wsUrl);
-      (window as any).__globalWebSocket = ws;
-      return ws;
-    };
-
-    const ws = getWebSocket();
+    // Use the existing authenticated WebSocket from global hook
+    const ws = (window as any).__appWebSocket as WebSocket | undefined;
+    if (!ws) {
+      console.error("[RouterDetails] Global WebSocket not available");
+      return;
+    }
     wsRef.current = ws;
+    
+    let isSubscribed = true;
+    let authCheckInterval: NodeJS.Timeout | null = null;
+
+    let pollingStarted = false;
 
     const handleMessage = (event: MessageEvent) => {
       try {
         const message = JSON.parse(event.data);
         
-        if (message.type === "realtime_traffic" && message.routerId === id) {
+        if (message.type === "realtime_traffic" && message.routerId === id && isSubscribed) {
           // Update real-time traffic data
           console.log("[RouterDetails] Received real-time traffic data:", message.data.length, "points");
           setRealtimeTrafficData(message.data);
+        } else if (message.type === "realtime_polling_started" && message.routerId === id) {
+          console.log("[RouterDetails] Real-time polling started confirmation received");
+          pollingStarted = true;
+          if (authCheckInterval) {
+            clearInterval(authCheckInterval);
+            authCheckInterval = null;
+          }
+        } else if (message.type === "auth_success" && isSubscribed && !pollingStarted) {
+          console.log("[RouterDetails] WebSocket authenticated, starting polling...");
+          if (authCheckInterval) {
+            clearInterval(authCheckInterval);
+            authCheckInterval = null;
+          }
+          startPolling();
         }
       } catch (error) {
         console.error("[RouterDetails] Error parsing WebSocket message:", error);
@@ -122,27 +130,52 @@ export default function RouterDetails() {
     };
 
     const startPolling = () => {
+      if (!isSubscribed || !ws || ws.readyState !== WebSocket.OPEN || pollingStarted) {
+        if (pollingStarted) {
+          console.log("[RouterDetails] Polling already started, skipping");
+        }
+        return;
+      }
       console.log("[RouterDetails] Starting real-time polling for router", id);
       ws.send(JSON.stringify({ type: "start_realtime_polling", routerId: id }));
     };
 
+    // Wait for WebSocket to be ready and authenticated
     if (ws.readyState === WebSocket.OPEN) {
       ws.addEventListener('message', handleMessage);
-      startPolling();
+      // Wait for authentication - the message handler will start polling on auth_success
+      setTimeout(() => {
+        if (!pollingStarted && isSubscribed) {
+          startPolling();
+        }
+      }, 1000);
     } else {
       ws.addEventListener('open', () => {
-        ws.addEventListener('message', handleMessage);
-        startPolling();
+        if (isSubscribed) {
+          ws.addEventListener('message', handleMessage);
+          // Wait for authentication
+          setTimeout(() => {
+            if (!pollingStarted && isSubscribed) {
+              startPolling();
+            }
+          }, 1000);
+        }
       });
     }
 
     // Cleanup on unmount or when switching time ranges
     return () => {
+      isSubscribed = false;
+      if (authCheckInterval) {
+        clearInterval(authCheckInterval);
+      }
       console.log("[RouterDetails] Cleanup: Stopping real-time polling for router", id);
-      if (ws.readyState === WebSocket.OPEN) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "stop_realtime_polling", routerId: id }));
       }
-      ws.removeEventListener('message', handleMessage);
+      if (ws) {
+        ws.removeEventListener('message', handleMessage);
+      }
     };
   }, [id, useRealtimeEndpoint]);
 

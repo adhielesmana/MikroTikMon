@@ -938,6 +938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on('message', (message: string) => {
       try {
         const data = JSON.parse(message);
+        console.log(`[WebSocket] Received message type: ${data.type}`, data);
         
         // Handle authentication
         if (data.type === "auth" && data.userId) {
@@ -956,7 +957,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Handle start real-time traffic polling
         if (data.type === "start_realtime_polling" && data.routerId) {
+          console.log(`[WebSocket] Checking auth for start polling - userId: ${userId}`);
           if (!userId) {
+            console.log("[WebSocket] Not authenticated, sending error");
             ws.send(JSON.stringify({ type: "error", message: "Not authenticated" }));
             return;
           }

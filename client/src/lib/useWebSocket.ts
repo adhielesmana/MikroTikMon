@@ -41,6 +41,8 @@ export function useWebSocket(userId: string | null) {
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+    // Expose globally for RouterDetails to use the same connection
+    (window as any).__appWebSocket = ws;
 
     ws.onopen = () => {
       console.log("[WebSocket] Connected");
