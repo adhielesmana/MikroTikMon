@@ -43,7 +43,9 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
   const isEditing = !!port;
 
   // Fetch available interfaces from router
-  const { data: interfacesData, isLoading: loadingInterfaces } = useQuery<{ interfaces: string[] }>({
+  const { data: interfacesData, isLoading: loadingInterfaces } = useQuery<{ 
+    interfaces: Array<{ name: string; comment?: string }> 
+  }>({
     queryKey: ["/api/routers", routerId, "interfaces"],
     enabled: open && !isEditing, // Only fetch when dialog is open and adding new port
   });
@@ -167,8 +169,8 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
                       </FormControl>
                       <SelectContent>
                         {interfacesData.interfaces.map((iface) => (
-                          <SelectItem key={iface} value={iface}>
-                            {iface}
+                          <SelectItem key={iface.name} value={iface.name}>
+                            {iface.name}{iface.comment ? ` - ${iface.comment}` : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>

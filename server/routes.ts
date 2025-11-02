@@ -587,24 +587,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getRealtimeTraffic } = await import("./scheduler");
       const trafficData = getRealtimeTraffic(req.params.id);
       
-      // Extract unique port names
-      let interfaceNames = Array.from(new Set(trafficData.map(d => d.portName)));
+      // Create a map to store the latest data for each interface (including comment)
+      const interfaceMap = new Map<string, { name: string; comment?: string }>();
+      
+      for (const data of trafficData) {
+        if (!interfaceMap.has(data.portName)) {
+          interfaceMap.set(data.portName, {
+            name: data.portName,
+            comment: (data as any).comment || undefined
+          });
+        }
+      }
+      
+      // Get array of interfaces
+      let interfaces = Array.from(interfaceMap.values());
       
       // Filter based on router's interfaceDisplayMode setting
       if (router.interfaceDisplayMode === 'none') {
         // Hide all interfaces
-        interfaceNames = [];
+        interfaces = [];
       } else if (router.interfaceDisplayMode === 'static') {
         // Show only static interfaces (exclude dynamic ones)
         const dynamicPrefixes = ['pppoe-', 'l2tp-', 'pptp-', 'sstp-', 'ovpn-'];
-        interfaceNames = interfaceNames.filter(name => {
-          const lowerName = name.toLowerCase();
+        interfaces = interfaces.filter(iface => {
+          const lowerName = iface.name.toLowerCase();
           return !dynamicPrefixes.some(prefix => lowerName.startsWith(prefix));
         });
       }
       // else 'all' - show all interfaces (no filtering)
       
-      res.json({ interfaces: interfaceNames });
+      res.json({ interfaces });
     } catch (error) {
       console.error("Error fetching interfaces:", error);
       res.status(500).json({ message: "Failed to fetch interfaces" });

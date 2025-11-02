@@ -33,6 +33,7 @@ export function broadcastNotification(userId: string, notification: any) {
 interface RealtimeTrafficData {
   routerId: string;
   portName: string;
+  comment?: string;
   timestamp: Date;
   rxBytesPerSecond: number;
   txBytesPerSecond: number;
@@ -226,6 +227,7 @@ async function pollRouterTraffic() {
         for (const stat of stats) {
           addRealtimeTraffic(router.id, {
             portName: stat.name,
+            comment: stat.comment,
             timestamp,
             rxBytesPerSecond: stat.rxBytesPerSecond,
             txBytesPerSecond: stat.txBytesPerSecond,

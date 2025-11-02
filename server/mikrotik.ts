@@ -40,6 +40,7 @@ function filterInterfaces(interfaces: string[], displayMode: 'none' | 'static' |
 
 export interface InterfaceStats {
   name: string;
+  comment?: string; // Interface comment/description
   rxBytesPerSecond: number;
   txBytesPerSecond: number;
   totalBytesPerSecond: number;
@@ -587,6 +588,7 @@ export class MikrotikClient {
       for (const iface of interfaces) {
         // REST API doesn't provide real-time rates directly, so we calculate from byte counters
         const name = iface.name;
+        const comment = iface.comment || undefined;
         const rxBytes = parseInt(iface['rx-byte'] || '0');
         const txBytes = parseInt(iface['tx-byte'] || '0');
         
@@ -609,6 +611,7 @@ export class MikrotikClient {
         // Always add the interface to results (even on first poll with 0 rates)
         result.push({
           name,
+          comment,
           rxBytesPerSecond: rxRate,
           txBytesPerSecond: txRate,
           totalBytesPerSecond: rxRate + txRate,
@@ -769,6 +772,20 @@ export class MikrotikClient {
     try {
       await api.connect();
 
+      // First, get interface details (including comments)
+      const interfaceDetails = await api.write("/interface/print");
+      const interfaceComments = new Map<string, string>();
+      
+      if (Array.isArray(interfaceDetails)) {
+        for (const iface of interfaceDetails) {
+          const name = iface.name;
+          const comment = iface.comment || "";
+          if (name) {
+            interfaceComments.set(name, comment);
+          }
+        }
+      }
+
       // Get interface traffic statistics
       const stats = await api.write("/interface/monitor-traffic", [
         "=interface=all",
@@ -788,6 +805,7 @@ export class MikrotikClient {
 
           allResults.push({
             name,
+            comment: interfaceComments.get(name) || undefined,
             rxBytesPerSecond: rxRate,
             txBytesPerSecond: txRate,
             totalBytesPerSecond: rxRate + txRate,
