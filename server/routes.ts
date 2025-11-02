@@ -876,8 +876,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } catch (downloadError: any) {
-          console.error("[Settings] Error downloading logo:", downloadError);
-          return res.status(400).json({ message: `Failed to download logo: ${downloadError.message}` });
+          console.error("[Settings] Error downloading/saving logo:", downloadError);
+          console.log("[Settings] Falling back to using URL directly");
+          // Fallback: Use the external URL directly instead of downloading
+          localLogoPath = logo_url;
         }
       }
       

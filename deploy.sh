@@ -47,7 +47,7 @@ fi
 
 # Create required directories if they don't exist
 print_info "Creating required directories..."
-mkdir -p logs attached_assets
+mkdir -p logs attached_assets/logos
 print_success "Directories ready"
 
 # Parse command line arguments

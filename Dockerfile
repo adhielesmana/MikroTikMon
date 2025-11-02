@@ -48,7 +48,7 @@ COPY --chown=nodejs:nodejs drizzle.config.ts ./
 RUN npm ci && npm cache clean --force
 
 # Create directories for runtime assets and ensure proper ownership
-RUN mkdir -p /app/attached_assets /app/logs && \
+RUN mkdir -p /app/attached_assets/logos /app/logs && \
     chown -R nodejs:nodejs /app/attached_assets /app/logs
 
 # Switch to non-root user
