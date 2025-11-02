@@ -45,6 +45,10 @@ interface RealtimeTrafficData {
 const realtimeTrafficStore = new Map<string, Map<string, RealtimeTrafficData[]>>();
 const MAX_ENTRIES_PER_INTERFACE = 7200; // 2 hours at 1 second intervals per interface
 
+// On-demand real-time traffic polling state
+// Tracks which routers are currently being monitored in real-time (when details page is open)
+const activeRealtimePolling = new Map<string, { interval: NodeJS.Timeout; clients: Set<WebSocket> }>();
+
 // Track consecutive threshold violations per port for 3-check confirmation
 // Map<portId, { count: number, lastCheck: Date }>
 const consecutiveViolations = new Map<string, { count: number; lastCheck: Date }>();
@@ -154,24 +158,40 @@ function addRealtimeTraffic(routerId: string, data: Omit<RealtimeTrafficData, 'r
   }
 }
 
-// Traffic data collection (runs every 1 second)
+// Traffic data collection for monitored ports only (runs every 60 seconds)
+// Real-time traffic for all interfaces is now handled by on-demand polling when details page is open
 async function pollRouterTraffic() {
   try {
-    // First, check reachability for ALL routers (not just those with monitored ports)
+    // Get all enabled monitored ports with their routers
+    const monitoredPorts = await storage.getAllEnabledPorts();
+    
+    // Group ports by router to minimize connections
+    const portsByRouter = new Map<string, typeof monitoredPorts>();
+    for (const port of monitoredPorts) {
+      const existing = portsByRouter.get(port.router.id) || [];
+      existing.push(port);
+      portsByRouter.set(port.router.id, existing);
+    }
+
+    // Get unique routers that have monitored ports
+    const uniqueRouterIds = new Set(monitoredPorts.map(p => p.router.id));
     const allRouters = await storage.getAllRouters();
+    const routersWithMonitoredPorts = allRouters.filter(r => uniqueRouterIds.has(r.id));
+
+    console.log(`[Scheduler] Polling ${routersWithMonitoredPorts.length} routers with monitored ports`);
+
+    // First, check reachability for routers with monitored ports
     const reachableRouterIds = new Set<string>();
     
-    // Process all routers in parallel for reachability checks
     await Promise.all(
-      allRouters.map(async (router) => {
+      routersWithMonitoredPorts.map(async (router) => {
         try {
           const credentials = await storage.getRouterCredentials(router.id);
           if (!credentials) {
-            console.log(`[Scheduler] Skipping reachability check for ${router.name} - no credentials`);
+            console.log(`[Scheduler] Skipping ${router.name} - no credentials`);
             return;
           }
 
-          console.log(`[Scheduler] Checking reachability for ${router.name} (${router.ipAddress})...`);
           const client = new MikrotikClient({
             host: router.ipAddress,
             port: router.port,
@@ -188,27 +208,24 @@ async function pollRouterTraffic() {
           });
 
           const isReachable = await client.checkReachability();
-          console.log(`[Scheduler] Reachability result for ${router.name}: ${isReachable}`);
           await storage.updateRouterReachability(router.id, isReachable);
           
           if (isReachable) {
             reachableRouterIds.add(router.id);
           } else {
-            console.log(`[Scheduler] Router ${router.name} is unreachable, marking as disconnected`);
+            console.log(`[Scheduler] Router ${router.name} unreachable`);
             await storage.updateRouterConnection(router.id, false);
           }
         } catch (error) {
-          console.log(`[Scheduler] Reachability check failed for ${router.name}, marking as unreachable`);
-          // Mark as unreachable on error
           await storage.updateRouterReachability(router.id, false);
           await storage.updateRouterConnection(router.id, false);
         }
       })
     )
 
-    // Collect traffic data for ALL reachable routers in parallel (so interface list is populated)
+    // Collect traffic data for MONITORED PORTS ONLY on reachable routers
     await Promise.all(
-      allRouters
+      routersWithMonitoredPorts
         .filter(router => reachableRouterIds.has(router.id))
         .map(async (router) => {
           try {
@@ -255,19 +272,27 @@ async function pollRouterTraffic() {
             await storage.updateRouterConnection(router.id, true);
 
             // Cloud DDNS hostname extraction: Store separately without replacing IP address
-            // IP address is always used for reachability checks (TCP connection tests)
-            // Cloud DDNS hostname is stored for reference and can be used for REST API connections
             if (storedMethod === 'rest' && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
               const extractedHostname = client.getExtractedHostname();
               if (extractedHostname && extractedHostname !== router.ipAddress) {
-                console.log(`[Scheduler] Storing Cloud DDNS hostname ${extractedHostname} for router ${router.name} (IP: ${router.ipAddress})`);
+                console.log(`[Scheduler] Storing Cloud DDNS hostname ${extractedHostname} for router ${router.name}`);
                 await storage.updateRouterCloudDdnsHostname(router.id, extractedHostname);
               }
             }
 
-            // Store traffic data for ALL interfaces in memory for real-time display
+            // Get monitored ports for this router
+            const monitoredPortsForRouter = portsByRouter.get(router.id) || [];
+            
+            // Store traffic data ONLY for monitored ports (not all interfaces)
             const timestamp = new Date();
-            for (const stat of stats) {
+            for (const port of monitoredPortsForRouter) {
+              const stat = stats.find(s => s.name === port.portName);
+              if (!stat) {
+                console.warn(`[Scheduler] Monitored port ${port.portName} not found in interface stats for ${router.name}`);
+                continue;
+              }
+              
+              // Store in-memory for alert checking
               addRealtimeTraffic(router.id, {
                 portName: stat.name,
                 comment: stat.comment,
@@ -276,57 +301,23 @@ async function pollRouterTraffic() {
                 txBytesPerSecond: stat.txBytesPerSecond,
                 totalBytesPerSecond: stat.totalBytesPerSecond,
               });
+              
+              // Store to database
+              await storage.insertTrafficData({
+                routerId: router.id,
+                portId: port.id,
+                portName: port.portName,
+                rxBytesPerSecond: stat.rxBytesPerSecond,
+                txBytesPerSecond: stat.txBytesPerSecond,
+                totalBytesPerSecond: stat.totalBytesPerSecond,
+              });
             }
           } catch (error: any) {
             console.error(`[Scheduler] Failed to collect traffic for router ${router.name}:`, error?.message || error?.stack || error || 'Unknown error');
-            // Update router connection status
             await storage.updateRouterConnection(router.id, false);
           }
         })
     )
-
-    // Get all enabled monitored ports with their routers for database persistence
-    const monitoredPorts = await storage.getAllEnabledPorts();
-
-    // Group ports by router
-    const portsByRouter = new Map<string, typeof monitoredPorts>();
-    for (const port of monitoredPorts) {
-      const existing = portsByRouter.get(port.router.id) || [];
-      existing.push(port);
-      portsByRouter.set(port.router.id, existing);
-    }
-
-    // Store traffic data to database for monitored ports only
-    for (const [routerId, ports] of Array.from(portsByRouter)) {
-      try {
-        // Get the latest realtime data for this router
-        const realtimeData = getRealtimeTraffic(routerId);
-        
-        // Store to database for each monitored port
-        for (const port of ports) {
-          const portData = realtimeData.filter(d => d.portName === port.portName);
-          if (portData.length === 0) {
-            console.warn(`[Scheduler] Port ${port.portName} not found in realtime data for router ${routerId}`);
-            continue;
-          }
-          
-          // Get the most recent data point
-          const latestData = portData[portData.length - 1];
-          
-          // Store traffic data to database
-          await storage.insertTrafficData({
-            routerId: port.routerId,
-            portId: port.id,
-            portName: port.portName,
-            rxBytesPerSecond: latestData.rxBytesPerSecond,
-            txBytesPerSecond: latestData.txBytesPerSecond,
-            totalBytesPerSecond: latestData.totalBytesPerSecond,
-          });
-        }
-      } catch (error: any) {
-        console.error(`[Scheduler] Failed to store traffic data for router ${routerId}: ${error.message}`);
-      }
-    }
   } catch (error) {
     console.error("[Scheduler] Error in traffic polling:", error);
   }
@@ -705,6 +696,131 @@ async function cleanupOldData() {
   }
 }
 
+// On-demand real-time traffic polling (1-second interval)
+// This is triggered when router details page is opened
+async function pollSingleRouterRealtime(routerId: string) {
+  try {
+    const router = await storage.getRouter(routerId);
+    if (!router) {
+      console.log(`[RealtimePoll] Router ${routerId} not found`);
+      return;
+    }
+
+    const credentials = await storage.getRouterCredentials(router.id);
+    if (!credentials) {
+      console.log(`[RealtimePoll] No credentials for ${router.name}`);
+      return;
+    }
+
+    const client = new MikrotikClient({
+      host: router.ipAddress,
+      port: router.port,
+      user: credentials.username,
+      password: credentials.password,
+      cloudDdnsHostname: router.cloudDdnsHostname || undefined,
+      restEnabled: router.restEnabled || false,
+      restPort: router.restPort || 443,
+      snmpEnabled: router.snmpEnabled || false,
+      snmpCommunity: router.snmpCommunity || "public",
+      snmpVersion: router.snmpVersion || "2c",
+      snmpPort: router.snmpPort || 161,
+      interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
+    });
+
+    // Use cached connection method for efficiency
+    const storedMethod = router.lastSuccessfulConnectionMethod as 'native' | 'rest' | 'snmp' | null;
+    if (!storedMethod) {
+      console.log(`[RealtimePoll] No connection method cached for ${router.name}`);
+      return;
+    }
+
+    const stats = await client.getInterfaceStatsWithMethod(storedMethod);
+    
+    // Store all interfaces in memory
+    const timestamp = new Date();
+    for (const stat of stats) {
+      addRealtimeTraffic(router.id, {
+        portName: stat.name,
+        comment: stat.comment,
+        timestamp,
+        rxBytesPerSecond: stat.rxBytesPerSecond,
+        txBytesPerSecond: stat.txBytesPerSecond,
+        totalBytesPerSecond: stat.totalBytesPerSecond,
+      });
+    }
+
+    // Broadcast real-time data to connected clients via WebSocket
+    const pollingState = activeRealtimePolling.get(routerId);
+    if (pollingState && pollingState.clients.size > 0) {
+      const trafficData = getRealtimeTraffic(routerId);
+      const message = JSON.stringify({
+        type: "realtime_traffic",
+        routerId,
+        data: trafficData.slice(-100), // Send last 100 data points
+      });
+      
+      pollingState.clients.forEach((client: WebSocket) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(message);
+        }
+      });
+    }
+  } catch (error: any) {
+    console.error(`[RealtimePoll] Failed for router ${routerId}:`, error?.message || error);
+  }
+}
+
+// Start on-demand real-time polling for a specific router
+export function startRealtimePolling(routerId: string, client: WebSocket) {
+  console.log(`[RealtimePoll] Starting real-time polling for router ${routerId}`);
+  
+  let pollingState = activeRealtimePolling.get(routerId);
+  
+  if (!pollingState) {
+    // First client for this router - start polling
+    const interval = setInterval(() => {
+      pollSingleRouterRealtime(routerId).catch(error => {
+        console.error(`[RealtimePoll] Error in real-time poll for ${routerId}:`, error);
+      });
+    }, 1000); // 1-second interval for true real-time
+    
+    pollingState = {
+      interval,
+      clients: new Set([client]),
+    };
+    activeRealtimePolling.set(routerId, pollingState);
+    
+    // Immediately poll once
+    pollSingleRouterRealtime(routerId).catch(error => {
+      console.error(`[RealtimePoll] Error in initial poll for ${routerId}:`, error);
+    });
+  } else {
+    // Add client to existing polling
+    pollingState.clients.add(client);
+  }
+  
+  console.log(`[RealtimePoll] Router ${routerId} now has ${pollingState.clients.size} client(s)`);
+}
+
+// Stop on-demand real-time polling for a specific router
+export function stopRealtimePolling(routerId: string, client: WebSocket) {
+  const pollingState = activeRealtimePolling.get(routerId);
+  
+  if (!pollingState) {
+    return;
+  }
+  
+  pollingState.clients.delete(client);
+  console.log(`[RealtimePoll] Client disconnected from router ${routerId}, ${pollingState.clients.size} client(s) remaining`);
+  
+  if (pollingState.clients.size === 0) {
+    // No more clients - stop polling
+    clearInterval(pollingState.interval);
+    activeRealtimePolling.delete(routerId);
+    console.log(`[RealtimePoll] Stopped real-time polling for router ${routerId} (no clients)`);
+  }
+}
+
 // Execution guards to prevent concurrent runs
 let isPollingTraffic = false;
 let isCheckingAlerts = false;
@@ -786,5 +902,5 @@ export function startScheduler() {
     });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully (60s real-time polling, 60s alert checking with 3-check confirmation, 5min database persistence, 5min counter cleanup, daily data cleanup)");
+  console.log("[Scheduler] Scheduler started successfully (60s monitored ports polling for alerts, on-demand real-time traffic when router details page is open, 60s alert checking with 3-check confirmation, 5min database persistence, 5min counter cleanup, daily data cleanup)");
 }

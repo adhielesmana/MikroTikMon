@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, isSuperadmin, isEnabled } from "./replitAuth";
 import { MikrotikClient } from "./mikrotik";
 import { emailService } from "./emailService";
-import { startScheduler, setWebSocketServer } from "./scheduler";
+import { startScheduler, setWebSocketServer, startRealtimePolling, stopRealtimePolling } from "./scheduler";
 import { insertRouterSchema } from "@shared/schema";
 import { z } from "zod";
 import fs from "fs/promises";
@@ -932,6 +932,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Send authentication request
     ws.send(JSON.stringify({ type: "auth_required" }));
     
+    // Track active router polling for cleanup
+    let activeRouterId: string | null = null;
+    
     ws.on('message', (message: string) => {
       try {
         const data = JSON.parse(message);
@@ -950,12 +953,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[WebSocket] User ${userId} authenticated`);
           ws.send(JSON.stringify({ type: "auth_success" }));
         }
+        
+        // Handle start real-time traffic polling
+        if (data.type === "start_realtime_polling" && data.routerId) {
+          if (!userId) {
+            ws.send(JSON.stringify({ type: "error", message: "Not authenticated" }));
+            return;
+          }
+          
+          console.log(`[WebSocket] Starting real-time polling for router ${data.routerId}`);
+          activeRouterId = data.routerId;
+          startRealtimePolling(data.routerId, ws);
+          ws.send(JSON.stringify({ type: "realtime_polling_started", routerId: data.routerId }));
+        }
+        
+        // Handle stop real-time traffic polling
+        if (data.type === "stop_realtime_polling" && data.routerId) {
+          console.log(`[WebSocket] Stopping real-time polling for router ${data.routerId}`);
+          stopRealtimePolling(data.routerId, ws);
+          if (activeRouterId === data.routerId) {
+            activeRouterId = null;
+          }
+          ws.send(JSON.stringify({ type: "realtime_polling_stopped", routerId: data.routerId }));
+        }
       } catch (error) {
         console.error('[WebSocket] Error parsing message:', error);
       }
     });
     
     ws.on('close', () => {
+      // Stop real-time polling if active
+      if (activeRouterId) {
+        console.log(`[WebSocket] Client disconnected, stopping real-time polling for router ${activeRouterId}`);
+        stopRealtimePolling(activeRouterId, ws);
+        activeRouterId = null;
+      }
+      
       if (userId && userConnections.has(userId)) {
         userConnections.get(userId)!.delete(ws);
         if (userConnections.get(userId)!.size === 0) {
