@@ -405,20 +405,32 @@ export default function RouterDetails() {
             </div>
           ) : ports && ports.length > 0 ? (
             <div className="space-y-3">
-              {ports.map((port) => (
-                <div
-                  key={port.id}
-                  className="flex items-center justify-between p-3 rounded-md border"
-                  data-testid={`port-item-${port.id}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium" data-testid={`text-port-name-${port.id}`}>
-                      {port.portName}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Threshold: {formatBytesPerSecond(port.minThresholdBps)}
-                    </p>
-                  </div>
+              {ports.map((port) => {
+                // Find comment for this port from interface data
+                const interfaceData = interfacesData?.interfaces.find(
+                  (iface) => iface.name === port.portName
+                );
+                const comment = interfaceData?.comment;
+                
+                return (
+                  <div
+                    key={port.id}
+                    className="flex items-center justify-between p-3 rounded-md border"
+                    data-testid={`port-item-${port.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium" data-testid={`text-port-name-${port.id}`}>
+                        {port.portName}
+                        {comment && (
+                          <span className="text-muted-foreground font-normal ml-2">
+                            - {comment}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Threshold: {formatBytesPerSecond(port.minThresholdBps)}
+                      </p>
+                    </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Badge variant={port.enabled ? "default" : "secondary"}>
                       {port.enabled ? "Enabled" : "Disabled"}
@@ -475,7 +487,8 @@ export default function RouterDetails() {
                     </AlertDialog>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8 space-y-3">

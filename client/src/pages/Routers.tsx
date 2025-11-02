@@ -217,14 +217,34 @@ export default function Routers() {
                             {router.connected ? "Connected" : "Disconnected"}
                           </Badge>
                           {router.connected && router.lastSuccessfulConnectionMethod && (
-                            <Badge
-                              variant="outline"
-                              data-testid={`badge-router-method-${router.id}`}
-                            >
-                              {router.lastSuccessfulConnectionMethod === 'native' && 'Native API'}
-                              {router.lastSuccessfulConnectionMethod === 'rest' && 'REST API'}
-                              {router.lastSuccessfulConnectionMethod === 'snmp' && 'SNMP'}
-                            </Badge>
+                            <>
+                              {router.lastSuccessfulConnectionMethod === 'native' && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-purple-500 text-purple-700 dark:text-purple-400"
+                                  data-testid={`badge-router-method-${router.id}`}
+                                >
+                                  Native API
+                                </Badge>
+                              )}
+                              {router.lastSuccessfulConnectionMethod === 'rest' && (
+                                <Badge
+                                  className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300 dark:border-green-700"
+                                  data-testid={`badge-router-method-${router.id}`}
+                                >
+                                  REST API
+                                </Badge>
+                              )}
+                              {router.lastSuccessfulConnectionMethod === 'snmp' && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-pink-500 text-pink-700 dark:text-pink-400"
+                                  data-testid={`badge-router-method-${router.id}`}
+                                >
+                                  SNMP
+                                </Badge>
+                              )}
+                            </>
                           )}
                         </div>
                       </TableCell>
