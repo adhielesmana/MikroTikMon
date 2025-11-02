@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated, isAdmin, isSuperadmin, isEnabled } from "./
 import { MikrotikClient } from "./mikrotik";
 import { emailService } from "./emailService";
 import { startScheduler, setWebSocketServer, startRealtimePolling, stopRealtimePolling } from "./scheduler";
-import { insertRouterSchema } from "@shared/schema";
+import { insertRouterSchema, type Router } from "@shared/schema";
 import { z } from "zod";
 import fs from "fs/promises";
 import path from "path";
@@ -93,11 +93,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = getUserId(req);
       const user = await storage.getUser(userId);
       
-      // Admin users can see all routers, normal users only see their own
-      const routers = user?.role === "admin" 
-        ? await storage.getAllRouters() 
-        : await storage.getRouters(userId);
+      // Super admins can see all routers
+      if (user?.isSuperadmin) {
+        const routers = await storage.getAllRouters();
+        return res.json(routers);
+      }
       
+      // Normal users see their own routers + routers assigned to them
+      const ownRouters = await storage.getRouters(userId);
+      const assignedRouters = await storage.getUserAssignedRouters(userId);
+      
+      // Merge and deduplicate based on router id
+      const routerMap = new Map<string, Router>();
+      ownRouters.forEach(r => routerMap.set(r.id, r));
+      assignedRouters.forEach(r => routerMap.set(r.id, r));
+      
+      const routers = Array.from(routerMap.values());
       res.json(routers);
     } catch (error) {
       console.error("Error fetching routers:", error);
@@ -131,12 +142,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      // Check ownership
-      if (router.userId !== userId) {
-        const user = await storage.getUser(userId);
-        if (!user || user.role !== "admin") {
-          return res.status(403).json({ message: "Forbidden" });
-        }
+      const user = await storage.getUser(userId);
+      
+      // Check access: super admin, owner, or assigned user
+      const isOwner = router.userId === userId;
+      const isSuperAdmin = user?.isSuperadmin;
+      const isAssigned = await storage.isRouterAssignedToUser(req.params.id, userId);
+      
+      if (!isOwner && !isSuperAdmin && !isAssigned) {
+        return res.status(403).json({ message: "Forbidden" });
       }
       
       res.json(router);
@@ -193,6 +207,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting router:", error);
       res.status(500).json({ message: "Failed to delete router" });
+    }
+  });
+
+  // Router assignment endpoints (super admin only)
+  app.get("/api/routers/:id/assignments", isAuthenticated, isEnabled, isSuperadmin, async (req: any, res) => {
+    try {
+      const router = await storage.getRouter(req.params.id);
+      
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      const assignments = await storage.getRouterAssignments(req.params.id);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching router assignments:", error);
+      res.status(500).json({ message: "Failed to fetch router assignments" });
+    }
+  });
+
+  app.post("/api/routers/:id/assignments", isAuthenticated, isEnabled, isSuperadmin, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const { userIds } = req.body;
+      
+      if (!Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json({ message: "userIds must be a non-empty array" });
+      }
+      
+      const router = await storage.getRouter(req.params.id);
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      // Assign router to each user
+      const assignments = [];
+      for (const targetUserId of userIds) {
+        try {
+          const assignment = await storage.assignRouterToUser(req.params.id, targetUserId, userId);
+          assignments.push(assignment);
+        } catch (error: any) {
+          console.log(`User ${targetUserId} already assigned to router ${req.params.id}`);
+        }
+      }
+      
+      res.json({ success: true, assignments });
+    } catch (error) {
+      console.error("Error assigning router to users:", error);
+      res.status(500).json({ message: "Failed to assign router to users" });
+    }
+  });
+
+  app.delete("/api/routers/:id/assignments/:userId", isAuthenticated, isEnabled, isSuperadmin, async (req: any, res) => {
+    try {
+      const router = await storage.getRouter(req.params.id);
+      
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      await storage.unassignRouterFromUser(req.params.id, req.params.userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error unassigning router from user:", error);
+      res.status(500).json({ message: "Failed to unassign router from user" });
     }
   });
 

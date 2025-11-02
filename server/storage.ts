@@ -8,6 +8,7 @@ import {
   alerts,
   notifications,
   appSettings,
+  userRouters,
   type User,
   type UpsertUser,
   type Router,
@@ -20,6 +21,8 @@ import {
   type Alert,
   type Notification,
   type AppSettings,
+  type UserRouter,
+  type InsertUserRouter,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lt, sql } from "drizzle-orm";
@@ -66,6 +69,13 @@ export interface IStorage {
   createRouterGroup(group: InsertRouterGroup, userId: string): Promise<RouterGroup>;
   updateRouterGroup(id: string, data: Partial<InsertRouterGroup>): Promise<RouterGroup>;
   deleteRouterGroup(id: string): Promise<void>;
+
+  // User-Router Assignment operations
+  assignRouterToUser(routerId: string, userId: string, assignedBy: string): Promise<UserRouter>;
+  unassignRouterFromUser(routerId: string, userId: string): Promise<void>;
+  getRouterAssignments(routerId: string): Promise<(UserRouter & { user: User })[]>;
+  getUserAssignedRouters(userId: string): Promise<Router[]>;
+  isRouterAssignedToUser(routerId: string, userId: string): Promise<boolean>;
 
   // Monitored Ports operations
   getMonitoredPorts(routerId: string): Promise<MonitoredPort[]>;
@@ -293,6 +303,71 @@ export class DatabaseStorage implements IStorage {
 
   async deleteRouterGroup(id: string): Promise<void> {
     await db.delete(routerGroups).where(eq(routerGroups.id, id));
+  }
+
+  // User-Router Assignment operations
+  async assignRouterToUser(routerId: string, userId: string, assignedBy: string): Promise<UserRouter> {
+    const [assignment] = await db
+      .insert(userRouters)
+      .values({
+        routerId,
+        userId,
+        assignedBy,
+      })
+      .onConflictDoNothing()
+      .returning();
+    return assignment;
+  }
+
+  async unassignRouterFromUser(routerId: string, userId: string): Promise<void> {
+    await db.delete(userRouters).where(
+      and(
+        eq(userRouters.routerId, routerId),
+        eq(userRouters.userId, userId)
+      )
+    );
+  }
+
+  async getRouterAssignments(routerId: string): Promise<(UserRouter & { user: User })[]> {
+    return db
+      .select({
+        id: userRouters.id,
+        userId: userRouters.userId,
+        routerId: userRouters.routerId,
+        assignedBy: userRouters.assignedBy,
+        assignedAt: userRouters.assignedAt,
+        user: users,
+      })
+      .from(userRouters)
+      .innerJoin(users, eq(userRouters.userId, users.id))
+      .where(eq(userRouters.routerId, routerId));
+  }
+
+  async getUserAssignedRouters(userId: string): Promise<Router[]> {
+    const results = await db
+      .select({
+        router: routers,
+      })
+      .from(userRouters)
+      .innerJoin(routers, eq(userRouters.routerId, routers.id))
+      .where(eq(userRouters.userId, userId));
+    
+    return results.map(r => r.router);
+  }
+
+  async isRouterAssignedToUser(routerId: string, userId: string): Promise<boolean> {
+    const [assignment] = await db
+      .select()
+      .from(userRouters)
+      .where(
+        and(
+          eq(userRouters.routerId, routerId),
+          eq(userRouters.userId, userId)
+        )
+      )
+      .limit(1);
+    
+    return !!assignment;
   }
 
   // Monitored Ports operations
