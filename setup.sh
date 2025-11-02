@@ -746,8 +746,8 @@ else
     echo "  1. Run: ./deploy.sh up"
 fi
 echo "  2. Access: $APP_URL"
-echo "  3. Login with default credentials: admin / admin"
-echo "  4. Change password on first login"
+echo "  3. Login with superadmin credentials: adhielesmana / admin123"
+echo "  4. IMPORTANT: Change the superadmin password immediately after first login"
 echo ""
 
 if [ "$USE_DOMAIN" = true ] && [ "$USE_HTTPS" = false ]; then
