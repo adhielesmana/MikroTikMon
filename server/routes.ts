@@ -810,6 +810,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // App Settings routes
+  // Public endpoint for logo (no authentication required)
+  app.get("/api/settings/public", async (req, res) => {
+    try {
+      const settings = await storage.getAppSettings();
+      // Only return logo URL for public access
+      res.json({ logoUrl: settings?.logoUrl || null });
+    } catch (error) {
+      console.error("Error fetching public settings:", error);
+      res.json({ logoUrl: null });
+    }
+  });
+
   app.get("/api/settings", async (req, res) => {
     try {
       const settings = await storage.getAppSettings();

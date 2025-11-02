@@ -21,6 +21,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [authMethods, setAuthMethods] = useState({
     local: true,
     google: false,
@@ -43,7 +44,7 @@ export default function Login() {
     },
   });
 
-  // Check available auth methods and database status
+  // Check available auth methods, database status, and fetch logo
   useEffect(() => {
     const checkAuthMethods = async () => {
       try {
@@ -80,8 +81,23 @@ export default function Login() {
       }
     };
     
+    const fetchLogo = async () => {
+      try {
+        const response = await fetch("/api/settings/public");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.logoUrl) {
+            setLogoUrl(data.logoUrl);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching logo:", error);
+      }
+    };
+    
     checkAuthMethods();
     checkDatabaseStatus();
+    fetchLogo();
   }, []);
 
   const handleLocalLogin = async (data: LoginFormData) => {
@@ -131,9 +147,18 @@ export default function Login() {
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <Shield className="h-6 w-6 text-primary" />
-            </div>
+            {logoUrl ? (
+              <img 
+                src={logoUrl} 
+                alt="Logo" 
+                className="h-16 w-auto max-w-[200px] object-contain"
+                data-testid="img-login-logo"
+              />
+            ) : (
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Shield className="h-6 w-6 text-primary" />
+              </div>
+            )}
           </div>
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
           <CardDescription>
