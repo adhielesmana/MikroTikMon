@@ -425,6 +425,14 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(alerts).orderBy(desc(alerts.createdAt));
   }
 
+  async getAlertsByRouter(routerId: string): Promise<Alert[]> {
+    return db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.routerId, routerId))
+      .orderBy(desc(alerts.createdAt));
+  }
+
   async createAlert(alertData: Omit<Alert, "id" | "createdAt" | "acknowledged" | "acknowledgedAt">): Promise<Alert> {
     const [alert] = await db.insert(alerts).values(alertData).returning();
     return alert;
