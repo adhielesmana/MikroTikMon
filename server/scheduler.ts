@@ -161,123 +161,125 @@ async function pollRouterTraffic() {
     const allRouters = await storage.getAllRouters();
     const reachableRouterIds = new Set<string>();
     
-    for (const router of allRouters) {
-      try {
-        const credentials = await storage.getRouterCredentials(router.id);
-        if (!credentials) {
-          console.log(`[Scheduler] Skipping reachability check for ${router.name} - no credentials`);
-          continue;
-        }
+    // Process all routers in parallel for reachability checks
+    await Promise.all(
+      allRouters.map(async (router) => {
+        try {
+          const credentials = await storage.getRouterCredentials(router.id);
+          if (!credentials) {
+            console.log(`[Scheduler] Skipping reachability check for ${router.name} - no credentials`);
+            return;
+          }
 
-        console.log(`[Scheduler] Checking reachability for ${router.name} (${router.ipAddress})...`);
-        const client = new MikrotikClient({
-          host: router.ipAddress,
-          port: router.port,
-          user: credentials.username,
-          password: credentials.password,
-          restEnabled: router.restEnabled || false,
-          restPort: router.restPort || 443,
-          snmpEnabled: router.snmpEnabled || false,
-          snmpCommunity: router.snmpCommunity || "public",
-          snmpVersion: router.snmpVersion || "2c",
-          snmpPort: router.snmpPort || 161,
-          interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
-        });
+          console.log(`[Scheduler] Checking reachability for ${router.name} (${router.ipAddress})...`);
+          const client = new MikrotikClient({
+            host: router.ipAddress,
+            port: router.port,
+            user: credentials.username,
+            password: credentials.password,
+            restEnabled: router.restEnabled || false,
+            restPort: router.restPort || 443,
+            snmpEnabled: router.snmpEnabled || false,
+            snmpCommunity: router.snmpCommunity || "public",
+            snmpVersion: router.snmpVersion || "2c",
+            snmpPort: router.snmpPort || 161,
+            interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
+          });
 
-        const isReachable = await client.checkReachability();
-        console.log(`[Scheduler] Reachability result for ${router.name}: ${isReachable}`);
-        await storage.updateRouterReachability(router.id, isReachable);
-        
-        if (isReachable) {
-          reachableRouterIds.add(router.id);
-        } else {
-          console.log(`[Scheduler] Router ${router.name} is unreachable, marking as disconnected`);
+          const isReachable = await client.checkReachability();
+          console.log(`[Scheduler] Reachability result for ${router.name}: ${isReachable}`);
+          await storage.updateRouterReachability(router.id, isReachable);
+          
+          if (isReachable) {
+            reachableRouterIds.add(router.id);
+          } else {
+            console.log(`[Scheduler] Router ${router.name} is unreachable, marking as disconnected`);
+            await storage.updateRouterConnection(router.id, false);
+          }
+        } catch (error) {
+          console.log(`[Scheduler] Reachability check failed for ${router.name}, marking as unreachable`);
+          // Mark as unreachable on error
+          await storage.updateRouterReachability(router.id, false);
           await storage.updateRouterConnection(router.id, false);
         }
-      } catch (error) {
-        console.log(`[Scheduler] Reachability check failed for ${router.name}, marking as unreachable`);
-        // Mark as unreachable on error
-        await storage.updateRouterReachability(router.id, false);
-        await storage.updateRouterConnection(router.id, false);
-      }
-    }
+      })
+    )
 
-    // Collect traffic data for ALL reachable routers (so interface list is populated)
-    for (const router of allRouters) {
-      // Skip if not reachable
-      if (!reachableRouterIds.has(router.id)) {
-        continue;
-      }
+    // Collect traffic data for ALL reachable routers in parallel (so interface list is populated)
+    await Promise.all(
+      allRouters
+        .filter(router => reachableRouterIds.has(router.id))
+        .map(async (router) => {
+          try {
+            // Get router credentials
+            const credentials = await storage.getRouterCredentials(router.id);
+            if (!credentials) {
+              return;
+            }
 
-      try {
-        // Get router credentials
-        const credentials = await storage.getRouterCredentials(router.id);
-        if (!credentials) {
-          continue;
-        }
+            // Connect to MikroTik and get stats
+            const client = new MikrotikClient({
+              host: router.ipAddress,
+              port: router.port,
+              user: credentials.username,
+              password: credentials.password,
+              restEnabled: router.restEnabled || false,
+              restPort: router.restPort || 443,
+              snmpEnabled: router.snmpEnabled || false,
+              snmpCommunity: router.snmpCommunity || "public",
+              snmpVersion: router.snmpVersion || "2c",
+              snmpPort: router.snmpPort || 161,
+              interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
+            });
 
-        // Connect to MikroTik and get stats
-        const client = new MikrotikClient({
-          host: router.ipAddress,
-          port: router.port,
-          user: credentials.username,
-          password: credentials.password,
-          restEnabled: router.restEnabled || false,
-          restPort: router.restPort || 443,
-          snmpEnabled: router.snmpEnabled || false,
-          snmpCommunity: router.snmpCommunity || "public",
-          snmpVersion: router.snmpVersion || "2c",
-          snmpPort: router.snmpPort || 161,
-          interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
-        });
+            // Use the last successful connection method (cached)
+            // We do NOT re-test fallbacks during background operations to reduce API calls
+            // Re-testing only happens when viewing/editing routers
+            let stats: any[] = [];
+            const storedMethod = router.lastSuccessfulConnectionMethod as 'native' | 'rest' | 'snmp' | null;
+            
+            if (storedMethod) {
+              // Use the cached method directly - if it fails, skip this router
+              console.log(`[Scheduler] Using stored method '${storedMethod}' for ${router.name}`);
+              stats = await client.getInterfaceStatsWithMethod(storedMethod);
+            } else {
+              // No stored method - this means the router hasn't been tested yet
+              // Skip this router - it will be tested when user views/edits it
+              console.log(`[Scheduler] No stored method for ${router.name}, skipping (will be tested on view/edit)`);
+              return;
+            }
 
-        // Use the last successful connection method (cached)
-        // We do NOT re-test fallbacks during background operations to reduce API calls
-        // Re-testing only happens when viewing/editing routers
-        let stats: any[] = [];
-        const storedMethod = router.lastSuccessfulConnectionMethod as 'native' | 'rest' | 'snmp' | null;
-        
-        if (storedMethod) {
-          // Use the cached method directly - if it fails, skip this router
-          console.log(`[Scheduler] Using stored method '${storedMethod}' for ${router.name}`);
-          stats = await client.getInterfaceStatsWithMethod(storedMethod);
-        } else {
-          // No stored method - this means the router hasn't been tested yet
-          // Skip this router - it will be tested when user views/edits it
-          console.log(`[Scheduler] No stored method for ${router.name}, skipping (will be tested on view/edit)`);
-          continue;
-        }
+            // Update router connection status (only if reachable AND data retrieved successfully)
+            await storage.updateRouterConnection(router.id, true);
 
-        // Update router connection status (only if reachable AND data retrieved successfully)
-        await storage.updateRouterConnection(router.id, true);
+            // Cloud DDNS hostname auto-conversion: If connected via IP and hostname extracted from certificate
+            if (storedMethod === 'rest' && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
+              const extractedHostname = client.getExtractedHostname();
+              if (extractedHostname && extractedHostname !== router.ipAddress) {
+                console.log(`[Scheduler] Auto-converting router ${router.name} from IP ${router.ipAddress} to Cloud DDNS hostname ${extractedHostname}`);
+                await storage.updateRouterHostname(router.id, extractedHostname);
+              }
+            }
 
-        // Cloud DDNS hostname auto-conversion: If connected via IP and hostname extracted from certificate
-        if (storedMethod === 'rest' && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
-          const extractedHostname = client.getExtractedHostname();
-          if (extractedHostname && extractedHostname !== router.ipAddress) {
-            console.log(`[Scheduler] Auto-converting router ${router.name} from IP ${router.ipAddress} to Cloud DDNS hostname ${extractedHostname}`);
-            await storage.updateRouterHostname(router.id, extractedHostname);
+            // Store traffic data for ALL interfaces in memory for real-time display
+            const timestamp = new Date();
+            for (const stat of stats) {
+              addRealtimeTraffic(router.id, {
+                portName: stat.name,
+                comment: stat.comment,
+                timestamp,
+                rxBytesPerSecond: stat.rxBytesPerSecond,
+                txBytesPerSecond: stat.txBytesPerSecond,
+                totalBytesPerSecond: stat.totalBytesPerSecond,
+              });
+            }
+          } catch (error: any) {
+            console.error(`[Scheduler] Failed to collect traffic for router ${router.name}: ${error.message}`);
+            // Update router connection status
+            await storage.updateRouterConnection(router.id, false);
           }
-        }
-
-        // Store traffic data for ALL interfaces in memory for real-time display
-        const timestamp = new Date();
-        for (const stat of stats) {
-          addRealtimeTraffic(router.id, {
-            portName: stat.name,
-            comment: stat.comment,
-            timestamp,
-            rxBytesPerSecond: stat.rxBytesPerSecond,
-            txBytesPerSecond: stat.txBytesPerSecond,
-            totalBytesPerSecond: stat.totalBytesPerSecond,
-          });
-        }
-      } catch (error: any) {
-        console.error(`[Scheduler] Failed to collect traffic for router ${router.name}: ${error.message}`);
-        // Update router connection status
-        await storage.updateRouterConnection(router.id, false);
-      }
-    }
+        })
+    )
 
     // Get all enabled monitored ports with their routers for database persistence
     const monitoredPorts = await storage.getAllEnabledPorts();
@@ -699,28 +701,63 @@ async function cleanupOldData() {
   }
 }
 
+// Execution guards to prevent concurrent runs
+let isPollingTraffic = false;
+let isCheckingAlerts = false;
+let isPersistingData = false;
+
 export function startScheduler() {
   console.log("[Scheduler] Starting traffic monitoring scheduler...");
 
   // Poll traffic every 1 second for real-time updates (data collection only)
   cron.schedule("* * * * * *", () => {
-    pollRouterTraffic().catch(error => {
-      console.error("[Scheduler] Unhandled error in real-time polling:", error);
-    });
+    if (isPollingTraffic) {
+      console.log("[Scheduler] Skipping traffic poll - previous execution still running");
+      return;
+    }
+    
+    isPollingTraffic = true;
+    pollRouterTraffic()
+      .catch(error => {
+        console.error("[Scheduler] Unhandled error in real-time polling:", error);
+      })
+      .finally(() => {
+        isPollingTraffic = false;
+      });
   });
 
   // Check alerts every 60 seconds with 3-consecutive-checks confirmation
   cron.schedule("*/60 * * * * *", () => {
-    checkAlerts().catch(error => {
-      console.error("[Scheduler] Unhandled error in alert checking:", error);
-    });
+    if (isCheckingAlerts) {
+      console.log("[Scheduler] Skipping alert check - previous execution still running");
+      return;
+    }
+    
+    isCheckingAlerts = true;
+    checkAlerts()
+      .catch(error => {
+        console.error("[Scheduler] Unhandled error in alert checking:", error);
+      })
+      .finally(() => {
+        isCheckingAlerts = false;
+      });
   });
 
   // Persist to database every 5 minutes
   cron.schedule("*/5 * * * *", () => {
-    persistTrafficData().catch(error => {
-      console.error("[Scheduler] Unhandled error in database persistence:", error);
-    });
+    if (isPersistingData) {
+      console.log("[Scheduler] Skipping data persistence - previous execution still running");
+      return;
+    }
+    
+    isPersistingData = true;
+    persistTrafficData()
+      .catch(error => {
+        console.error("[Scheduler] Unhandled error in database persistence:", error);
+      })
+      .finally(() => {
+        isPersistingData = false;
+      });
   });
 
   // Clean up stale violation counters every 5 minutes
