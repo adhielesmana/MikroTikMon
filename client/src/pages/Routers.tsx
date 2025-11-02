@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus, Loader2, Eye, Pencil, RefreshCw, Trash2, MoreVertical } from "lucide-react";
-import type { Router, RouterGroup } from "@shared/schema";
+import { Plus, Loader2, Eye, Pencil, RefreshCw, Trash2, MoreVertical, Users } from "lucide-react";
+import type { Router, RouterGroup, User } from "@shared/schema";
 import { AddRouterDialog } from "@/components/AddRouterDialog";
 import { ManageGroupsDialog } from "@/components/ManageGroupsDialog";
+import { ManageRouterAssignmentsDialog } from "@/components/ManageRouterAssignmentsDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,8 +49,13 @@ export default function Routers() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRouter, setEditingRouter] = useState<Router | undefined>();
   const [deletingRouter, setDeletingRouter] = useState<Router | undefined>();
+  const [managingAssignmentsRouter, setManagingAssignmentsRouter] = useState<Router | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string>("all");
   const { toast } = useToast();
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ["/api/user"],
+  });
 
   const { data: routers, isLoading } = useQuery<Router[]>({
     queryKey: ["/api/routers"],
@@ -277,6 +283,12 @@ export default function Routers() {
                               <Pencil className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
+                            {currentUser?.isSuperadmin && (
+                              <DropdownMenuItem onClick={() => setManagingAssignmentsRouter(router)} data-testid={`menu-manage-users-${router.id}`}>
+                                <Users className="h-4 w-4 mr-2" />
+                                Manage Users
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => handleTest(router)} data-testid={`menu-test-${router.id}`}>
                               <RefreshCw className="h-4 w-4 mr-2" />
                               Test Connection
@@ -352,6 +364,13 @@ export default function Routers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manage Router Assignments Dialog */}
+      <ManageRouterAssignmentsDialog
+        open={!!managingAssignmentsRouter}
+        onOpenChange={(open) => !open && setManagingAssignmentsRouter(null)}
+        router={managingAssignmentsRouter}
+      />
     </div>
   );
 }

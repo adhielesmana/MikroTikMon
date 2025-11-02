@@ -72,6 +72,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Alias for /api/auth/user for frontend convenience
+  app.get('/api/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
   // Check which authentication methods are available
   app.get('/api/auth/methods', async (_req, res) => {
     try {
