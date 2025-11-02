@@ -3,6 +3,7 @@ import { storage } from "./storage";
 import { MikrotikClient } from "./mikrotik";
 import { emailService } from "./emailService";
 import { WebSocket } from "ws";
+import type { Alert } from "@shared/schema";
 
 let wss: any = null;
 let userConnections: Map<string, Set<WebSocket>> | null = null;
@@ -293,7 +294,95 @@ async function checkAlerts() {
   try {
     console.log("[Scheduler] Checking alerts...");
 
-    // Get all enabled monitored ports with their routers
+    // FIRST: Check router connectivity for all routers
+    const allRouters = await storage.getAllRouters();
+    
+    for (const router of allRouters) {
+      try {
+        const credentials = await storage.getRouterCredentials(router.id);
+        if (!credentials) {
+          continue;
+        }
+
+        // Check if router is reachable (using database status from pollRouterTraffic)
+        const isReachable = router.reachable !== false; // Default to true if not set
+        
+        // Check for existing unacknowledged router down alert
+        const allAlerts = await storage.getAllAlerts();
+        const routerDownAlert = allAlerts.find(
+          (alert: Alert) => alert.routerId === router.id && !alert.acknowledgedAt && alert.message.includes("Router is UNREACHABLE")
+        );
+        
+        if (!isReachable) {
+          // Router is DOWN - increment violation count
+          const violationCount = incrementViolationCount(`router_down_${router.id}`);
+          
+          console.log(`[Scheduler] Router ${router.name} is unreachable (check ${violationCount}/3)`);
+          
+          // Create router down alert only after 3 consecutive checks
+          if (violationCount >= 3 && !routerDownAlert) {
+            const alert = await storage.createAlert({
+              routerId: router.id,
+              portId: null,
+              portName: null,
+              userId: router.userId,
+              severity: "critical",
+              message: `Router is UNREACHABLE - Cannot connect to ${router.name} (${router.ipAddress})`,
+              currentTrafficBps: null,
+              thresholdBps: null,
+            });
+
+            // Create notification
+            const notification = await storage.createNotification({
+              userId: router.userId,
+              alertId: alert.id,
+              type: "popup",
+              title: `Router Down: ${router.name}`,
+              message: alert.message,
+            });
+
+            // Send email notification - get user email
+            const user = await storage.getUser(router.userId);
+            if (user?.email) {
+              await emailService.sendAlertEmail(user.email, {
+                routerName: router.name,
+                portName: 'Router Connectivity',
+                currentTraffic: 'N/A',
+                threshold: 'N/A',
+                severity: alert.severity,
+              });
+            }
+
+            // Broadcast real-time notification via WebSocket
+            broadcastNotification(router.userId, {
+              id: notification.id,
+              title: notification.title,
+              message: notification.message,
+              severity: alert.severity,
+              routerName: router.name,
+              portName: null,
+            });
+
+            console.log(`[Scheduler] Router down alert created for ${router.name} (confirmed after 3 checks)`);
+            resetViolationCount(`router_down_${router.id}`); // Reset after alert created
+          }
+        } else {
+          // Router is UP - reset violation count
+          resetViolationCount(`router_down_${router.id}`);
+          
+          // Auto-acknowledge router down alert if exists
+          if (routerDownAlert) {
+            await storage.acknowledgeAlert(routerDownAlert.id);
+            resetViolationCount(`router_down_${router.id}`);
+            console.log(`[Scheduler] Auto-acknowledged router down alert for ${router.name} (router came back online)`);
+          }
+        }
+      } catch (error: any) {
+        console.error(`[Scheduler] Error checking router connectivity for ${router.name}:`, error.message);
+      }
+    }
+
+    // SECOND: Get all enabled monitored ports with their routers
     const monitoredPorts = await storage.getAllEnabledPorts();
 
     // Group ports by router to minimize connections

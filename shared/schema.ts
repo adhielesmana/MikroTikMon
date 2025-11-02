@@ -205,17 +205,17 @@ export const trafficDataRelations = relations(trafficData, ({ one }) => ({
 
 export type TrafficData = typeof trafficData.$inferSelect;
 
-// Alerts table - Stores triggered alerts
+// Alerts table - Stores triggered alerts (supports both port-level and router-level alerts)
 export const alerts = pgTable("alerts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
-  portId: varchar("port_id").notNull().references(() => monitoredPorts.id, { onDelete: "cascade" }),
-  portName: varchar("port_name", { length: 255 }).notNull(),
+  portId: varchar("port_id").references(() => monitoredPorts.id, { onDelete: "cascade" }), // nullable for router-level alerts
+  portName: varchar("port_name", { length: 255 }), // nullable for router-level alerts
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   severity: varchar("severity", { length: 20 }).notNull().default("warning"), // 'critical', 'warning', 'info'
   message: text("message").notNull(),
-  currentTrafficBps: real("current_traffic_bps").notNull(),
-  thresholdBps: real("threshold_bps").notNull(),
+  currentTrafficBps: real("current_traffic_bps"), // nullable for router-level alerts
+  thresholdBps: real("threshold_bps"), // nullable for router-level alerts
   acknowledged: boolean("acknowledged").notNull().default(false),
   acknowledgedAt: timestamp("acknowledged_at"),
   createdAt: timestamp("created_at").defaultNow(),
