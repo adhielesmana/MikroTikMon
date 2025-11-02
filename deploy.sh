@@ -224,7 +224,7 @@ case $COMMAND in
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             print_info "Resetting admin password..."
-            $DOCKER_COMPOSE exec app node scripts/reset-admin-password.js
+            $DOCKER_COMPOSE exec app tsx scripts/reset-admin-password.js
         else
             print_info "Password reset cancelled"
         fi
