@@ -274,7 +274,7 @@ async function pollRouterTraffic() {
               });
             }
           } catch (error: any) {
-            console.error(`[Scheduler] Failed to collect traffic for router ${router.name}: ${error.message}`);
+            console.error(`[Scheduler] Failed to collect traffic for router ${router.name}:`, error?.message || error?.stack || error || 'Unknown error');
             // Update router connection status
             await storage.updateRouterConnection(router.id, false);
           }
@@ -709,8 +709,8 @@ let isPersistingData = false;
 export function startScheduler() {
   console.log("[Scheduler] Starting traffic monitoring scheduler...");
 
-  // Poll traffic every 1 second for real-time updates (data collection only)
-  cron.schedule("* * * * * *", () => {
+  // Poll traffic every 60 seconds for real-time updates (data collection only)
+  cron.schedule("*/60 * * * * *", () => {
     if (isPollingTraffic) {
       console.log("[Scheduler] Skipping traffic poll - previous execution still running");
       return;
@@ -782,5 +782,5 @@ export function startScheduler() {
     });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully (1s real-time polling, 60s alert checking with 3-check confirmation, 5min database persistence, 5min counter cleanup, daily data cleanup)");
+  console.log("[Scheduler] Scheduler started successfully (60s real-time polling, 60s alert checking with 3-check confirmation, 5min database persistence, 5min counter cleanup, daily data cleanup)");
 }
