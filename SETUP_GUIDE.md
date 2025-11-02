@@ -10,11 +10,11 @@ The `setup.sh` script now **automatically installs Docker and all required depen
 # Make script executable
 chmod +x setup.sh
 
-# Run setup script
+# Run setup script (no sudo required)
 ./setup.sh
 ```
 
-**That's it!** The script will handle everything automatically.
+**That's it!** The script will handle everything automatically without requiring sudo privileges.
 
 ---
 
@@ -160,55 +160,55 @@ Choose option (1/2/3): 1
 
 ```bash
 # Update package index
-sudo apt-get update
+apt-get update
 
 # Install prerequisites
-sudo apt-get install -y ca-certificates curl gnupg lsb-release
+apt-get install -y ca-certificates curl gnupg lsb-release
 
 # Add Docker repository
-sudo mkdir -p /etc/apt/keyrings
+mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-  sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
   https://download.docker.com/linux/ubuntu \
   $(lsb_release -cs) stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # Install Docker
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io \
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io \
   docker-buildx-plugin docker-compose-plugin
 
 # Add user to docker group
-sudo usermod -aG docker $USER
+usermod -aG docker $USER
 
 # Start Docker
-sudo systemctl start docker
-sudo systemctl enable docker
+systemctl start docker
+systemctl enable docker
 ```
 
 ### CentOS/RHEL
 
 ```bash
 # Install prerequisites
-sudo yum install -y yum-utils
+yum install -y yum-utils
 
 # Add Docker repository
-sudo yum-config-manager --add-repo \
+yum-config-manager --add-repo \
   https://download.docker.com/linux/centos/docker-ce.repo
 
 # Install Docker
-sudo yum install -y docker-ce docker-ce-cli containerd.io \
+yum install -y docker-ce docker-ce-cli containerd.io \
   docker-buildx-plugin docker-compose-plugin
 
 # Add user to docker group
-sudo usermod -aG docker $USER
+usermod -aG docker $USER
 
 # Start Docker
-sudo systemctl start docker
-sudo systemctl enable docker
+systemctl start docker
+systemctl enable docker
 ```
 
 ### macOS
@@ -275,16 +275,16 @@ sudo systemctl status docker
 **Solution:**
 ```bash
 # Check Docker is running
-sudo systemctl status docker
+systemctl status docker
 
 # If stopped, start it
-sudo systemctl start docker
+systemctl start docker
 
 # Check group membership
 groups
 
 # If 'docker' not listed, add user and re-login
-sudo usermod -aG docker $USER
+usermod -aG docker $USER
 # Log out and back in
 ```
 

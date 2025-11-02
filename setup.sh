@@ -124,10 +124,10 @@ setup_ssl_certificates() {
     if ! command -v certbot &> /dev/null; then
         print_info "Installing Certbot..."
         if command -v apt &> /dev/null; then
-            sudo apt update
-            sudo apt install -y certbot
+            apt update
+            apt install -y certbot
         elif command -v yum &> /dev/null; then
-            sudo yum install -y certbot
+            yum install -y certbot
         else
             print_error "Cannot install Certbot automatically. Please install manually."
             return 1
@@ -140,7 +140,7 @@ setup_ssl_certificates() {
     
     # Obtain certificate
     print_info "Obtaining SSL certificate from Let's Encrypt..."
-    sudo certbot certonly --standalone \
+    certbot certonly --standalone \
         -d "$domain" \
         --agree-tos \
         --email "$email" \
@@ -155,11 +155,11 @@ setup_ssl_certificates() {
     
     # Copy certificates
     print_info "Copying certificates to project..."
-    sudo cp "/etc/letsencrypt/live/$domain/fullchain.pem" ssl/
-    sudo cp "/etc/letsencrypt/live/$domain/privkey.pem" ssl/
+    cp "/etc/letsencrypt/live/$domain/fullchain.pem" ssl/
+    cp "/etc/letsencrypt/live/$domain/privkey.pem" ssl/
     
     # Fix permissions
-    sudo chown $USER:$USER ssl/*.pem
+    chown $USER:$USER ssl/*.pem
     chmod 644 ssl/fullchain.pem
     chmod 600 ssl/privkey.pem
     
@@ -180,7 +180,7 @@ setup_ssl_renewal() {
     print_info "Setting up automatic SSL certificate renewal..."
     
     # Create renewal script
-    sudo tee /usr/local/bin/renew-ssl-${domain}.sh > /dev/null <<EOF
+    tee /usr/local/bin/renew-ssl-${domain}.sh > /dev/null <<EOF
 #!/bin/bash
 # Auto-renewal script for $domain
 cd $current_dir
@@ -195,10 +195,10 @@ docker compose --profile with-nginx start nginx 2>/dev/null || true
 echo "SSL certificate renewed for $domain: \$(date)" >> /var/log/ssl-renewal-${domain}.log
 EOF
     
-    sudo chmod +x "/usr/local/bin/renew-ssl-${domain}.sh"
+    chmod +x "/usr/local/bin/renew-ssl-${domain}.sh"
     
     # Add to crontab if not already present
-    (sudo crontab -l 2>/dev/null | grep -v "renew-ssl-${domain}.sh"; echo "0 3 1 * * /usr/local/bin/renew-ssl-${domain}.sh >> /var/log/ssl-renewal-${domain}.log 2>&1") | sudo crontab -
+    (crontab -l 2>/dev/null | grep -v "renew-ssl-${domain}.sh"; echo "0 3 1 * * /usr/local/bin/renew-ssl-${domain}.sh >> /var/log/ssl-renewal-${domain}.log 2>&1") | crontab -
     
     print_success "SSL auto-renewal configured (runs monthly)"
 }
@@ -235,30 +235,30 @@ install_docker() {
             print_info "Installing Docker on Ubuntu/Debian..."
             
             # Update package index
-            sudo apt-get update
+            apt-get update
             
             # Install prerequisites
-            sudo apt-get install -y \
+            apt-get install -y \
                 ca-certificates \
                 curl \
                 gnupg \
                 lsb-release
             
             # Add Docker's official GPG key
-            sudo mkdir -p /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/$os/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            mkdir -p /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/$os/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
             
             # Set up repository
             echo \
               "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$os \
-              $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+              $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
             
             # Install Docker Engine
-            sudo apt-get update
-            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            apt-get update
+            apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
             
             # Add current user to docker group
-            sudo usermod -aG docker $USER
+            usermod -aG docker $USER
             
             print_success "Docker installed successfully"
             print_warning "You may need to log out and back in for group changes to take effect"
@@ -268,20 +268,20 @@ install_docker() {
             print_info "Installing Docker on CentOS/RHEL/Fedora..."
             
             # Install prerequisites
-            sudo yum install -y yum-utils
+            yum install -y yum-utils
             
             # Add repository
-            sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+            yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
             
             # Install Docker Engine
-            sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
             
             # Start Docker
-            sudo systemctl start docker
-            sudo systemctl enable docker
+            systemctl start docker
+            systemctl enable docker
             
             # Add current user to docker group
-            sudo usermod -aG docker $USER
+            usermod -aG docker $USER
             
             print_success "Docker installed successfully"
             print_warning "You may need to log out and back in for group changes to take effect"
@@ -305,8 +305,8 @@ install_docker() {
     
     # Start Docker service
     if [ "$os" != "macos" ]; then
-        sudo systemctl start docker 2>/dev/null || true
-        sudo systemctl enable docker 2>/dev/null || true
+        systemctl start docker 2>/dev/null || true
+        systemctl enable docker 2>/dev/null || true
     fi
     
     return 0
@@ -320,8 +320,8 @@ install_prerequisites() {
     
     case $os in
         ubuntu|debian)
-            sudo apt-get update
-            sudo apt-get install -y \
+            apt-get update
+            apt-get install -y \
                 curl \
                 wget \
                 git \
@@ -331,7 +331,7 @@ install_prerequisites() {
             ;;
             
         centos|rhel|fedora)
-            sudo yum install -y \
+            yum install -y \
                 curl \
                 wget \
                 git \
@@ -399,13 +399,13 @@ if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/
     case $os in
         ubuntu|debian)
             print_info "Installing Docker Compose plugin..."
-            sudo apt-get update
-            sudo apt-get install -y docker-compose-plugin
+            apt-get update
+            apt-get install -y docker-compose-plugin
             print_success "Docker Compose plugin installed"
             ;;
         centos|rhel|fedora)
             print_info "Installing Docker Compose plugin..."
-            sudo yum install -y docker-compose-plugin
+            yum install -y docker-compose-plugin
             print_success "Docker Compose plugin installed"
             ;;
         *)
@@ -671,7 +671,7 @@ if [ "$USE_HTTPS" = true ]; then
     else
         print_error "SSL certificate setup failed"
         print_warning "You can set up SSL manually later using:"
-        echo "  sudo certbot certonly --standalone -d $DOMAIN"
+        echo "  certbot certonly --standalone -d $DOMAIN"
         echo ""
         read -p "Continue without SSL? (y/N): " -n 1 -r
         echo
@@ -751,7 +751,7 @@ echo "  4. Change password on first login"
 echo ""
 
 if [ "$USE_DOMAIN" = true ] && [ "$USE_HTTPS" = false ]; then
-    print_info "To enable HTTPS later, run: sudo certbot certonly --standalone -d $DOMAIN"
+    print_info "To enable HTTPS later, run: certbot certonly --standalone -d $DOMAIN"
 fi
 
 print_success "Setup complete! You're ready to deploy."
