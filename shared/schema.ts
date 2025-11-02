@@ -90,6 +90,20 @@ export const routers = pgTable("routers", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// User-Router Assignments table - Junction table for many-to-many relationship
+// Allows super admins to assign routers to multiple users
+export const userRouters = pgTable("user_routers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
+  assignedBy: varchar("assigned_by").notNull().references(() => users.id, { onDelete: "cascade" }), // Super admin who made the assignment
+  assignedAt: timestamp("assigned_at").defaultNow(),
+}, (table) => [
+  unique().on(table.userId, table.routerId), // Prevent duplicate assignments
+  index("idx_user_routers_user").on(table.userId),
+  index("idx_user_routers_router").on(table.routerId),
+]);
+
 // Relations - Defined after all tables
 export const routerGroupsRelations = relations(routerGroups, ({ one, many }) => ({
   user: one(users, {
@@ -111,6 +125,26 @@ export const routersRelations = relations(routers, ({ one, many }) => ({
   monitoredPorts: many(monitoredPorts),
   trafficData: many(trafficData),
   alerts: many(alerts),
+  userAssignments: many(userRouters),
+}));
+
+export const userRoutersRelations = relations(userRouters, ({ one }) => ({
+  user: one(users, {
+    fields: [userRouters.userId],
+    references: [users.id],
+  }),
+  router: one(routers, {
+    fields: [userRouters.routerId],
+    references: [routers.id],
+  }),
+  assignedByUser: one(users, {
+    fields: [userRouters.assignedBy],
+    references: [users.id],
+  }),
+}));
+
+export const usersRelations = relations(users, ({ many }) => ({
+  routerAssignments: many(userRouters),
 }));
 
 // Router Group Schemas
@@ -143,6 +177,15 @@ export const insertRouterSchema = z.object({
 
 export type InsertRouter = z.infer<typeof insertRouterSchema>;
 export type Router = typeof routers.$inferSelect;
+
+// User-Router Assignment Schemas
+export const insertUserRouterSchema = createInsertSchema(userRouters).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export type InsertUserRouter = z.infer<typeof insertUserRouterSchema>;
+export type UserRouter = typeof userRouters.$inferSelect;
 
 // Monitored Ports table - Stores which ports to monitor and their thresholds
 export const monitoredPorts = pgTable("monitored_ports", {
