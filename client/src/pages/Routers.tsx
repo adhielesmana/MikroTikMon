@@ -209,12 +209,24 @@ export default function Routers() {
                         {router.ipAddress}:{router.port}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={router.connected ? "default" : "secondary"}
-                          data-testid={`badge-router-status-${router.id}`}
-                        >
-                          {router.connected ? "Connected" : "Disconnected"}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={router.connected ? "default" : "secondary"}
+                            data-testid={`badge-router-status-${router.id}`}
+                          >
+                            {router.connected ? "Connected" : "Disconnected"}
+                          </Badge>
+                          {router.connected && router.lastSuccessfulConnectionMethod && (
+                            <Badge
+                              variant="outline"
+                              data-testid={`badge-router-method-${router.id}`}
+                            >
+                              {router.lastSuccessfulConnectionMethod === 'native' && 'Native API'}
+                              {router.lastSuccessfulConnectionMethod === 'rest' && 'REST API'}
+                              {router.lastSuccessfulConnectionMethod === 'snmp' && 'SNMP'}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge

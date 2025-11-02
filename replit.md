@@ -37,12 +37,12 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 
 ### Key Features
 - **User Management:** Multi-provider authentication, Admin/Normal User roles, user invitation system with secure temporary passwords, role-based access control.
-- **Router Management:** Add/manage MikroTik routers, secure credential storage, connection status monitoring, test connection functionality, router groups, three-tier fallback system, automatic hostname extraction, network reachability status.
-- **Traffic Monitoring:** Real-time updates (1-second polling), all interfaces tracked, multi-interface graphs, dual data sources (in-memory/database), graph history page, 2-year data retention.
-- **Alert System:** Configurable thresholds, dual notification (Email + In-App Popup), alert de-duplication, auto-acknowledgment, port status monitoring, dashboard alert filtering, professional table-based alert history.
+- **Router Management:** Add/manage MikroTik routers, secure credential storage, connection status monitoring, test connection functionality, router groups, three-tier fallback system, automatic hostname extraction, network reachability status, connection method display (Native API/REST API/SNMP badges).
+- **Traffic Monitoring:** Real-time updates (1-second polling), all interfaces tracked, multi-interface graphs, dual data sources (in-memory/database), graph history page, 2-year data retention, interface comments in port selection.
+- **Alert System:** Configurable thresholds, dual notification (Email + In-App Popup), alert de-duplication, auto-acknowledgment, port status monitoring, dashboard alert filtering, professional table-based alert history, router connectivity alerts with 3-check confirmation.
 - **Responsive Design:** Mobile-first approach, collapsible sidebar, touch-friendly, auto-sizing components, dark mode.
 - **Security Features:** Encrypted credentials, role-based access control, user approval workflow, session-based authentication, user-scoped WebSocket notifications, authorization checks.
-- **Performance:** Background scheduler, indexed traffic data, efficient Drizzle ORM queries, real-time WebSocket updates, responsive UI.
+- **Performance:** Background scheduler, indexed traffic data, efficient Drizzle ORM queries, real-time WebSocket updates, responsive UI, optimized alert queries.
 
 ## External Dependencies
 -   **PostgreSQL Database:** Neon (serverless) for data persistence.
