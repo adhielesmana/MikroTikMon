@@ -307,10 +307,10 @@ async function checkAlerts() {
         // Check if router is reachable (using database status from pollRouterTraffic)
         const isReachable = router.reachable !== false; // Default to true if not set
         
-        // Check for existing unacknowledged router down alert
-        const allAlerts = await storage.getAllAlerts();
-        const routerDownAlert = allAlerts.find(
-          (alert: Alert) => alert.routerId === router.id && !alert.acknowledgedAt && alert.message.includes("Router is UNREACHABLE")
+        // Check for existing unacknowledged router down alert (efficient query)
+        const routerAlerts = await storage.getAlertsByRouter(router.id);
+        const routerDownAlert = routerAlerts.find(
+          (alert: Alert) => !alert.acknowledgedAt && alert.message.includes("Router is UNREACHABLE")
         );
         
         if (!isReachable) {

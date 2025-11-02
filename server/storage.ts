@@ -84,6 +84,7 @@ export interface IStorage {
   // Alert operations
   getAlerts(userId: string): Promise<(Alert & { routerName: string })[]>;
   getAllAlerts(): Promise<Alert[]>;
+  getAlertsByRouter(routerId: string): Promise<Alert[]>;
   getLatestAlertForPort(portId: string): Promise<Alert | undefined>;
   getLatestUnacknowledgedAlertForPort(portId: string): Promise<Alert | undefined>;
   createAlert(alert: Omit<Alert, "id" | "createdAt" | "acknowledged" | "acknowledgedAt">): Promise<Alert>;
