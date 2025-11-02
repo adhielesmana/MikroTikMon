@@ -252,7 +252,11 @@ async function pollRouterTraffic() {
             // Update router connection status (only if reachable AND data retrieved successfully)
             await storage.updateRouterConnection(router.id, true);
 
-            // Cloud DDNS hostname auto-conversion: If connected via IP and hostname extracted from certificate
+            // Cloud DDNS hostname auto-conversion DISABLED
+            // Reason: Auto-conversion breaks reachability checks in cloud environments (like Replit)
+            // because Cloud DDNS hostnames may not respond to TCP connection tests
+            // Users can manually update to Cloud DDNS hostname if needed
+            /*
             if (storedMethod === 'rest' && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
               const extractedHostname = client.getExtractedHostname();
               if (extractedHostname && extractedHostname !== router.ipAddress) {
@@ -260,6 +264,7 @@ async function pollRouterTraffic() {
                 await storage.updateRouterHostname(router.id, extractedHostname);
               }
             }
+            */
 
             // Store traffic data for ALL interfaces in memory for real-time display
             const timestamp = new Date();
