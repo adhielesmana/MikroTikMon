@@ -39,6 +39,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
 # Copy necessary files
 COPY --chown=nodejs:nodejs shared ./shared
+COPY --chown=nodejs:nodejs scripts ./scripts
 COPY --chown=nodejs:nodejs drizzle.config.ts ./
 
 # Install ALL dependencies (including dev) because esbuild uses --packages=external
