@@ -249,6 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         port: router.port,
         user: credentials.username,
         password: credentials.password,
+        cloudDdnsHostname: router.cloudDdnsHostname || undefined,
         restEnabled: router.restEnabled || false,
         restPort: router.restPort || 443,
         snmpEnabled: router.snmpEnabled || false,

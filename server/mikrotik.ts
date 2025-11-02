@@ -8,6 +8,7 @@ export interface MikrotikConnection {
   port: number;
   user: string;
   password: string;
+  cloudDdnsHostname?: string; // Cloud DDNS hostname (for REST API HTTPS)
   restEnabled?: boolean;
   restPort?: number;
   snmpEnabled?: boolean;
@@ -430,13 +431,14 @@ export class MikrotikClient {
 
   private extractedHostname: string | null = null;
 
-  private async restRequest(endpoint: string, allowSelfSigned: boolean = true): Promise<any> {
+  private async restRequest(endpoint: string, allowSelfSigned: boolean = true, specificHost?: string): Promise<any> {
     const restPort = this.connection.restPort || 443;
     const auth = Buffer.from(`${this.connection.user}:${this.connection.password}`).toString('base64');
+    const targetHost = specificHost || this.connection.host;
 
     return new Promise((resolve, reject) => {
       const options = {
-        hostname: this.connection.host,
+        hostname: targetHost,
         port: restPort,
         path: endpoint,
         method: 'GET',
@@ -453,14 +455,14 @@ export class MikrotikClient {
 
       const req = https.request(options, (res) => {
         // Extract hostname from SSL certificate if connecting via IP address
-        if (/^\d+\.\d+\.\d+\.\d+$/.test(this.connection.host)) {
+        if (/^\d+\.\d+\.\d+\.\d+$/.test(targetHost)) {
           try {
             const socket = (req as any).socket;
             if (socket && socket.getPeerCertificate) {
               const cert = socket.getPeerCertificate();
               if (cert && cert.subject && cert.subject.CN) {
                 const hostname = cert.subject.CN;
-                if (hostname && hostname !== this.connection.host) {
+                if (hostname && hostname !== targetHost) {
                   console.log(`[REST API] Extracted hostname from certificate: ${hostname}`);
                   this.extractedHostname = hostname;
                 }
@@ -504,6 +506,22 @@ export class MikrotikClient {
     });
   }
 
+  // REST API request with automatic fallback from Cloud DDNS hostname to IP address
+  private async restRequestWithFallback(endpoint: string, allowSelfSigned: boolean = true): Promise<any> {
+    // Try Cloud DDNS hostname first if available
+    if (this.connection.cloudDdnsHostname) {
+      try {
+        return await this.restRequest(endpoint, allowSelfSigned, this.connection.cloudDdnsHostname);
+      } catch (error) {
+        console.log(`[REST API] Cloud DDNS hostname failed, falling back to IP address...`);
+        // Fall through to IP address attempt
+      }
+    }
+
+    // Fallback to IP address
+    return await this.restRequest(endpoint, allowSelfSigned, this.connection.host);
+  }
+
   getExtractedHostname(): string | null {
     return this.extractedHostname;
   }
@@ -514,7 +532,7 @@ export class MikrotikClient {
     }
 
     try {
-      await this.restRequest('/rest/system/resource');
+      await this.restRequestWithFallback('/rest/system/resource');
       return true;
     } catch (error) {
       console.error("REST API connection test failed:", error);
@@ -529,8 +547,8 @@ export class MikrotikClient {
 
     try {
       const [identity, resource] = await Promise.all([
-        this.restRequest('/rest/system/identity'),
-        this.restRequest('/rest/system/resource'),
+        this.restRequestWithFallback('/rest/system/identity'),
+        this.restRequestWithFallback('/rest/system/resource'),
       ]);
 
       // MikroTik REST API returns objects directly, not arrays
@@ -552,7 +570,7 @@ export class MikrotikClient {
     }
 
     try {
-      const interfaces = await this.restRequest('/rest/interface');
+      const interfaces = await this.restRequestWithFallback('/rest/interface');
       const allInterfaces = interfaces.map((iface: any) => iface.name).filter(Boolean);
       return filterInterfaces(allInterfaces, this.connection.interfaceDisplayMode || 'static');
     } catch (error) {
@@ -567,9 +585,10 @@ export class MikrotikClient {
     }
 
     try {
-      console.log(`[REST API] Attempting to connect to ${this.connection.host}:${this.connection.restPort || 443}...`);
+      const targetHost = this.connection.cloudDdnsHostname || this.connection.host;
+      console.log(`[REST API] Attempting to connect to ${targetHost}:${this.connection.restPort || 443}...`);
       // Get current interface stats
-      const allInterfaces = await this.restRequest('/rest/interface');
+      const allInterfaces = await this.restRequestWithFallback('/rest/interface');
       console.log(`[REST API] Successfully retrieved ${allInterfaces.length} interfaces (before filtering)`);
       
       // Filter interfaces based on display mode
