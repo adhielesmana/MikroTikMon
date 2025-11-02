@@ -65,7 +65,8 @@ export const routers = pgTable("routers", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   groupId: varchar("group_id").references(() => routerGroups.id, { onDelete: "set null" }),
   name: varchar("name", { length: 255 }).notNull(),
-  ipAddress: varchar("ip_address", { length: 255 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 255 }).notNull(), // User-entered IP/hostname for reachability checks
+  cloudDdnsHostname: varchar("cloud_ddns_hostname", { length: 255 }), // Auto-extracted Cloud DDNS hostname from SSL certificate
   port: integer("port").notNull().default(8728), // MikroTik API port
   username: varchar("username", { length: 255 }).notNull(),
   // Password is encrypted using crypto-js

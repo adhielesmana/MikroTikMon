@@ -56,6 +56,7 @@ export interface IStorage {
   updateRouterConnection(id: string, connected: boolean): Promise<void>;
   updateRouterReachability(id: string, reachable: boolean): Promise<void>;
   updateRouterHostname(id: string, hostname: string): Promise<void>;
+  updateRouterCloudDdnsHostname(id: string, hostname: string): Promise<void>;
   updateLastSuccessfulConnectionMethod(id: string, method: 'native' | 'rest' | 'snmp'): Promise<void>;
   getRouterCredentials(id: string): Promise<{ username: string; password: string } | undefined>;
 
@@ -231,6 +232,15 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(routers)
       .set({ ipAddress: hostname })
+      .where(eq(routers.id, id));
+  }
+
+  async updateRouterCloudDdnsHostname(id: string, hostname: string): Promise<void> {
+    // Store Cloud DDNS hostname separately (for REST API HTTPS and display purposes only)
+    // IP address remains unchanged and is used for reachability checks
+    await db
+      .update(routers)
+      .set({ cloudDdnsHostname: hostname })
       .where(eq(routers.id, id));
   }
 
