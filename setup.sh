@@ -210,22 +210,224 @@ echo "  MikroTik Monitor - Setup Script"
 echo "========================================="
 echo ""
 
+# Function to detect OS
+detect_os() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    elif [ -f /etc/redhat-release ]; then
+        echo "rhel"
+    elif [ "$(uname)" == "Darwin" ]; then
+        echo "macos"
+    else
+        echo "unknown"
+    fi
+}
+
+# Function to install Docker
+install_docker() {
+    local os=$(detect_os)
+    
+    print_info "Installing Docker for $os..."
+    
+    case $os in
+        ubuntu|debian)
+            print_info "Installing Docker on Ubuntu/Debian..."
+            
+            # Update package index
+            sudo apt-get update
+            
+            # Install prerequisites
+            sudo apt-get install -y \
+                ca-certificates \
+                curl \
+                gnupg \
+                lsb-release
+            
+            # Add Docker's official GPG key
+            sudo mkdir -p /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/$os/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            
+            # Set up repository
+            echo \
+              "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$os \
+              $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            
+            # Install Docker Engine
+            sudo apt-get update
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            
+            # Add current user to docker group
+            sudo usermod -aG docker $USER
+            
+            print_success "Docker installed successfully"
+            print_warning "You may need to log out and back in for group changes to take effect"
+            ;;
+            
+        centos|rhel|fedora)
+            print_info "Installing Docker on CentOS/RHEL/Fedora..."
+            
+            # Install prerequisites
+            sudo yum install -y yum-utils
+            
+            # Add repository
+            sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+            
+            # Install Docker Engine
+            sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            
+            # Start Docker
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            
+            # Add current user to docker group
+            sudo usermod -aG docker $USER
+            
+            print_success "Docker installed successfully"
+            print_warning "You may need to log out and back in for group changes to take effect"
+            ;;
+            
+        macos)
+            print_error "Please install Docker Desktop for Mac manually:"
+            echo "  1. Visit: https://www.docker.com/products/docker-desktop"
+            echo "  2. Download Docker Desktop for Mac"
+            echo "  3. Install and start Docker Desktop"
+            echo "  4. Run this script again"
+            return 1
+            ;;
+            
+        *)
+            print_error "Unsupported OS: $os"
+            echo "Please install Docker manually: https://docs.docker.com/get-docker/"
+            return 1
+            ;;
+    esac
+    
+    # Start Docker service
+    if [ "$os" != "macos" ]; then
+        sudo systemctl start docker 2>/dev/null || true
+        sudo systemctl enable docker 2>/dev/null || true
+    fi
+    
+    return 0
+}
+
+# Function to install other prerequisites
+install_prerequisites() {
+    local os=$(detect_os)
+    
+    print_info "Installing additional prerequisites..."
+    
+    case $os in
+        ubuntu|debian)
+            sudo apt-get update
+            sudo apt-get install -y \
+                curl \
+                wget \
+                git \
+                openssl \
+                dnsutils \
+                net-tools
+            ;;
+            
+        centos|rhel|fedora)
+            sudo yum install -y \
+                curl \
+                wget \
+                git \
+                openssl \
+                bind-utils \
+                net-tools
+            ;;
+            
+        macos)
+            # Check if Homebrew is installed
+            if ! command -v brew &> /dev/null; then
+                print_info "Installing Homebrew..."
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            fi
+            
+            brew install openssl git wget
+            ;;
+    esac
+    
+    print_success "Prerequisites installed"
+}
+
 # Check prerequisites
 print_info "Checking prerequisites..."
 
+# Check for Docker
 if ! command -v docker &> /dev/null; then
-    print_error "Docker is not installed. Please install Docker first."
-    echo "Visit: https://docs.docker.com/get-docker/"
-    exit 1
+    print_warning "Docker is not installed"
+    echo ""
+    read -p "Would you like to install Docker automatically? (y/N): " -n 1 -r
+    echo
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if install_docker; then
+            print_success "Docker installation complete"
+            
+            # Check if we need to start a new shell for group changes
+            if ! docker ps &> /dev/null 2>&1; then
+                print_warning "Docker group changes require a new login session"
+                echo ""
+                echo "Please run ONE of the following commands:"
+                echo "  Option 1 (Recommended): Log out and log back in, then run ./setup.sh again"
+                echo "  Option 2 (Quick): Run: newgrp docker && ./setup.sh"
+                echo ""
+                exit 0
+            fi
+        else
+            print_error "Docker installation failed"
+            echo "Please install Docker manually: https://docs.docker.com/get-docker/"
+            exit 1
+        fi
+    else
+        print_error "Docker is required to continue"
+        echo "Please install Docker manually: https://docs.docker.com/get-docker/"
+        exit 1
+    fi
 fi
 
+# Check for Docker Compose
 if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    print_error "Docker Compose is not installed. Please install Docker Compose first."
-    echo "Visit: https://docs.docker.com/compose/install/"
-    exit 1
+    print_warning "Docker Compose plugin not found"
+    
+    # Try to install compose plugin if Docker is already installed
+    local os=$(detect_os)
+    case $os in
+        ubuntu|debian)
+            print_info "Installing Docker Compose plugin..."
+            sudo apt-get update
+            sudo apt-get install -y docker-compose-plugin
+            print_success "Docker Compose plugin installed"
+            ;;
+        centos|rhel|fedora)
+            print_info "Installing Docker Compose plugin..."
+            sudo yum install -y docker-compose-plugin
+            print_success "Docker Compose plugin installed"
+            ;;
+        *)
+            print_error "Please install Docker Compose manually"
+            echo "Visit: https://docs.docker.com/compose/install/"
+            exit 1
+            ;;
+    esac
 fi
 
-print_success "Docker and Docker Compose are installed"
+# Install other prerequisites
+if ! command -v openssl &> /dev/null || ! command -v git &> /dev/null; then
+    print_info "Some prerequisites are missing"
+    read -p "Install missing prerequisites? (Y/n): " -n 1 -r
+    echo
+    
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        install_prerequisites
+    fi
+fi
+
+print_success "All prerequisites are installed"
 
 # Detect server IP
 SERVER_IP=$(get_server_ip)
