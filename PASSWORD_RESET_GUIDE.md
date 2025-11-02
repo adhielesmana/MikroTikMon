@@ -6,7 +6,7 @@
 |-------------|---------|-------|
 | **Replit Dev** | `tsx scripts/reset-admin-password.js` | Direct access to TypeScript |
 | **Docker Production** | `./deploy.sh reset-password` | Wrapper script with prompts |
-| **Docker Direct** | `docker compose exec app tsx scripts/reset-admin-password.js` | Bypass prompts |
+| **Docker Direct** | `docker compose exec app npx tsx scripts/reset-admin-password.js` | Bypass prompts |
 
 ---
 
@@ -66,7 +66,7 @@ Continue? (y/N): y
 ### **Option 3: Docker Direct** (Advanced)
 
 ```bash
-docker compose exec app tsx scripts/reset-admin-password.js
+docker compose exec app npx tsx scripts/reset-admin-password.js
 ```
 
 **When to use:**
