@@ -55,6 +55,8 @@ services:
     volumes:
       # Optional: Mount for logs
       - ./logs:/app/logs
+      # Mount for uploaded assets (custom logos, etc.)
+      - ./attached_assets:/app/attached_assets
     networks:
       - mikrotik-network
     healthcheck:

@@ -47,6 +47,10 @@ COPY --chown=nodejs:nodejs drizzle.config.ts ./
 # This means the bundled code still imports packages from node_modules
 RUN npm ci && npm cache clean --force
 
+# Create directories for runtime assets and ensure proper ownership
+RUN mkdir -p /app/attached_assets /app/logs && \
+    chown -R nodejs:nodejs /app/attached_assets /app/logs
+
 # Switch to non-root user
 USER nodejs
 

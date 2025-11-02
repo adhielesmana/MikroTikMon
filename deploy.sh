@@ -45,6 +45,11 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+# Create required directories if they don't exist
+print_info "Creating required directories..."
+mkdir -p logs attached_assets
+print_success "Directories ready"
+
 # Parse command line arguments
 COMMAND=${1:-up}
 WITH_NGINX=${2:-}
