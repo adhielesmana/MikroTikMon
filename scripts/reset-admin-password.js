@@ -13,8 +13,8 @@
 
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import { db } from '../server/db.js';
-import { users } from '../shared/schema.js';
+import { db } from '../server/db.ts';
+import { users } from '../shared/schema.ts';
 import { eq } from 'drizzle-orm';
 
 const DEFAULT_ADMIN_ID = 'super-admin-001';
