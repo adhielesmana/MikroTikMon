@@ -21,7 +21,7 @@ import type { AppSettings } from "@shared/schema";
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isSuperadmin } = useAuth();
   const [logoError, setLogoError] = useState(false);
   
   const { data: settings } = useQuery<AppSettings>({
@@ -108,7 +108,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {isAdmin && (
+        {isSuperadmin && (
           <SidebarGroup>
             <SidebarGroupLabel>Administration</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -161,9 +161,15 @@ export function AppSidebar() {
               {user?.firstName} {user?.lastName}
             </p>
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">
-                {isAdmin ? "Admin" : "User"}
-              </Badge>
+              {isSuperadmin ? (
+                <Badge variant="default" className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20">
+                  Superadmin
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-xs">
+                  {isAdmin ? "Admin" : "User"}
+                </Badge>
+              )}
             </div>
           </div>
         </div>

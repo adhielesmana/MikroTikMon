@@ -35,6 +35,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role", { length: 20 }).notNull().default("user"), // 'admin' or 'user'
+  isSuperadmin: boolean("is_superadmin").notNull().default(false), // Immutable hardcoded superadmin flag
   enabled: boolean("enabled").notNull().default(false), // New users disabled by default
   passwordHash: text("password_hash"), // For local authentication (super admin)
   mustChangePassword: boolean("must_change_password").notNull().default(false), // Force password change on first login

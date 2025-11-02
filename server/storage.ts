@@ -132,6 +132,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: string, data: Partial<User>): Promise<User> {
+    // Prevent modification of superadmin's critical fields
+    const existing = await this.getUser(id);
+    if (existing?.isSuperadmin) {
+      // Remove protected fields from update
+      const { isSuperadmin, username, passwordHash, role, ...safeData } = data;
+      const [user] = await db
+        .update(users)
+        .set({ ...safeData, updatedAt: new Date() })
+        .where(eq(users.id, id))
+        .returning();
+      return user;
+    }
+    
     const [user] = await db
       .update(users)
       .set({ ...data, updatedAt: new Date() })
@@ -141,6 +154,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
+    // Prevent deletion of superadmin
+    const user = await this.getUser(id);
+    if (user?.isSuperadmin) {
+      throw new Error("Cannot delete superadmin user");
+    }
     await db.delete(users).where(eq(users.id, id));
   }
 

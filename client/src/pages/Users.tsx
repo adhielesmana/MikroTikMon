@@ -9,9 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Mail, Key, Trash2 } from "lucide-react";
+import { UserPlus, Mail, Key, Trash2, Shield, ShieldCheck, RotateCw, UserCheck, UserX, Crown } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 export default function Users() {
   const { toast } = useToast();
@@ -67,6 +76,27 @@ export default function Users() {
     },
   });
 
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: any }) => {
+      const response = await apiRequest("PATCH", `/api/admin/users/${userId}`, data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "User Updated",
+        description: "User has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update user",
+      });
+    },
+  });
+
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       const response = await fetch(`/api/admin/users/${userId}`, {
@@ -91,6 +121,34 @@ export default function Users() {
         variant: "destructive",
         title: "Error",
         description: error.message || "Failed to delete user",
+      });
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await fetch(`/api/admin/users/${userId}/reset-password`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to reset password");
+      }
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "Password Reset",
+        description: `Temporary password: ${data.temporaryPassword}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to reset password",
       });
     },
   });
@@ -264,7 +322,15 @@ export default function Users() {
                   {users.map((user) => (
                     <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                       <TableCell className="font-medium">
-                        {user.firstName} {user.lastName}
+                        <div className="flex items-center gap-2">
+                          {user.firstName} {user.lastName}
+                          {user.isSuperadmin && (
+                            <Badge variant="default" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20">
+                              <Crown className="h-3 w-3 mr-1" />
+                              Superadmin
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
@@ -285,19 +351,58 @@ export default function Users() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {user.id !== "super-admin-001" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              if (confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) {
-                                deleteUserMutation.mutate(user.id);
-                              }
-                            }}
-                            data-testid={`button-delete-${user.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                        {user.isSuperadmin ? (
+                          <Badge variant="outline" className="text-muted-foreground">Protected</Badge>
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-actions-${user.id}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => updateUserMutation.mutate({ userId: user.id, data: { enabled: !user.enabled } })}
+                                data-testid={`action-toggle-enabled-${user.id}`}
+                              >
+                                {user.enabled ? <UserX className="mr-2 h-4 w-4" /> : <UserCheck className="mr-2 h-4 w-4" />}
+                                {user.enabled ? "Disable" : "Enable"} User
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => updateUserMutation.mutate({ userId: user.id, data: { isSuperadmin: !user.isSuperadmin } })}
+                                data-testid={`action-toggle-superadmin-${user.id}`}
+                              >
+                                {user.isSuperadmin ? <Shield className="mr-2 h-4 w-4" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                                {user.isSuperadmin ? "Demote from" : "Promote to"} Superadmin
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  if (confirm(`Reset password for ${user.firstName} ${user.lastName}?`)) {
+                                    resetPasswordMutation.mutate(user.id);
+                                  }
+                                }}
+                                data-testid={`action-reset-password-${user.id}`}
+                              >
+                                <RotateCw className="mr-2 h-4 w-4" />
+                                Reset Password
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) {
+                                    deleteUserMutation.mutate(user.id);
+                                  }
+                                }}
+                                data-testid={`action-delete-${user.id}`}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete User
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </TableCell>
                     </TableRow>

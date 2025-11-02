@@ -12,6 +12,7 @@ export function useAuth() {
     isLoading,
     isAuthenticated: !!user,
     isAdmin: user?.role === "admin",
+    isSuperadmin: user?.isSuperadmin === true,
     isEnabled: user?.enabled === true,
     mustChangePassword: user?.mustChangePassword === true,
   };

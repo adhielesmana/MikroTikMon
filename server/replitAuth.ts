@@ -198,14 +198,13 @@ export async function setupAuth(app: Express) {
     );
   }
 
-  // Always setup local admin authentication with default credentials
-  const DEFAULT_ADMIN_ID = "super-admin-001";
-  const DEFAULT_ADMIN_USERNAME = "admin";
-  // Pre-hashed password for "admin" (bcrypt hash)
-  const DEFAULT_ADMIN_PASSWORD_HASH = "$2b$10$cMvOUlC.MTj7ynM.j/JyMu4IfHEsTjHYTTJBNAmTklFZ9wxTUJP1O";
+  // Always setup hardcoded superadmin authentication
+  const SUPERADMIN_ID = "super-admin-001";
+  const SUPERADMIN_USERNAME = "adhielesmana";
+  // Pre-hashed password for "admin123" (bcrypt hash)
+  const SUPERADMIN_PASSWORD_HASH = "$2b$10$ASst66/GZvS3LHAnC5671ep42D8MQtyPguAkUMFittEvbrXXg//tW";
   
-  console.log("✓ Default admin account enabled (username: admin, password: admin)");
-  console.log("⚠️  You will be forced to change the password on first login");
+  console.log("✓ Hardcoded superadmin account enabled (adhielesmana)");
   
   passport.use(new LocalStrategy({
     usernameField: 'username',
@@ -226,27 +225,29 @@ export async function setupAuth(app: Express) {
             firstName: dbUser.firstName,
             lastName: dbUser.lastName,
             role: dbUser.role,
+            isSuperadmin: dbUser.isSuperadmin || false,
             mustChangePassword: dbUser.mustChangePassword,
           };
           
           return done(null, user);
         }
-      } else if (username === DEFAULT_ADMIN_USERNAME) {
-        // First-time login with default credentials
-        const passwordMatch = await bcrypt.compare(password, DEFAULT_ADMIN_PASSWORD_HASH);
+      } else if (username === SUPERADMIN_USERNAME) {
+        // Hardcoded superadmin login
+        const passwordMatch = await bcrypt.compare(password, SUPERADMIN_PASSWORD_HASH);
         
         if (passwordMatch) {
-          // Create/update default admin user with all required fields
+          // Create/update hardcoded superadmin user
           const createdUser = await storage.upsertUser({
-            id: DEFAULT_ADMIN_ID,
-            username: DEFAULT_ADMIN_USERNAME,
-            email: `${DEFAULT_ADMIN_USERNAME}@local`,
-            firstName: "Admin",
-            lastName: "User",
+            id: SUPERADMIN_ID,
+            username: SUPERADMIN_USERNAME,
+            email: `${SUPERADMIN_USERNAME}@local`,
+            firstName: "Super",
+            lastName: "Admin",
             profileImageUrl: "",
-            passwordHash: DEFAULT_ADMIN_PASSWORD_HASH,
-            mustChangePassword: true,
+            passwordHash: SUPERADMIN_PASSWORD_HASH,
+            mustChangePassword: false,
             role: "admin",
+            isSuperadmin: true,
             enabled: true,
           });
           
@@ -256,6 +257,7 @@ export async function setupAuth(app: Express) {
             firstName: createdUser.firstName,
             lastName: createdUser.lastName,
             role: createdUser.role,
+            isSuperadmin: createdUser.isSuperadmin,
             mustChangePassword: createdUser.mustChangePassword,
           };
           
@@ -315,6 +317,11 @@ export async function setupAuth(app: Express) {
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Prevent hardcoded superadmin from changing credentials
+      if (user.isSuperadmin) {
+        return res.status(403).json({ message: "Superadmin credentials cannot be changed" });
       }
       
       // Verify current password
@@ -459,6 +466,21 @@ export const isAdmin: RequestHandler = async (req, res, next) => {
   const user = await storage.getUser(userId);
   if (!user || user.role !== "admin") {
     return res.status(403).json({ message: "Forbidden: Admin access required" });
+  }
+
+  next();
+};
+
+// Middleware to check if user is superadmin
+export const isSuperadmin: RequestHandler = async (req, res, next) => {
+  const userId = (req.user as any)?.id || (req.user as any)?.claims?.sub;
+  if (!userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const user = await storage.getUser(userId);
+  if (!user || !user.isSuperadmin) {
+    return res.status(403).json({ message: "Forbidden: Superadmin access required" });
   }
 
   next();

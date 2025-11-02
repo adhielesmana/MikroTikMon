@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { SiGoogle } from "react-icons/si";
-import { Shield } from "lucide-react";
+import { Shield, CheckCircle2, XCircle } from "lucide-react";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -20,11 +21,17 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
-  const [showDefaultCredentials, setShowDefaultCredentials] = useState(false);
   const [authMethods, setAuthMethods] = useState({
     local: true,
     google: false,
     replit: false,
+  });
+  const [dbStatus, setDbStatus] = useState<{
+    status: 'connected' | 'disconnected' | 'checking';
+    message: string;
+  }>({
+    status: 'checking',
+    message: 'Checking database status...',
   });
   const { toast } = useToast();
 
@@ -36,7 +43,7 @@ export default function Login() {
     },
   });
 
-  // Check available auth methods and default credentials
+  // Check available auth methods and database status
   useEffect(() => {
     const checkAuthMethods = async () => {
       try {
@@ -50,21 +57,31 @@ export default function Login() {
       }
     };
     
-    const checkDefaultCredentials = async () => {
+    const checkDatabaseStatus = async () => {
       try {
-        const response = await fetch("/api/auth/show-default-credentials");
+        const response = await fetch("/api/health/db");
         if (response.ok) {
           const data = await response.json();
-          setShowDefaultCredentials(data.showDefaultCredentials);
+          setDbStatus({
+            status: data.status,
+            message: data.message,
+          });
+        } else {
+          setDbStatus({
+            status: 'disconnected',
+            message: 'Database offline or disconnected',
+          });
         }
       } catch (error) {
-        // If error, default to showing credentials (fail-safe for new installations)
-        setShowDefaultCredentials(true);
+        setDbStatus({
+          status: 'disconnected',
+          message: 'Cannot reach database',
+        });
       }
     };
     
     checkAuthMethods();
-    checkDefaultCredentials();
+    checkDatabaseStatus();
   }, []);
 
   const handleLocalLogin = async (data: LoginFormData) => {
@@ -200,12 +217,26 @@ export default function Login() {
             </>
           )}
 
-          {showDefaultCredentials && (
-            <div className="text-center text-sm text-muted-foreground mt-4" data-testid="default-credentials-info">
-              <p>Default admin credentials:</p>
-              <p className="font-mono text-xs">username: admin | password: admin</p>
-            </div>
-          )}
+          <div className="flex items-center justify-center gap-2 mt-4">
+            {dbStatus.status === 'checking' && (
+              <Badge variant="outline" data-testid="badge-db-checking">
+                <div className="h-2 w-2 rounded-full bg-muted-foreground mr-2" />
+                Checking database...
+              </Badge>
+            )}
+            {dbStatus.status === 'connected' && (
+              <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20" data-testid="badge-db-connected">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Database Online
+              </Badge>
+            )}
+            {dbStatus.status === 'disconnected' && (
+              <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20" data-testid="badge-db-disconnected">
+                <XCircle className="h-3 w-3 mr-1" />
+                Database Offline
+              </Badge>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

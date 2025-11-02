@@ -3,7 +3,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, isAdmin, isEnabled } from "./replitAuth";
+import { setupAuth, isAuthenticated, isAdmin, isSuperadmin, isEnabled } from "./replitAuth";
 import { MikrotikClient } from "./mikrotik";
 import { emailService } from "./emailService";
 import { startScheduler, setWebSocketServer } from "./scheduler";
@@ -40,6 +40,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Database health check endpoint (no auth required) - for login page status indicator
+  app.get('/api/health/db', async (_req, res) => {
+    try {
+      // Try to query the database
+      await storage.getAllUsers();
+      res.status(200).json({ 
+        status: 'connected',
+        reachable: true,
+        message: 'Database online and connected'
+      });
+    } catch (error) {
+      console.error("Database health check failed:", error);
+      res.status(200).json({ 
+        status: 'disconnected',
+        reachable: true,
+        message: 'Database online but disconnected'
+      });
+    }
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
@@ -49,19 +69,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
-  // Check if default admin credentials should be shown on login page
-  app.get('/api/auth/show-default-credentials', async (_req, res) => {
-    try {
-      const adminUser = await storage.getUser('super-admin-001');
-      // Show default credentials only if admin still needs to change password
-      const showCredentials = adminUser ? adminUser.mustChangePassword === true : true;
-      res.json({ showDefaultCredentials: showCredentials });
-    } catch (error) {
-      // If admin user doesn't exist yet, show default credentials
-      res.json({ showDefaultCredentials: true });
     }
   });
 
@@ -634,8 +641,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin routes
-  app.get("/api/admin/users", isAuthenticated, isAdmin, async (req, res) => {
+  // Admin routes - User management restricted to superadmin only
+  app.get("/api/admin/users", isAuthenticated, isSuperadmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);
@@ -645,7 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/users", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/admin/users", isAuthenticated, isSuperadmin, async (req, res) => {
     try {
       const { username, email, firstName, lastName, role, temporaryPassword } = req.body;
 
@@ -698,9 +705,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/admin/users/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.patch("/api/admin/users/:id", isAuthenticated, isSuperadmin, async (req, res) => {
     try {
-      const { enabled, role } = req.body;
+      const { enabled, role, isSuperadmin: promoteToSuperadmin } = req.body;
       const updateData: any = {};
       
       if (typeof enabled === "boolean") {
@@ -719,21 +726,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.role = role;
       }
       
+      // Allow superadmin to promote other users to superadmin
+      if (typeof promoteToSuperadmin === "boolean") {
+        updateData.isSuperadmin = promoteToSuperadmin;
+        if (promoteToSuperadmin) {
+          updateData.role = "admin"; // Superadmins must be admins
+        }
+      }
+      
       const user = await storage.updateUser(req.params.id, updateData);
       res.json(user);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating user:", error);
-      res.status(500).json({ message: "Failed to update user" });
+      res.status(500).json({ message: error.message || "Failed to update user" });
     }
   });
 
-  app.delete("/api/admin/users/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/admin/users/:id", isAuthenticated, isSuperadmin, async (req, res) => {
     try {
       await storage.deleteUser(req.params.id);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting user:", error);
-      res.status(500).json({ message: "Failed to delete user" });
+      res.status(500).json({ message: error.message || "Failed to delete user" });
+    }
+  });
+
+  // Reset user password endpoint (superadmin only)
+  app.post("/api/admin/users/:id/reset-password", isAuthenticated, isSuperadmin, async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (user.isSuperadmin) {
+        return res.status(403).json({ message: "Cannot reset superadmin password" });
+      }
+      
+      // Generate temporary password
+      const tempPassword = crypto.randomBytes(8).toString('base64').slice(0, 12);
+      const passwordHash = await bcrypt.hash(tempPassword, 10);
+      
+      // Update user with new password and force password change
+      await storage.updateUser(userId, {
+        passwordHash,
+        mustChangePassword: true,
+      });
+      
+      // Send email with new temporary password
+      try {
+        await emailService.sendUserInvitationEmail(
+          user.email || '',
+          user.firstName || '',
+          user.username || '',
+          tempPassword
+        );
+      } catch (emailError) {
+        console.error("Failed to send password reset email:", emailError);
+      }
+      
+      res.json({
+        success: true,
+        temporaryPassword: tempPassword,
+        message: "Password reset successfully. User will be prompted to change it on next login."
+      });
+    } catch (error: any) {
+      console.error("Error resetting user password:", error);
+      res.status(500).json({ message: error.message || "Failed to reset password" });
     }
   });
 
