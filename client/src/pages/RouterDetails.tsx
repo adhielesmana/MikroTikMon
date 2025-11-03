@@ -244,15 +244,18 @@ export default function RouterDetails() {
       return [];
     }
 
-    // Group data by timestamp
+    // Group data by timestamp (preserve millisecond precision)
     const dataByTime = new Map<string, any>();
 
     trafficData.forEach((d) => {
-      const time = new Date(d.timestamp).toLocaleTimeString();
-      if (!dataByTime.has(time)) {
-        dataByTime.set(time, { time });
+      // Use ISO string as key to preserve exact timestamp
+      const timestamp = new Date(d.timestamp).toISOString();
+      if (!dataByTime.has(timestamp)) {
+        // Format for display (time only, with seconds precision)
+        const displayTime = new Date(d.timestamp).toLocaleTimeString();
+        dataByTime.set(timestamp, { time: displayTime, timestamp });
       }
-      const timeData = dataByTime.get(time);
+      const timeData = dataByTime.get(timestamp);
 
       // Only include data for selected interfaces
       if (selectedInterfaces.has(d.portName)) {
