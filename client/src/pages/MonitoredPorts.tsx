@@ -104,6 +104,26 @@ export default function MonitoredPorts() {
     },
   });
 
+  const refreshAllMetadataMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/ports/refresh-all-metadata");
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/monitored-ports"] });
+      toast({
+        title: "Bulk Refresh Complete",
+        description: `Successfully refreshed ${data.success} port${data.success !== 1 ? 's' : ''}${data.failed > 0 ? `, ${data.failed} failed` : ''}`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to bulk refresh interface metadata",
+        variant: "destructive",
+      });
+    },
+  });
+
   const startEditing = (port: MonitoredPortWithRouter) => {
     setEditingId(port.id);
     // Convert bits per second to Mbps for display
@@ -155,10 +175,34 @@ export default function MonitoredPorts() {
 
       <Card>
         <CardHeader>
-          <CardTitle>All Monitored Ports</CardTitle>
-          <CardDescription>
-            {ports?.length || 0} port{ports?.length !== 1 ? "s" : ""} being monitored
-          </CardDescription>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle>All Monitored Ports</CardTitle>
+              <CardDescription>
+                {ports?.length || 0} port{ports?.length !== 1 ? "s" : ""} being monitored
+              </CardDescription>
+            </div>
+            {ports && ports.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => refreshAllMetadataMutation.mutate()}
+                disabled={refreshAllMetadataMutation.isPending}
+                data-testid="button-refresh-all"
+              >
+                {refreshAllMetadataMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh All Metadata
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {!ports || ports.length === 0 ? (

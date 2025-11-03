@@ -763,6 +763,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/ports/refresh-all-metadata", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Get all monitored ports for this user
+      const ports = await storage.getAllMonitoredPorts(userId);
+      
+      let successCount = 0;
+      let failCount = 0;
+      const results: { portId: string; portName: string; success: boolean; error?: string }[] = [];
+      
+      // Process each port
+      for (const port of ports) {
+        try {
+          const router = await storage.getRouter(port.routerId);
+          if (!router) {
+            results.push({ portId: port.id, portName: port.portName, success: false, error: "Router not found" });
+            failCount++;
+            continue;
+          }
+          
+          const { decryptPassword } = await import("./storage.js");
+          const decryptedPassword = decryptPassword(router.encryptedPassword);
+          
+          const client = new MikrotikClient({
+            host: router.cloudDdnsHostname || router.ipAddress,
+            user: router.username,
+            password: decryptedPassword,
+            port: router.port,
+            restEnabled: router.restEnabled || false,
+            restPort: router.restPort || 443,
+            snmpEnabled: router.snmpEnabled || false,
+            snmpCommunity: router.snmpCommunity || 'public',
+            snmpPort: router.snmpPort || 161,
+            interfaceDisplayMode: (router.interfaceDisplayMode || 'static') as 'static' | 'none' | 'all',
+          });
+          
+          const interfaces = await client.getInterfaceStats();
+          const targetInterface = interfaces.find((iface: any) => iface.name === port.portName);
+          
+          await storage.updateMonitoredPort(port.id, {
+            interfaceComment: targetInterface?.comment || null,
+            interfaceMacAddress: targetInterface?.macAddress || null,
+            lastInterfaceUpdate: new Date(),
+          });
+          
+          results.push({ portId: port.id, portName: port.portName, success: true });
+          successCount++;
+        } catch (error: any) {
+          console.error(`Failed to refresh metadata for port ${port.portName}:`, error);
+          results.push({ 
+            portId: port.id, 
+            portName: port.portName, 
+            success: false, 
+            error: error.message || "Unknown error" 
+          });
+          failCount++;
+        }
+      }
+      
+      res.json({
+        total: ports.length,
+        success: successCount,
+        failed: failCount,
+        results,
+      });
+    } catch (error) {
+      console.error("Error bulk refreshing interface metadata:", error);
+      res.status(500).json({ message: "Failed to bulk refresh interface metadata" });
+    }
+  });
+
   app.delete("/api/ports/:id", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
       const port = await storage.getMonitoredPort(req.params.id);
