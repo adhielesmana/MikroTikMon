@@ -39,7 +39,7 @@ const INTERFACE_COLORS = [
 
 export default function RouterDetails() {
   const { id } = useParams<{ id: string }>();
-  const [timeRange, setTimeRange] = useState("1h");
+  const [timeRange, setTimeRange] = useState("5m");
   const [selectedInterfaces, setSelectedInterfaces] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   
@@ -67,8 +67,8 @@ export default function RouterDetails() {
   
   const allInterfaces = interfacesData?.interfaces.map(i => i.name) || [];
 
-  // Use WebSocket for real-time (15m and 1h), database for historical (longer ranges)
-  const useRealtimeEndpoint = timeRange === "15m" || timeRange === "1h";
+  // Use WebSocket for real-time (5m, 15m, and 1h), database for historical (longer ranges)
+  const useRealtimeEndpoint = timeRange === "5m" || timeRange === "15m" || timeRange === "1h";
   
   // Only fetch historical data for longer time ranges
   const { data: historicalTrafficData, isLoading: loadingTraffic } = useQuery<TrafficData[]>({
@@ -76,6 +76,12 @@ export default function RouterDetails() {
     enabled: !!id && !useRealtimeEndpoint,
     refetchInterval: 30000, // 30 seconds for historical
   });
+
+  // Clear data when time range changes
+  useEffect(() => {
+    console.log("[RouterDetails] Time range changed to:", timeRange);
+    setRealtimeTrafficData([]); // Clear old data for fresh start
+  }, [timeRange]);
 
   // WebSocket setup for on-demand real-time traffic
   useEffect(() => {
@@ -106,17 +112,23 @@ export default function RouterDetails() {
         const message = JSON.parse(event.data);
         
         if (message.type === "realtime_traffic" && message.routerId === id && isSubscribed) {
-          // Update real-time traffic data - append new points and keep reasonable limit
+          // Update real-time traffic data - append new points and keep 5-minute rolling window
           console.log("[RouterDetails] Received real-time traffic data:", message.data.length, "points");
           setRealtimeTrafficData((prev) => {
+            const now = Date.now();
+            const fiveMinutesAgo = now - (5 * 60 * 1000); // 5 minutes in milliseconds
+            
             // Combine previous and new data
             const combined = [...prev, ...message.data];
-            // Keep only the most recent points (limit to 7200 points = 2 hours at 1s interval)
-            const maxPoints = 7200;
-            if (combined.length > maxPoints) {
-              return combined.slice(combined.length - maxPoints);
-            }
-            return combined;
+            
+            // Filter to keep only data from last 5 minutes
+            const filtered = combined.filter(d => {
+              const timestamp = new Date(d.timestamp).getTime();
+              return timestamp >= fiveMinutesAgo;
+            });
+            
+            console.log("[RouterDetails] Total data points:", filtered.length, "(last 5 minutes)");
+            return filtered;
           });
         } else if (message.type === "realtime_polling_started" && message.routerId === id) {
           console.log("[RouterDetails] Real-time polling started confirmation received");
@@ -376,7 +388,7 @@ export default function RouterDetails() {
               {trafficData?.length || 0}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Last {timeRange}
+              Last 5 minutes (Live)
             </p>
           </CardContent>
         </Card>
@@ -388,23 +400,15 @@ export default function RouterDetails() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Network Traffic (Real-time)</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Network Traffic (Live - Last 5 Minutes)
+                  <Badge variant="default" className="animate-pulse" data-testid="badge-live-indicator">
+                    LIVE
+                  </Badge>
+                </CardTitle>
                 <CardDescription className="mt-1">
                   Select interfaces to display on the graph
                 </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                {["15m", "1h", "6h", "24h"].map((range) => (
-                  <Button
-                    key={range}
-                    variant={timeRange === range ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setTimeRange(range)}
-                    data-testid={`button-timerange-${range}`}
-                  >
-                    {range}
-                  </Button>
-                ))}
               </div>
             </div>
 
