@@ -255,6 +255,7 @@ export const alerts = pgTable("alerts", {
   routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
   portId: varchar("port_id").references(() => monitoredPorts.id, { onDelete: "cascade" }), // nullable for router-level alerts
   portName: varchar("port_name", { length: 255 }), // nullable for router-level alerts
+  portComment: varchar("port_comment", { length: 255 }), // Interface comment from MikroTik (nullable)
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   severity: varchar("severity", { length: 20 }).notNull().default("warning"), // 'critical', 'warning', 'info'
   message: text("message").notNull(),

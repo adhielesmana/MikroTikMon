@@ -216,7 +216,11 @@ export default function Dashboard() {
                         'text-blue-500'
                       }`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{alert.portName} - {alert.routerName}</p>
+                        <p className="text-sm font-medium truncate">
+                          {alert.portName}
+                          {alert.portComment && ` - ${alert.portComment}`}
+                          {` - ${alert.routerName}`}
+                        </p>
                         <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
                       </div>
                       {!alert.acknowledged && (

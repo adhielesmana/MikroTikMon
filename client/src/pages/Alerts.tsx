@@ -85,7 +85,7 @@ export default function Alerts() {
             <TableHeader>
               <TableRow>
                 <TableHead>Severity</TableHead>
-                <TableHead>Port - Router Name</TableHead>
+                <TableHead>Interface - Comment - Router Name</TableHead>
                 <TableHead>Message</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date & Time</TableHead>
@@ -103,7 +103,9 @@ export default function Alerts() {
                       </Badge>
                     </TableCell>
                     <TableCell className="font-medium" data-testid={`text-alert-port-${alert.id}`}>
-                      {alert.portName} - {alert.routerName}
+                      {alert.portName}
+                      {alert.portComment && ` - ${alert.portComment}`}
+                      {` - ${alert.routerName}`}
                     </TableCell>
                     <TableCell data-testid={`text-alert-message-${alert.id}`}>
                       {getSimplifiedMessage(alert)}
