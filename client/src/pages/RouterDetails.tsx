@@ -244,18 +244,20 @@ export default function RouterDetails() {
       return [];
     }
 
-    // Group data by timestamp (preserve millisecond precision)
-    const dataByTime = new Map<string, any>();
+    // Group data by second (round timestamp to nearest second)
+    const dataByTime = new Map<number, any>();
 
     trafficData.forEach((d) => {
-      // Use ISO string as key to preserve exact timestamp
-      const timestamp = new Date(d.timestamp).toISOString();
-      if (!dataByTime.has(timestamp)) {
+      // Round timestamp to nearest second (remove milliseconds)
+      const timestampMs = new Date(d.timestamp).getTime();
+      const timestampSecond = Math.floor(timestampMs / 1000) * 1000;
+      
+      if (!dataByTime.has(timestampSecond)) {
         // Format for display (time only, with seconds precision)
-        const displayTime = new Date(d.timestamp).toLocaleTimeString();
-        dataByTime.set(timestamp, { time: displayTime, timestamp });
+        const displayTime = new Date(timestampSecond).toLocaleTimeString();
+        dataByTime.set(timestampSecond, { time: displayTime });
       }
-      const timeData = dataByTime.get(timestamp);
+      const timeData = dataByTime.get(timestampSecond);
 
       // Only include data for selected interfaces
       if (selectedInterfaces.has(d.portName)) {
@@ -265,7 +267,10 @@ export default function RouterDetails() {
       }
     });
 
-    return Array.from(dataByTime.values());
+    // Convert to array and sort by timestamp
+    return Array.from(dataByTime.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([, data]) => data);
   }, [trafficData, selectedInterfaces]);
 
   // Get selected interfaces list
