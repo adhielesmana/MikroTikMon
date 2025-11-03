@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Server, Bell, Settings, Users, LogOut, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Server, Bell, Settings, Users, LogOut, TrendingUp, Network } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
@@ -43,6 +43,11 @@ export function AppSidebar() {
       title: "Routers",
       url: "/routers",
       icon: Server,
+    },
+    {
+      title: "Monitored Ports",
+      url: "/monitored-ports",
+      icon: Network,
     },
     {
       title: "Graph History",

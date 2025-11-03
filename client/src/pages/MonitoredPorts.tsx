@@ -43,11 +43,7 @@ export default function MonitoredPorts() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, threshold }: { id: string; threshold: number }) => {
-      return apiRequest(`/api/ports/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ minThresholdBps: threshold }),
-      });
+      return apiRequest("PATCH", `/api/ports/${id}`, { minThresholdBps: threshold });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/monitored-ports"] });
@@ -68,9 +64,7 @@ export default function MonitoredPorts() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/ports/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest("DELETE", `/api/ports/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/monitored-ports"] });
