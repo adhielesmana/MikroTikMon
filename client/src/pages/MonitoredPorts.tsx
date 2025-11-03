@@ -25,10 +25,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Trash2, Save, X, Network } from "lucide-react";
+import { Loader2, Trash2, Save, X, Network, RefreshCw } from "lucide-react";
 import type { MonitoredPort, Router } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
 
-type MonitoredPortWithRouter = MonitoredPort & { router: Router; portComment?: string; ownerUsername?: string };
+type MonitoredPortWithRouter = MonitoredPort & { router: Router; ownerUsername?: string };
 
 export default function MonitoredPorts() {
   const { isSuperadmin } = useAuth();
@@ -78,6 +79,26 @@ export default function MonitoredPorts() {
       toast({
         title: "Error",
         description: "Failed to delete monitored port",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const refreshMetadataMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("POST", `/api/ports/${id}/refresh-metadata`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/monitored-ports"] });
+      toast({
+        title: "Success",
+        description: "Interface metadata refreshed successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to refresh interface metadata",
         variant: "destructive",
       });
     },
@@ -155,11 +176,12 @@ export default function MonitoredPorts() {
                   <TableRow>
                     <TableHead>Port Name</TableHead>
                     <TableHead>Interface Comment</TableHead>
+                    <TableHead>MAC Address</TableHead>
                     <TableHead>Router Name</TableHead>
                     <TableHead>Owner</TableHead>
                     <TableHead>Threshold (Mbps)</TableHead>
                     <TableHead>Status</TableHead>
-                    {isSuperadmin && <TableHead className="w-24">Actions</TableHead>}
+                    <TableHead className="w-32">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -173,7 +195,17 @@ export default function MonitoredPorts() {
                           {port.portName}
                         </TableCell>
                         <TableCell className="text-muted-foreground" data-testid={`text-port-comment-${port.id}`}>
-                          {port.portComment || "-"}
+                          <div className="flex flex-col gap-0.5">
+                            <span>{port.interfaceComment || "-"}</span>
+                            {port.lastInterfaceUpdate && (
+                              <span className="text-xs text-muted-foreground">
+                                Updated {formatDistanceToNow(new Date(port.lastInterfaceUpdate), { addSuffix: true })}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-xs" data-testid={`text-mac-${port.id}`}>
+                          {port.interfaceMacAddress || "-"}
                         </TableCell>
                         <TableCell data-testid={`text-router-name-${port.id}`}>
                           {port.router.name}
@@ -234,18 +266,34 @@ export default function MonitoredPorts() {
                             {port.enabled ? "Enabled" : "Disabled"}
                           </Badge>
                         </TableCell>
-                        {isSuperadmin && (
-                          <TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => setDeletePortId(port.id)}
-                              data-testid={`button-delete-${port.id}`}
+                              onClick={() => refreshMetadataMutation.mutate(port.id)}
+                              disabled={refreshMetadataMutation.isPending}
+                              data-testid={`button-refresh-${port.id}`}
+                              title="Refresh interface metadata"
                             >
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                              {refreshMetadataMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4" />
+                              )}
                             </Button>
-                          </TableCell>
-                        )}
+                            {isSuperadmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeletePortId(port.id)}
+                                data-testid={`button-delete-${port.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}

@@ -586,8 +586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const decryptedPassword = decryptPassword(router.encryptedPassword);
         
         const client = new MikrotikClient({
-          id: router.id,
-          host: router.ipAddress,
+          host: router.cloudDdnsHostname || router.ipAddress,
           user: router.username,
           password: decryptedPassword,
           port: router.port,
@@ -633,9 +632,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Forbidden" });
       }
       
+      // Fetch interface metadata from router
+      let interfaceComment: string | undefined;
+      let interfaceMacAddress: string | undefined;
+      
+      try {
+        const { decryptPassword } = await import("./storage.js");
+        const decryptedPassword = decryptPassword(router.encryptedPassword);
+        
+        const client = new MikrotikClient({
+          host: router.cloudDdnsHostname || router.ipAddress,
+          user: router.username,
+          password: decryptedPassword,
+          port: router.port,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || 'public',
+          snmpPort: router.snmpPort || 161,
+          interfaceDisplayMode: (router.interfaceDisplayMode || 'static') as 'static' | 'none' | 'all',
+        });
+        
+        const interfaces = await client.getInterfaceStats();
+        const targetInterface = interfaces.find((iface: any) => iface.name === req.body.portName);
+        
+        if (targetInterface) {
+          interfaceComment = targetInterface.comment || undefined;
+          interfaceMacAddress = targetInterface.macAddress || undefined;
+        }
+      } catch (interfaceError) {
+        console.error("Failed to fetch interface metadata:", interfaceError);
+        // Continue without metadata - it's optional
+      }
+      
       const port = await storage.createMonitoredPort({
         ...req.body,
         routerId: req.params.id,
+        interfaceComment,
+        interfaceMacAddress,
+        lastInterfaceUpdate: interfaceComment || interfaceMacAddress ? new Date() : undefined,
       });
       
       res.json(port);
@@ -668,6 +703,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating port:", error);
       res.status(500).json({ message: "Failed to update port" });
+    }
+  });
+
+  // Refresh interface metadata for a monitored port
+  app.post("/api/ports/:id/refresh-metadata", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const port = await storage.getMonitoredPort(req.params.id);
+      
+      if (!port) {
+        return res.status(404).json({ message: "Port not found" });
+      }
+      
+      const router = await storage.getRouter(port.routerId);
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      const userId = getUserId(req);
+      if (router.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Fetch fresh interface metadata from router
+      try {
+        const { decryptPassword } = await import("./storage.js");
+        const decryptedPassword = decryptPassword(router.encryptedPassword);
+        
+        const client = new MikrotikClient({
+          host: router.cloudDdnsHostname || router.ipAddress,
+          user: router.username,
+          password: decryptedPassword,
+          port: router.port,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || 'public',
+          snmpPort: router.snmpPort || 161,
+          interfaceDisplayMode: (router.interfaceDisplayMode || 'static') as 'static' | 'none' | 'all',
+        });
+        
+        const interfaces = await client.getInterfaceStats();
+        const targetInterface = interfaces.find((iface: any) => iface.name === port.portName);
+        
+        const updated = await storage.updateMonitoredPort(req.params.id, {
+          interfaceComment: targetInterface?.comment || null,
+          interfaceMacAddress: targetInterface?.macAddress || null,
+          lastInterfaceUpdate: new Date(),
+        });
+        
+        res.json(updated);
+      } catch (interfaceError) {
+        console.error("Failed to fetch interface metadata:", interfaceError);
+        return res.status(500).json({ message: "Failed to fetch interface metadata from router" });
+      }
+    } catch (error) {
+      console.error("Error refreshing interface metadata:", error);
+      res.status(500).json({ message: "Failed to refresh interface metadata" });
     }
   });
 

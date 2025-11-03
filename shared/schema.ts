@@ -197,6 +197,10 @@ export const monitoredPorts = pgTable("monitored_ports", {
   minThresholdBps: integer("min_threshold_bps").notNull().default(0),
   emailNotifications: boolean("email_notifications").notNull().default(true),
   popupNotifications: boolean("popup_notifications").notNull().default(true),
+  // Cached interface metadata - fetched from router and stored for performance
+  interfaceComment: text("interface_comment"), // Interface comment/description from MikroTik
+  interfaceMacAddress: varchar("interface_mac_address", { length: 17 }), // MAC address in format XX:XX:XX:XX:XX:XX
+  lastInterfaceUpdate: timestamp("last_interface_update"), // When we last fetched interface metadata
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [

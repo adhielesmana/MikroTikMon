@@ -42,6 +42,7 @@ function filterInterfaces(interfaces: string[], displayMode: 'none' | 'static' |
 export interface InterfaceStats {
   name: string;
   comment?: string; // Interface comment/description
+  macAddress?: string; // MAC address of the interface
   rxBytesPerSecond: number;
   txBytesPerSecond: number;
   totalBytesPerSecond: number;
@@ -608,6 +609,7 @@ export class MikrotikClient {
         // REST API doesn't provide real-time rates directly, so we calculate from byte counters
         const name = iface.name;
         const comment = iface.comment || undefined;
+        const macAddress = iface['mac-address'] || undefined;
         const rxBytes = parseInt(iface['rx-byte'] || '0');
         const txBytes = parseInt(iface['tx-byte'] || '0');
         
@@ -631,6 +633,7 @@ export class MikrotikClient {
         result.push({
           name,
           comment,
+          macAddress,
           rxBytesPerSecond: rxRate,
           txBytesPerSecond: txRate,
           totalBytesPerSecond: rxRate + txRate,
@@ -791,16 +794,17 @@ export class MikrotikClient {
     try {
       await api.connect();
 
-      // First, get interface details (including comments)
+      // First, get interface details (including comments and MAC addresses)
       const interfaceDetails = await api.write("/interface/print");
-      const interfaceComments = new Map<string, string>();
+      const interfaceMetadata = new Map<string, { comment?: string; macAddress?: string }>();
       
       if (Array.isArray(interfaceDetails)) {
         for (const iface of interfaceDetails) {
           const name = iface.name;
-          const comment = iface.comment || "";
+          const comment = iface.comment || undefined;
+          const macAddress = iface['mac-address'] || undefined;
           if (name) {
-            interfaceComments.set(name, comment);
+            interfaceMetadata.set(name, { comment, macAddress });
           }
         }
       }
@@ -840,9 +844,11 @@ export class MikrotikClient {
           // Update cache for next poll
           snmpByteCountCache.set(cacheKey, { rx: rxBytes, tx: txBytes, timestamp: now });
 
+          const metadata = interfaceMetadata.get(name);
           allResults.push({
             name,
-            comment: interfaceComments.get(name) || undefined,
+            comment: metadata?.comment,
+            macAddress: metadata?.macAddress,
             rxBytesPerSecond: rxRate,
             txBytesPerSecond: txRate,
             totalBytesPerSecond: rxRate + txRate,
