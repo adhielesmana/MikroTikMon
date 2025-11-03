@@ -1334,11 +1334,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper function to extract log content from XML-wrapped log file
   function extractLogContent(rawContent: string): string {
-    // Extract content between <logs> and </logs> tags, plus any content after </workflow>
-    const logsMatch = rawContent.match(/<logs>([\s\S]*?)<\/logs>/);
-    const afterWorkflow = rawContent.split('</workflow>')[1] || '';
+    // Log files have format:
+    // <workflow>...<logs>CONTENT</logs></workflow>ADDITIONAL_CONTENT
+    // We want CONTENT + ADDITIONAL_CONTENT (everything except XML wrapper)
     
+    // First, extract everything between <logs> and </logs>
+    const logsMatch = rawContent.match(/<logs>([\s\S]*?)<\/logs>/);
     const logsContent = logsMatch ? logsMatch[1] : '';
+    
+    // Then, get everything after </workflow> (new logs continue here)
+    const workflowEndIndex = rawContent.indexOf('</workflow>');
+    const afterWorkflow = workflowEndIndex !== -1 
+      ? rawContent.substring(workflowEndIndex + '</workflow>'.length)
+      : '';
+    
     return logsContent + afterWorkflow;
   }
 
@@ -1379,18 +1388,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
 
-        // Get file stats to find the most recent
-        const logFiles = await Promise.all(
-          workflowLogs.map(async (filename) => {
-            const filePath = path.join(logsDir, filename);
-            const stats = await fs.stat(filePath);
-            return { filename, modified: stats.mtime };
-          })
-        );
-
-        // Sort by modified date (newest first)
-        logFiles.sort((a, b) => b.modified.getTime() - a.modified.getTime());
-        const latestLog = logFiles[0].filename;
+        // Sort by filename (which contains timestamp) to get the newest
+        // Format: Start_application_YYYYMMDD_HHMMSS_NNN.log
+        workflowLogs.sort((a, b) => b.localeCompare(a));
+        const latestLog = workflowLogs[0];
         const logPath = path.join(logsDir, latestLog);
 
         // If log file changed, reset and send full content
