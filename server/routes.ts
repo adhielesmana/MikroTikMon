@@ -135,7 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const router = await storage.createRouter(data, userId);
       
-      // Immediately check reachability after router creation
+      // Immediately check reachability and test connection methods after router creation
       try {
         const credentials = await storage.getRouterCredentials(router.id);
         if (credentials) {
@@ -154,12 +154,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
           });
 
+          // Check reachability
           const isReachable = await client.checkReachability();
           await storage.updateRouterReachability(router.id, isReachable);
           
           console.log(`[Router Creation] ${router.name} reachability check: ${isReachable ? 'REACHABLE' : 'UNREACHABLE'}`);
           
-          // Return updated router with reachability status
+          // Test connection methods (Native API → REST API → SNMP)
+          if (isReachable) {
+            try {
+              const workingMethod = await client.findWorkingConnectionMethod();
+              if (workingMethod) {
+                await storage.updateRouterConnection(router.id, true);
+                await storage.updateLastSuccessfulConnectionMethod(router.id, workingMethod);
+                console.log(`[Router Creation] ${router.name} connection method: ${workingMethod.toUpperCase()}`);
+              } else {
+                await storage.updateRouterConnection(router.id, false);
+                console.log(`[Router Creation] ${router.name} connection test failed - no working method found`);
+              }
+            } catch (connectionTestError) {
+              console.error(`[Router Creation] Error testing connection methods:`, connectionTestError);
+            }
+          }
+          
+          // Return updated router with reachability and connection status
           const updatedRouter = await storage.getRouter(router.id);
           res.json(updatedRouter);
         } else {
@@ -226,7 +244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updated = await storage.updateRouter(req.params.id, req.body);
       
-      // Immediately check reachability after router update (in case connection details changed)
+      // Immediately check reachability and test connection methods after router update
       try {
         const credentials = await storage.getRouterCredentials(updated.id);
         if (credentials) {
@@ -245,12 +263,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             interfaceDisplayMode: (updated.interfaceDisplayMode as "static" | "none" | "all") || 'static',
           });
 
+          // Check reachability
           const isReachable = await client.checkReachability();
           await storage.updateRouterReachability(updated.id, isReachable);
           
           console.log(`[Router Update] ${updated.name} reachability check: ${isReachable ? 'REACHABLE' : 'UNREACHABLE'}`);
           
-          // Return updated router with reachability status
+          // Test connection methods (Native API → REST API → SNMP)
+          if (isReachable) {
+            try {
+              const workingMethod = await client.findWorkingConnectionMethod();
+              if (workingMethod) {
+                await storage.updateRouterConnection(updated.id, true);
+                await storage.updateLastSuccessfulConnectionMethod(updated.id, workingMethod);
+                console.log(`[Router Update] ${updated.name} connection method: ${workingMethod.toUpperCase()}`);
+              } else {
+                await storage.updateRouterConnection(updated.id, false);
+                console.log(`[Router Update] ${updated.name} connection test failed - no working method found`);
+              }
+            } catch (connectionTestError) {
+              console.error(`[Router Update] Error testing connection methods:`, connectionTestError);
+            }
+          }
+          
+          // Return updated router with reachability and connection status
           const finalRouter = await storage.getRouter(updated.id);
           res.json(finalRouter);
         } else {
