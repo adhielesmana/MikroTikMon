@@ -303,6 +303,24 @@ case $COMMAND in
         fi
         ;;
         
+    bulk-threshold)
+        print_warning "This will update ALL monitored port thresholds to 100 KB/s (102,400 bytes/s)"
+        echo ""
+        print_info "Current thresholds will be replaced"
+        read -p "Continue? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Updating all monitored port thresholds..."
+            $DOCKER_COMPOSE exec -T mikrotik-monitor-db psql -U mikrotik_user mikrotik_monitor -c "UPDATE monitored_ports SET min_threshold_bps = 102400;"
+            UPDATED_COUNT=$($DOCKER_COMPOSE exec -T mikrotik-monitor-db psql -U mikrotik_user mikrotik_monitor -t -c "SELECT COUNT(*) FROM monitored_ports;")
+            print_success "Updated $UPDATED_COUNT monitored port(s) to 100 KB/s threshold"
+            echo ""
+            print_info "Threshold is now: 100 KB/s = 102,400 bytes/s"
+        else
+            print_info "Bulk update cancelled"
+        fi
+        ;;
+        
     *)
         echo "Usage: ./deploy.sh [command] [options]"
         echo ""
@@ -322,6 +340,7 @@ case $COMMAND in
         echo "  reset-password   Reset admin password (generates random temp password)"
         echo "  setup-admin      Create admin user in production database"
         echo "  fix-db           Fix database connection issues (.env configuration)"
+        echo "  bulk-threshold   Update ALL monitored port thresholds to 100 KB/s"
         echo ""
         echo "Options:"
         echo "  --with-nginx    Include Nginx reverse proxy"
@@ -331,6 +350,7 @@ case $COMMAND in
         echo "  ./deploy.sh up --with-nginx"
         echo "  ./deploy.sh logs"
         echo "  ./deploy.sh backup"
+        echo "  ./deploy.sh bulk-threshold"
         exit 1
         ;;
 esac
