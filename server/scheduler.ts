@@ -552,13 +552,13 @@ async function checkAlerts() {
             isTrafficAlert = latestAlert && !latestAlert.message.includes("is DOWN");
           }
 
-          // Check traffic threshold (RX only - download traffic)
+          // Check traffic threshold (Total traffic - RX + TX aggregate)
           // Use AVERAGE of last 3 data points to avoid false alerts from temporary spikes/drops
           const avgTraffic = getAverageTrafficForPort(routerId, port.portName, 3);
-          const currentRxTraffic = avgTraffic ? avgTraffic.rxBytesPerSecond : stat.rxBytesPerSecond;
-          const isBelowThreshold = currentRxTraffic < port.minThresholdBps;
+          const currentTotalTraffic = avgTraffic ? avgTraffic.totalBytesPerSecond : stat.totalBytesPerSecond;
+          const isBelowThreshold = currentTotalTraffic < port.minThresholdBps;
           
-          console.log(`[Scheduler] ${router.name} - ${port.portName}: RX Traffic ${(currentRxTraffic / 1024).toFixed(2)} KB/s (avg of last 3) vs Threshold ${(port.minThresholdBps / 1024).toFixed(2)} KB/s (${isBelowThreshold ? 'BELOW' : 'ABOVE'})`);
+          console.log(`[Scheduler] ${router.name} - ${port.portName}: Total Traffic ${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX avg of last 3) vs Threshold ${(port.minThresholdBps / 1024).toFixed(2)} KB/s (${isBelowThreshold ? 'BELOW' : 'ABOVE'})`);
 
           if (isBelowThreshold) {
             // Increment violation count
@@ -567,7 +567,7 @@ async function checkAlerts() {
             // Only create alert after 3 consecutive checks AND no active traffic alert
             if (violationCount >= 3 && (!hasActiveAlert || isPortDownAlert)) {
               // Determine severity based on how far below threshold
-              const percentBelow = ((port.minThresholdBps - currentRxTraffic) / port.minThresholdBps) * 100;
+              const percentBelow = ((port.minThresholdBps - currentTotalTraffic) / port.minThresholdBps) * 100;
               let severity = "warning";
               if (percentBelow > 50) severity = "critical";
               else if (percentBelow > 25) severity = "warning";
@@ -581,8 +581,8 @@ async function checkAlerts() {
                 portComment: stat.comment || null,
                 userId: router.userId,
                 severity,
-                message: `RX traffic on ${port.portName} is below threshold: ${(currentRxTraffic / 1024).toFixed(2)} KB/s (avg) < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
-                currentTrafficBps: currentRxTraffic,
+                message: `Total traffic on ${port.portName} is below threshold: ${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX avg) < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
+                currentTrafficBps: currentTotalTraffic,
                 thresholdBps: port.minThresholdBps,
               });
 
@@ -613,7 +613,7 @@ async function checkAlerts() {
                     await emailService.sendAlertEmail(user.email, {
                       routerName: router.name,
                       portName: port.portName,
-                      currentTraffic: `${(currentRxTraffic / 1024).toFixed(2)} KB/s (RX avg)`,
+                      currentTraffic: `${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX avg)`,
                       threshold: `${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
                       severity: alert.severity,
                     });
