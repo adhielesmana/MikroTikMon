@@ -209,7 +209,11 @@ export default function Routers() {
                   {filteredRouters.map((router) => (
                     <TableRow key={router.id} data-testid={`router-row-${router.id}`}>
                       <TableCell className="font-medium" data-testid={`text-router-name-${router.id}`}>
-                        {router.name}
+                        <Link href={`/routers/${router.id}`}>
+                          <span className="hover:underline cursor-pointer text-primary">
+                            {router.name}
+                          </span>
+                        </Link>
                       </TableCell>
                       <TableCell className="font-mono text-sm" data-testid={`text-router-ip-${router.id}`}>
                         {router.cloudDdnsHostname || router.ipAddress}:{router.port}
