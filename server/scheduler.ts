@@ -106,6 +106,23 @@ export function getRealtimeTraffic(routerId: string, since?: Date): RealtimeTraf
   return allData.filter(d => d.timestamp >= since);
 }
 
+// Get last N data points per interface (not total)
+// This ensures each interface gets its own data points, preventing one interface from dominating
+export function getRealtimeTrafficPerInterface(routerId: string, pointsPerInterface: number = 100): RealtimeTrafficData[] {
+  const routerData = realtimeTrafficStore.get(routerId);
+  if (!routerData) return [];
+  
+  const result: RealtimeTrafficData[] = [];
+  
+  // Get last N points for each interface
+  for (const interfaceData of Array.from(routerData.values())) {
+    const lastPoints = interfaceData.slice(-pointsPerInterface);
+    result.push(...lastPoints);
+  }
+  
+  return result;
+}
+
 // Get average traffic from last 3 data points for a specific port
 // This helps avoid false alerts from temporary traffic spikes/drops
 function getAverageTrafficForPort(routerId: string, portName: string, dataPoints: number = 3): {
@@ -759,11 +776,12 @@ async function pollSingleRouterRealtime(routerId: string) {
     // Broadcast real-time data to connected clients via WebSocket
     const pollingState = activeRealtimePolling.get(routerId);
     if (pollingState && pollingState.clients.size > 0) {
-      const trafficData = getRealtimeTraffic(routerId);
+      // Get last 100 points PER INTERFACE (not total) to ensure all interfaces are represented
+      const trafficData = getRealtimeTrafficPerInterface(routerId, 100);
       const message = JSON.stringify({
         type: "realtime_traffic",
         routerId,
-        data: trafficData.slice(-100), // Send last 100 data points
+        data: trafficData, // Already limited to 100 points per interface
       });
       
       pollingState.clients.forEach((client: WebSocket) => {
