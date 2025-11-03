@@ -872,8 +872,8 @@ export function startScheduler() {
       });
   });
 
-  // Check alerts every 30 seconds with 5-consecutive-checks confirmation
-  cron.schedule("*/30 * * * * *", () => {
+  // Check alerts every 60 seconds with 5-consecutive-checks confirmation (total 5 minutes)
+  cron.schedule("*/60 * * * * *", () => {
     if (isCheckingAlerts) {
       console.log("[Scheduler] Skipping alert check - previous execution still running");
       return;
@@ -928,5 +928,5 @@ export function startScheduler() {
     });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully (60s monitored ports polling for alerts, on-demand real-time traffic when router details page is open, 30s alert checking with 5-check confirmation, 5min database persistence, 5min counter cleanup, daily data cleanup)");
+  console.log("[Scheduler] Scheduler started successfully (60s traffic polling + alert checking with 5-check confirmation = 5min total alert confirmation time, on-demand real-time traffic when router details page is open, 5min database persistence, 5min counter cleanup, daily data cleanup)");
 }
