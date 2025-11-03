@@ -46,7 +46,7 @@ export default function RouterDetails() {
     enabled: !!id,
   });
 
-  const { data: ports, isLoading: loadingPorts } = useQuery<MonitoredPort[]>({
+  const { data: ports, isLoading: loadingPorts } = useQuery<(MonitoredPort & { routerName?: string; portComment?: string })[]>({
     queryKey: ["/api/routers", id, "ports"],
     enabled: !!id,
   });
@@ -518,6 +518,8 @@ export default function RouterDetails() {
                   <div>
                     <div className="font-medium" data-testid={`text-port-name-${port.id}`}>
                       {port.portName}
+                      {port.portComment && ` - ${port.portComment}`}
+                      {port.routerName && ` - ${port.routerName}`}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       Threshold: {formatBytesPerSecond(port.minThresholdBps)}

@@ -34,7 +34,7 @@ function encryptPassword(password: string): string {
   return CryptoJS.AES.encrypt(password, ENCRYPTION_KEY).toString();
 }
 
-function decryptPassword(encryptedPassword: string): string {
+export function decryptPassword(encryptedPassword: string): string {
   const bytes = CryptoJS.AES.decrypt(encryptedPassword, ENCRYPTION_KEY);
   return bytes.toString(CryptoJS.enc.Utf8);
 }
@@ -371,8 +371,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Monitored Ports operations
-  async getMonitoredPorts(routerId: string): Promise<MonitoredPort[]> {
-    return db.select().from(monitoredPorts).where(eq(monitoredPorts.routerId, routerId));
+  async getMonitoredPorts(routerId: string): Promise<(MonitoredPort & { routerName?: string; portComment?: string })[]> {
+    const result = await db
+      .select({
+        id: monitoredPorts.id,
+        routerId: monitoredPorts.routerId,
+        portName: monitoredPorts.portName,
+        enabled: monitoredPorts.enabled,
+        minThresholdBps: monitoredPorts.minThresholdBps,
+        emailNotifications: monitoredPorts.emailNotifications,
+        popupNotifications: monitoredPorts.popupNotifications,
+        createdAt: monitoredPorts.createdAt,
+        updatedAt: monitoredPorts.updatedAt,
+        routerName: routers.name,
+      })
+      .from(monitoredPorts)
+      .leftJoin(routers, eq(monitoredPorts.routerId, routers.id))
+      .where(eq(monitoredPorts.routerId, routerId));
+    
+    return result.map(r => ({
+      ...r,
+      routerName: r.routerName || undefined,
+    }));
   }
 
   async getMonitoredPort(id: string): Promise<MonitoredPort | undefined> {

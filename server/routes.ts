@@ -565,7 +565,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const ports = await storage.getMonitoredPorts(req.params.id);
-      res.json(ports);
+      
+      // Try to fetch interface comments from the router
+      try {
+        const { decryptPassword } = await import("./storage.js");
+        const decryptedPassword = decryptPassword(router.encryptedPassword);
+        
+        const client = new MikrotikClient({
+          id: router.id,
+          host: router.ipAddress,
+          user: router.username,
+          password: decryptedPassword,
+          port: router.port,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || 'public',
+          snmpPort: router.snmpPort || 161,
+          interfaceDisplayMode: (router.interfaceDisplayMode || 'static') as 'static' | 'none' | 'all',
+        });
+        
+        const interfaces = await client.getInterfaceStats();
+        const interfaceMap = new Map(interfaces.map((iface: any) => [iface.name, iface.comment]));
+        
+        // Merge interface comments with monitored ports
+        const portsWithComments = ports.map(port => ({
+          ...port,
+          portComment: interfaceMap.get(port.portName) || undefined,
+        }));
+        
+        res.json(portsWithComments);
+      } catch (interfaceError) {
+        // If we can't fetch interface comments, just return the ports without comments
+        console.error("Failed to fetch interface comments:", interfaceError);
+        res.json(ports);
+      }
     } catch (error) {
       console.error("Error fetching monitored ports:", error);
       res.status(500).json({ message: "Failed to fetch monitored ports" });
