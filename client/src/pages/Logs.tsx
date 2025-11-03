@@ -1,22 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { FileText, Server, Globe, RefreshCw, Download, Play, Pause } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { RefreshCw, Play, Pause } from "lucide-react";
 
 interface LogFile {
   filename: string;
@@ -32,26 +21,18 @@ interface LogContent {
 }
 
 export default function Logs() {
-  const [selectedLog, setSelectedLog] = useState<string | null>(null);
-  const [liveView, setLiveView] = useState(false);
+  const [liveView, setLiveView] = useState(true); // Auto-enable live view
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: logFiles, isLoading, refetch } = useQuery<LogFile[]>({
+  const { data: logFiles } = useQuery<LogFile[]>({
     queryKey: ["/api/logs"],
-    refetchInterval: liveView ? 2000 : 10000, // 2s in live mode, 10s otherwise
+    refetchInterval: 2000, // Poll for new log files
   });
 
-  // Auto-select newest server log in live view mode
-  useEffect(() => {
-    if (liveView && logFiles && logFiles.length > 0) {
-      const newestServerLog = logFiles.find(f => f.type === 'server');
-      if (newestServerLog && selectedLog !== newestServerLog.filename) {
-        setSelectedLog(newestServerLog.filename);
-      }
-    }
-  }, [liveView, logFiles]);
+  // Auto-select newest server log (Start application workflow)
+  const selectedLog = logFiles?.find(f => f.type === 'server')?.filename || null;
 
-  const { data: logContent, isLoading: isLoadingContent } = useQuery<LogContent>({
+  const { data: logContent, isLoading: isLoadingContent, refetch } = useQuery<LogContent>({
     queryKey: ["/api/logs", selectedLog],
     enabled: !!selectedLog,
     refetchInterval: liveView ? 1000 : false, // Refresh every 1s in live mode
@@ -64,38 +45,16 @@ export default function Logs() {
     }
   }, [liveView, logContent]);
 
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
-  };
-
-  const handleDownload = () => {
-    if (!logContent) return;
-    
-    const blob = new Blob([logContent.content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = logContent.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold mb-1" data-testid="text-logs-title">
-            System Logs
+            Application Logs
           </h1>
           <p className="text-sm text-muted-foreground">
-            View server and browser console logs for debugging and monitoring
+            Live streaming logs from the application workflow
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -108,7 +67,7 @@ export default function Logs() {
             />
             <Label htmlFor="live-view" className="flex items-center gap-2 cursor-pointer">
               {liveView ? <Play className="h-4 w-4 text-green-500" /> : <Pause className="h-4 w-4" />}
-              <span>Live View</span>
+              <span>Live Stream</span>
             </Label>
           </div>
           <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-logs">
@@ -118,136 +77,44 @@ export default function Logs() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Log Files List */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Available Logs</CardTitle>
-            <CardDescription>
-              {logFiles?.length || 0} log file{logFiles?.length !== 1 ? "s" : ""}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5].map(i => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : !logFiles || logFiles.length === 0 ? (
-              <div className="text-center py-8">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground">No log files found</p>
-              </div>
-            ) : (
-              <ScrollArea className="h-[600px]">
-                <div className="space-y-2">
-                  {logFiles.map((log) => (
-                    <button
-                      key={log.filename}
-                      onClick={() => setSelectedLog(log.filename)}
-                      className={`w-full text-left p-3 rounded-md border transition-colors ${
-                        selectedLog === log.filename
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "hover-elevate border-border"
-                      }`}
-                      data-testid={`button-log-${log.filename}`}
-                    >
-                      <div className="flex items-start gap-2">
-                        {log.type === "server" ? (
-                          <Server className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        ) : (
-                          <Globe className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{log.filename}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="secondary" className="text-xs">
-                              {log.type}
-                            </Badge>
-                            <span className="text-xs opacity-70">
-                              {formatBytes(log.size)}
-                            </span>
-                          </div>
-                          <p className="text-xs opacity-70 mt-1">
-                            {formatDistanceToNow(new Date(log.modified), { addSuffix: true })}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+      {/* Single Log Stream */}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {selectedLog ? "Start application" : "Loading..."}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingContent ? (
+            <div className="space-y-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <Skeleton key={i} className="h-4 w-full" />
+              ))}
+            </div>
+          ) : logContent ? (
+            <div 
+              ref={scrollRef}
+              className="h-[calc(100vh-280px)] w-full overflow-auto bg-black/95 dark:bg-black rounded-md relative"
+            >
+              <pre className="text-xs font-mono p-4 text-green-400">
+                {logContent.content}
+              </pre>
+              {liveView && (
+                <div className="sticky bottom-0 left-0 right-0 bg-green-500/10 border-t border-green-500/20 p-2 text-center backdrop-blur-sm">
+                  <div className="flex items-center justify-center gap-2 text-xs text-green-400">
+                    <Play className="h-3 w-3 animate-pulse" />
+                    <span>Live streaming • Updates every second</span>
+                  </div>
                 </div>
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Log Content Viewer */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>
-                  {selectedLog || "Select a log file"}
-                </CardTitle>
-                {logContent && (
-                  <CardDescription>
-                    {logContent.lines.toLocaleString()} lines • {formatBytes(logContent.content.length)}
-                  </CardDescription>
-                )}
-              </div>
-              {logContent && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownload}
-                  data-testid="button-download-log"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
               )}
             </div>
-          </CardHeader>
-          <CardContent>
-            {!selectedLog ? (
-              <div className="text-center py-16">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground">
-                  Select a log file from the list to view its contents
-                </p>
-              </div>
-            ) : isLoadingContent ? (
-              <div className="space-y-2">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                  <Skeleton key={i} className="h-4 w-full" />
-                ))}
-              </div>
-            ) : logContent ? (
-              <div 
-                ref={scrollRef}
-                className="h-[600px] w-full overflow-auto bg-muted rounded-md"
-              >
-                <pre className="text-xs font-mono p-4">
-                  {logContent.content}
-                </pre>
-                {liveView && (
-                  <div className="sticky bottom-0 left-0 right-0 bg-green-500/10 border-t border-green-500/20 p-2 text-center">
-                    <div className="flex items-center justify-center gap-2 text-xs text-green-600 dark:text-green-400">
-                      <Play className="h-3 w-3 animate-pulse" />
-                      <span>Live streaming - Updates every 1 second</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-16">
-                <p className="text-sm text-muted-foreground">Failed to load log content</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          ) : (
+            <div className="text-center py-16">
+              <p className="text-sm text-muted-foreground">No logs available</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
