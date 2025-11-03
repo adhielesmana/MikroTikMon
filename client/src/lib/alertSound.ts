@@ -17,7 +17,7 @@ export function initAudioContext() {
 
 /**
  * Play a 3-second alert sound
- * Creates an urgent alarm-style beep pattern
+ * Creates an urgent emergency beep alarm pattern (repeating beeps)
  */
 export function playAlertSound() {
   try {
@@ -29,47 +29,40 @@ export function playAlertSound() {
     }
 
     const now = ctx.currentTime;
-    const duration = 3.0; // 3 seconds total
     
-    // Create oscillator for the beep sound
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
+    // Create 6 urgent beeps over 3 seconds (classic emergency alarm pattern)
+    // Each beep: 0.25s on, 0.25s off
+    const beepDuration = 0.25;
+    const beepGap = 0.25;
+    const totalBeeps = 6;
     
-    // Connect nodes: oscillator -> gain -> destination
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    for (let i = 0; i < totalBeeps; i++) {
+      const startTime = now + (i * (beepDuration + beepGap));
+      
+      // Create oscillator for each beep
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      // Connect nodes
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      // Emergency alarm frequency (1000Hz - very attention-grabbing)
+      oscillator.frequency.setValueAtTime(1000, startTime);
+      oscillator.type = 'sine'; // Sine wave for clearer, louder beep
+      
+      // Volume envelope - loud with sharp attack and release
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(0.5, startTime + 0.01); // Very quick attack - LOUD
+      gainNode.gain.setValueAtTime(0.5, startTime + beepDuration - 0.05); // Hold at loud volume
+      gainNode.gain.linearRampToValueAtTime(0, startTime + beepDuration); // Quick release
+      
+      // Start and stop the beep
+      oscillator.start(startTime);
+      oscillator.stop(startTime + beepDuration);
+    }
     
-    // Set frequency to create an urgent alarm sound (alternating high-low)
-    oscillator.frequency.setValueAtTime(800, now); // Start at 800Hz
-    oscillator.frequency.setValueAtTime(600, now + 0.2); // Drop to 600Hz
-    oscillator.frequency.setValueAtTime(800, now + 0.4); // Back to 800Hz
-    oscillator.frequency.setValueAtTime(600, now + 0.6); // Drop again
-    oscillator.frequency.setValueAtTime(800, now + 0.8); // Back up
-    oscillator.frequency.setValueAtTime(600, now + 1.0); // Drop
-    oscillator.frequency.setValueAtTime(800, now + 1.2); // Back up
-    oscillator.frequency.setValueAtTime(600, now + 1.4); // Drop
-    oscillator.frequency.setValueAtTime(800, now + 1.6); // Back up
-    oscillator.frequency.setValueAtTime(600, now + 1.8); // Drop
-    oscillator.frequency.setValueAtTime(800, now + 2.0); // Back up
-    oscillator.frequency.setValueAtTime(600, now + 2.2); // Drop
-    oscillator.frequency.setValueAtTime(800, now + 2.4); // Back up
-    oscillator.frequency.setValueAtTime(600, now + 2.6); // Final drop
-    oscillator.frequency.setValueAtTime(800, now + 2.8); // Final rise
-    
-    // Set waveform to square wave for a more "alarm-like" sound
-    oscillator.type = 'square';
-    
-    // Volume envelope - loud and consistent
-    gainNode.gain.setValueAtTime(0, now);
-    gainNode.gain.linearRampToValueAtTime(0.3, now + 0.01); // Quick attack
-    gainNode.gain.setValueAtTime(0.3, now + duration - 0.1); // Hold volume
-    gainNode.gain.linearRampToValueAtTime(0, now + duration); // Quick fade out
-    
-    // Start and stop the sound
-    oscillator.start(now);
-    oscillator.stop(now + duration);
-    
-    console.log('[AlertSound] Playing 3-second alert sound');
+    console.log('[AlertSound] Playing 3-second emergency beep alarm (6 beeps)');
   } catch (error) {
     console.error('[AlertSound] Failed to play sound:', error);
   }
