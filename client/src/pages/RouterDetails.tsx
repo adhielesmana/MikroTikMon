@@ -155,26 +155,52 @@ export default function RouterDetails() {
 
   // Update current speed when new data arrives
   useEffect(() => {
-    if (!selectedInterface || realtimeTrafficData.length === 0) {
+    console.log("[RouterDetails] Speed update effect triggered", {
+      selectedInterface,
+      dataLength: realtimeTrafficData.length,
+      hasData: realtimeTrafficData.length > 0
+    });
+
+    if (!selectedInterface) {
+      console.log("[RouterDetails] No interface selected");
       return;
     }
 
-    // Get the latest data point for selected interface
-    const latestData = realtimeTrafficData
-      .filter(d => d.portName === selectedInterface)
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-
-    if (latestData) {
-      setCurrentSpeed({
-        rx: latestData.rxBytesPerSecond / 1024 / 1024, // Convert to Mbps
-        tx: latestData.txBytesPerSecond / 1024 / 1024,
-      });
-      console.log("[RouterDetails] Updated speed:", {
-        interface: selectedInterface,
-        rx: (latestData.rxBytesPerSecond / 1024 / 1024).toFixed(2),
-        tx: (latestData.txBytesPerSecond / 1024 / 1024).toFixed(2),
-      });
+    if (realtimeTrafficData.length === 0) {
+      console.log("[RouterDetails] No traffic data available");
+      return;
     }
+
+    // Get ALL data for selected interface (not just latest)
+    const interfaceData = realtimeTrafficData.filter(d => d.portName === selectedInterface);
+    console.log("[RouterDetails] Filtered data for", selectedInterface, ":", interfaceData.length, "points");
+
+    if (interfaceData.length === 0) {
+      console.log("[RouterDetails] No data for selected interface:", selectedInterface);
+      console.log("[RouterDetails] Available interfaces in data:", 
+        [...new Set(realtimeTrafficData.map(d => d.portName))].join(", "));
+      return;
+    }
+
+    // Get the latest data point
+    const latestData = interfaceData.sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    )[0];
+
+    const rxMbps = latestData.rxBytesPerSecond / 1024 / 1024;
+    const txMbps = latestData.txBytesPerSecond / 1024 / 1024;
+
+    setCurrentSpeed({
+      rx: rxMbps,
+      tx: txMbps,
+    });
+
+    console.log("[RouterDetails] ✅ Speed updated:", {
+      interface: selectedInterface,
+      rx: rxMbps.toFixed(2) + " Mbps",
+      tx: txMbps.toFixed(2) + " Mbps",
+      timestamp: latestData.timestamp
+    });
   }, [realtimeTrafficData, selectedInterface]);
 
   const deletePortMutation = useMutation({
