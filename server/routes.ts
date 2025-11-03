@@ -1332,6 +1332,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to extract log content from XML-wrapped log file
+  function extractLogContent(rawContent: string): string {
+    // Extract content between <logs> and </logs> tags, plus any content after </workflow>
+    const logsMatch = rawContent.match(/<logs>([\s\S]*?)<\/logs>/);
+    const afterWorkflow = rawContent.split('</workflow>')[1] || '';
+    
+    const logsContent = logsMatch ? logsMatch[1] : '';
+    return logsContent + afterWorkflow;
+  }
+
   // SSE endpoint for real-time log streaming (admin only)
   app.get("/api/logs/stream", isAuthenticated, isAdmin, async (req, res) => {
     console.log('[LogsSSE] Client connected to log stream');
@@ -1389,10 +1399,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currentLogFile = latestLog;
           lastSize = 0;
           
-          // Send full initial content
-          const content = await fs.readFile(logPath, 'utf-8');
+          // Send full initial content, stripping XML wrapper
+          const rawContent = await fs.readFile(logPath, 'utf-8');
+          const content = extractLogContent(rawContent);
           res.write(`data: ${JSON.stringify({ type: 'log', data: content })}\n\n`);
-          lastSize = content.length;
+          lastSize = rawContent.length;
           return;
         }
 
@@ -1407,6 +1418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const newContent = buffer.toString('utf-8');
           if (newContent) {
+            // Send raw new content (it's just log lines, no XML wrapper)
             res.write(`data: ${JSON.stringify({ type: 'log', data: newContent })}\n\n`);
             lastSize = stats.size;
           }
