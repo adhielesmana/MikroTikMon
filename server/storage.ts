@@ -431,6 +431,31 @@ export class DatabaseStorage implements IStorage {
     return port;
   }
 
+  // Update interface metadata (comment, MAC address) for a monitored port
+  async updateInterfaceMetadata(
+    routerId: string, 
+    portName: string, 
+    metadata: {
+      interfaceComment?: string | null;
+      interfaceMacAddress?: string | null;
+    }
+  ): Promise<void> {
+    await db
+      .update(monitoredPorts)
+      .set({
+        interfaceComment: metadata.interfaceComment,
+        interfaceMacAddress: metadata.interfaceMacAddress,
+        lastInterfaceUpdate: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(monitoredPorts.routerId, routerId),
+          eq(monitoredPorts.portName, portName)
+        )
+      );
+  }
+
   async deleteMonitoredPort(id: string): Promise<void> {
     await db.delete(monitoredPorts).where(eq(monitoredPorts.id, id));
   }
