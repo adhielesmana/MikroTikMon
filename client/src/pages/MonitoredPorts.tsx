@@ -28,7 +28,7 @@ import {
 import { Loader2, Trash2, Save, X, Network } from "lucide-react";
 import type { MonitoredPort, Router } from "@shared/schema";
 
-type MonitoredPortWithRouter = MonitoredPort & { router: Router; portComment?: string };
+type MonitoredPortWithRouter = MonitoredPort & { router: Router; portComment?: string; ownerUsername?: string };
 
 export default function MonitoredPorts() {
   const { isSuperadmin } = useAuth();
@@ -154,8 +154,9 @@ export default function MonitoredPorts() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Port Name</TableHead>
-                    <TableHead>Comment</TableHead>
-                    <TableHead>Router</TableHead>
+                    <TableHead>Interface Comment</TableHead>
+                    <TableHead>Router Name</TableHead>
+                    <TableHead>Owner</TableHead>
                     <TableHead>Threshold (Mbps)</TableHead>
                     <TableHead>Status</TableHead>
                     {isSuperadmin && <TableHead className="w-24">Actions</TableHead>}
@@ -175,7 +176,10 @@ export default function MonitoredPorts() {
                           {port.portComment || "-"}
                         </TableCell>
                         <TableCell data-testid={`text-router-name-${port.id}`}>
-                          {port.router.cloudDdnsHostname || port.router.name}
+                          {port.router.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground" data-testid={`text-owner-${port.id}`}>
+                          {port.ownerUsername || "-"}
                         </TableCell>
                         <TableCell data-testid={`cell-threshold-${port.id}`}>
                           {isEditing ? (

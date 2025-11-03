@@ -84,7 +84,7 @@ export interface IStorage {
   updateMonitoredPort(id: string, data: Partial<InsertMonitoredPort>): Promise<MonitoredPort>;
   deleteMonitoredPort(id: string): Promise<void>;
   getAllEnabledPorts(): Promise<(MonitoredPort & { router: Router })[]>;
-  getAllMonitoredPorts(userId: string): Promise<(MonitoredPort & { router: Router; portComment?: string })[]>;
+  getAllMonitoredPorts(userId: string): Promise<(MonitoredPort & { router: Router; portComment?: string; ownerUsername?: string })[]>;
 
   // Traffic Data operations
   insertTrafficData(data: Omit<TrafficData, "id" | "timestamp">): Promise<void>;
@@ -432,36 +432,56 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => ({ ...r.monitored_ports, router: r.routers }));
   }
 
-  async getAllMonitoredPorts(userId: string): Promise<(MonitoredPort & { router: Router; portComment?: string })[]> {
+  async getAllMonitoredPorts(userId: string): Promise<(MonitoredPort & { router: Router; portComment?: string; ownerUsername?: string })[]> {
     // For superadmins, return all monitored ports
     // For normal users, return only ports from their owned + assigned routers
     const user = await this.getUser(userId);
     if (!user) return [];
 
     if (user.isSuperadmin) {
-      // Superadmin sees all monitored ports
+      // Superadmin sees all monitored ports with owner information
       const result = await db
-        .select()
+        .select({
+          port: monitoredPorts,
+          router: routers,
+          owner: users,
+        })
         .from(monitoredPorts)
         .innerJoin(routers, eq(monitoredPorts.routerId, routers.id))
+        .innerJoin(users, eq(routers.userId, users.id))
         .orderBy(routers.name, monitoredPorts.portName);
 
-      return result.map(r => ({ ...r.monitored_ports, router: r.routers, portComment: undefined }));
+      return result.map(r => ({ 
+        ...r.port, 
+        router: r.router, 
+        portComment: undefined,
+        ownerUsername: r.owner.username || r.owner.email || 'Unknown'
+      }));
     } else {
-      // Normal users see ports from their own routers + assigned routers
+      // Normal users see ports from their own routers + assigned routers with owner information
       // Get owned routers' monitored ports
       const ownedPorts = await db
-        .select()
+        .select({
+          port: monitoredPorts,
+          router: routers,
+          owner: users,
+        })
         .from(monitoredPorts)
         .innerJoin(routers, eq(monitoredPorts.routerId, routers.id))
+        .innerJoin(users, eq(routers.userId, users.id))
         .where(eq(routers.userId, userId))
         .orderBy(routers.name, monitoredPorts.portName);
 
       // Get assigned routers' monitored ports
       const assignedPorts = await db
-        .select()
+        .select({
+          port: monitoredPorts,
+          router: routers,
+          owner: users,
+        })
         .from(monitoredPorts)
         .innerJoin(routers, eq(monitoredPorts.routerId, routers.id))
+        .innerJoin(users, eq(routers.userId, users.id))
         .innerJoin(userRouters, and(
           eq(userRouters.routerId, routers.id),
           eq(userRouters.userId, userId)
@@ -469,14 +489,24 @@ export class DatabaseStorage implements IStorage {
         .orderBy(routers.name, monitoredPorts.portName);
 
       // Merge and deduplicate based on port id
-      const portMap = new Map<string, MonitoredPort & { router: Router; portComment?: string }>();
+      const portMap = new Map<string, MonitoredPort & { router: Router; portComment?: string; ownerUsername?: string }>();
       
       ownedPorts.forEach(r => {
-        portMap.set(r.monitored_ports.id, { ...r.monitored_ports, router: r.routers, portComment: undefined });
+        portMap.set(r.port.id, { 
+          ...r.port, 
+          router: r.router, 
+          portComment: undefined,
+          ownerUsername: r.owner.username || r.owner.email || 'Unknown'
+        });
       });
       
       assignedPorts.forEach(r => {
-        portMap.set(r.monitored_ports.id, { ...r.monitored_ports, router: r.routers, portComment: undefined });
+        portMap.set(r.port.id, { 
+          ...r.port, 
+          router: r.router, 
+          portComment: undefined,
+          ownerUsername: r.owner.username || r.owner.email || 'Unknown'
+        });
       });
 
       return Array.from(portMap.values()).sort((a, b) => {
