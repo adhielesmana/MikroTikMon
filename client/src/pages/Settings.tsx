@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,12 +10,48 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, User, Shield, Loader2 } from "lucide-react";
+import { Mail, User, Shield, Loader2, Volume2 } from "lucide-react";
+import { playAlertSound } from "@/lib/alertSound";
 
 export default function Settings() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const [logoUrl, setLogoUrl] = useState("");
+  const [alertSoundEnabled, setAlertSoundEnabled] = useState(true);
+
+  // Load alert sound preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("alertSoundEnabled");
+    if (saved !== null) {
+      setAlertSoundEnabled(saved === "true");
+    }
+  }, []);
+
+  // Save alert sound preference to localStorage
+  const handleAlertSoundToggle = (enabled: boolean) => {
+    setAlertSoundEnabled(enabled);
+    localStorage.setItem("alertSoundEnabled", enabled.toString());
+    toast({
+      title: "Preference saved",
+      description: `Alert sound ${enabled ? "enabled" : "disabled"}`,
+    });
+  };
+
+  const handleTestSound = () => {
+    try {
+      playAlertSound();
+      toast({
+        title: "Test sound",
+        description: "Playing 3-second alert sound",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to play alert sound",
+        variant: "destructive",
+      });
+    }
+  };
 
   const { data: settings } = useQuery({
     queryKey: ["/api/settings"],
@@ -237,6 +273,32 @@ export default function Settings() {
               </p>
             </div>
             <Switch id="critical-only" data-testid="switch-critical-only" />
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t">
+            <div className="space-y-0.5 flex-1">
+              <Label htmlFor="alert-sound">Alert Sound</Label>
+              <p className="text-sm text-muted-foreground">
+                Play a 3-second loud alert sound when notifications arrive
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTestSound}
+                data-testid="button-test-sound"
+              >
+                <Volume2 className="h-4 w-4 mr-2" />
+                Test Sound
+              </Button>
+              <Switch 
+                id="alert-sound" 
+                checked={alertSoundEnabled}
+                onCheckedChange={handleAlertSoundToggle}
+                data-testid="switch-alert-sound" 
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

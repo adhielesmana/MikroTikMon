@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { playAlertSound } from "./alertSound";
 
 interface WebSocketMessage {
   type: string;
@@ -128,15 +129,15 @@ export function useWebSocket(userId: string | null) {
       duration: 10000, // Show for 10 seconds for critical alerts
     });
 
-    // Play notification sound (optional)
-    try {
-      const audio = new Audio("/notification.mp3");
-      audio.volume = 0.3;
-      audio.play().catch(() => {
-        // Ignore errors if audio fails to play
-      });
-    } catch (error) {
-      // Ignore audio errors
+    // Play 3-second alert sound if enabled in settings
+    const soundEnabled = localStorage.getItem("alertSoundEnabled");
+    if (soundEnabled === null || soundEnabled === "true") {
+      // Default to enabled if not set
+      try {
+        playAlertSound();
+      } catch (error) {
+        console.error("[WebSocket] Failed to play alert sound:", error);
+      }
     }
   };
 
