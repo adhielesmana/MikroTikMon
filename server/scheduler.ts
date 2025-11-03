@@ -49,7 +49,7 @@ const MAX_ENTRIES_PER_INTERFACE = 7200; // 2 hours at 1 second intervals per int
 // Tracks which routers are currently being monitored in real-time (when details page is open)
 const activeRealtimePolling = new Map<string, { interval: NodeJS.Timeout; clients: Set<WebSocket> }>();
 
-// Track consecutive threshold violations per port for 3-check confirmation
+// Track consecutive threshold violations per port for 5-check confirmation
 // Map<portId, { count: number, lastCheck: Date }>
 const consecutiveViolations = new Map<string, { count: number; lastCheck: Date }>();
 
@@ -340,7 +340,7 @@ async function pollRouterTraffic() {
   }
 }
 
-// Alert checking with 3-consecutive-checks confirmation (runs every 60 seconds)
+// Alert checking with 5-consecutive-checks confirmation (runs every 30 seconds)
 async function checkAlerts() {
   try {
     console.log("[Scheduler] Checking alerts...");
@@ -368,10 +368,10 @@ async function checkAlerts() {
           // Router is DOWN - increment violation count
           const violationCount = incrementViolationCount(`router_down_${router.id}`);
           
-          console.log(`[Scheduler] Router ${router.name} is unreachable (check ${violationCount}/3)`);
+          console.log(`[Scheduler] Router ${router.name} is unreachable (check ${violationCount}/5)`);
           
-          // Create router down alert only after 3 consecutive checks
-          if (violationCount >= 3 && !routerDownAlert) {
+          // Create router down alert only after 5 consecutive checks
+          if (violationCount >= 5 && !routerDownAlert) {
             const alert = await storage.createAlert({
               routerId: router.id,
               portId: null,
@@ -496,8 +496,8 @@ async function checkAlerts() {
             // Port is DOWN - increment violation count
             const violationCount = incrementViolationCount(`port_down_${port.id}`);
             
-            // Create port down alert only after 3 consecutive checks
-            if (violationCount >= 3 && (!hasActiveAlert || !isPortDownAlert)) {
+            // Create port down alert only after 5 consecutive checks
+            if (violationCount >= 5 && (!hasActiveAlert || !isPortDownAlert)) {
               const alert = await storage.createAlert({
                 routerId: port.routerId,
                 portId: port.id,
@@ -530,7 +530,7 @@ async function checkAlerts() {
                 portComment: stat.comment || null,
               });
 
-              console.log(`[Scheduler] Port down alert created for ${router.name} - ${port.portName} (confirmed after 3 checks)`);
+              console.log(`[Scheduler] Port down alert created for ${router.name} - ${port.portName} (confirmed after 5 checks)`);
               resetViolationCount(`port_down_${port.id}`); // Reset after alert created
             }
             resetViolationCount(`traffic_${port.id}`); // Reset traffic violation count
@@ -553,20 +553,19 @@ async function checkAlerts() {
             isTrafficAlert = latestAlert && !latestAlert.message.includes("is DOWN");
           }
 
-          // Check traffic threshold (Total traffic - RX + TX aggregate)
-          // Use AVERAGE of last 3 data points to avoid false alerts from temporary spikes/drops
-          const avgTraffic = getAverageTrafficForPort(routerId, port.portName, 3);
-          const currentTotalTraffic = avgTraffic ? avgTraffic.totalBytesPerSecond : stat.totalBytesPerSecond;
+          // Check traffic threshold (Total traffic - RX + TX sum)
+          // Use current sum (TX + RX) not average
+          const currentTotalTraffic = stat.totalBytesPerSecond;
           const isBelowThreshold = currentTotalTraffic < port.minThresholdBps;
           
-          console.log(`[Scheduler] ${router.name} - ${port.portName}: Total Traffic ${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX avg of last 3) vs Threshold ${(port.minThresholdBps / 1024).toFixed(2)} KB/s (${isBelowThreshold ? 'BELOW' : 'ABOVE'})`);
+          console.log(`[Scheduler] ${router.name} - ${port.portName}: Total Traffic ${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX sum) vs Threshold ${(port.minThresholdBps / 1024).toFixed(2)} KB/s (${isBelowThreshold ? 'BELOW' : 'ABOVE'})`);
 
           if (isBelowThreshold) {
             // Increment violation count
             const violationCount = incrementViolationCount(`traffic_${port.id}`);
             
-            // Only create alert after 3 consecutive checks AND no active traffic alert
-            if (violationCount >= 3 && (!hasActiveAlert || isPortDownAlert)) {
+            // Only create alert after 5 consecutive checks AND no active traffic alert
+            if (violationCount >= 5 && (!hasActiveAlert || isPortDownAlert)) {
               // Determine severity based on how far below threshold
               const percentBelow = ((port.minThresholdBps - currentTotalTraffic) / port.minThresholdBps) * 100;
               let severity = "warning";
@@ -582,7 +581,7 @@ async function checkAlerts() {
                 portComment: stat.comment || null,
                 userId: router.userId,
                 severity,
-                message: `Total traffic on ${port.portName} is below threshold: ${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX avg) < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
+                message: `Total traffic on ${port.portName} is below threshold: ${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX sum) < ${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
                 currentTrafficBps: currentTotalTraffic,
                 thresholdBps: port.minThresholdBps,
               });
@@ -615,7 +614,7 @@ async function checkAlerts() {
                     await emailService.sendAlertEmail(user.email, {
                       routerName: router.name,
                       portName: port.portName,
-                      currentTraffic: `${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX avg)`,
+                      currentTraffic: `${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX sum)`,
                       threshold: `${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
                       severity: alert.severity,
                     });
@@ -634,7 +633,7 @@ async function checkAlerts() {
                 }
               }
 
-              console.log(`[Scheduler] Alert created for ${router.name} - ${port.portName} (confirmed after 3 checks)`);
+              console.log(`[Scheduler] Alert created for ${router.name} - ${port.portName} (confirmed after 5 checks)`);
               resetViolationCount(`traffic_${port.id}`); // Reset after alert created
             }
           } else {
@@ -873,8 +872,8 @@ export function startScheduler() {
       });
   });
 
-  // Check alerts every 60 seconds with 3-consecutive-checks confirmation
-  cron.schedule("*/60 * * * * *", () => {
+  // Check alerts every 30 seconds with 5-consecutive-checks confirmation
+  cron.schedule("*/30 * * * * *", () => {
     if (isCheckingAlerts) {
       console.log("[Scheduler] Skipping alert check - previous execution still running");
       return;
@@ -929,5 +928,5 @@ export function startScheduler() {
     });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully (60s monitored ports polling for alerts, on-demand real-time traffic when router details page is open, 60s alert checking with 3-check confirmation, 5min database persistence, 5min counter cleanup, daily data cleanup)");
+  console.log("[Scheduler] Scheduler started successfully (60s monitored ports polling for alerts, on-demand real-time traffic when router details page is open, 30s alert checking with 5-check confirmation, 5min database persistence, 5min counter cleanup, daily data cleanup)");
 }
