@@ -252,12 +252,13 @@ export default function RouterDetails() {
 
   // Transform traffic data for multi-interface chart
   const chartData = useMemo(() => {
-    if (!trafficData || !Array.isArray(trafficData)) {
+    if (!trafficData || !Array.isArray(trafficData) || selectedInterfaces.size === 0) {
       return [];
     }
 
     // Group data by second (round timestamp to nearest second)
     const dataByTime = new Map<number, any>();
+    const selectedInterfacesArray = Array.from(selectedInterfaces);
 
     trafficData.forEach((d) => {
       // Round timestamp to nearest second (remove milliseconds)
@@ -267,7 +268,7 @@ export default function RouterDetails() {
       if (!dataByTime.has(timestampSecond)) {
         // Format for display (time only, with seconds precision)
         const displayTime = new Date(timestampSecond).toLocaleTimeString();
-        dataByTime.set(timestampSecond, { time: displayTime });
+        dataByTime.set(timestampSecond, { time: displayTime, timestamp: timestampSecond });
       }
       const timeData = dataByTime.get(timestampSecond);
 
@@ -279,10 +280,24 @@ export default function RouterDetails() {
       }
     });
 
-    // Convert to array and sort by timestamp
-    return Array.from(dataByTime.entries())
+    // Convert to sorted array
+    const sortedData = Array.from(dataByTime.entries())
       .sort((a, b) => a[0] - b[0])
       .map(([, data]) => data);
+
+    // Fill in missing interface data with 0 to ensure continuous lines
+    return sortedData.map(point => {
+      const filledPoint = { ...point };
+      selectedInterfacesArray.forEach(interfaceName => {
+        if (filledPoint[`${interfaceName}_rx`] === undefined) {
+          filledPoint[`${interfaceName}_rx`] = 0;
+        }
+        if (filledPoint[`${interfaceName}_tx`] === undefined) {
+          filledPoint[`${interfaceName}_tx`] = 0;
+        }
+      });
+      return filledPoint;
+    });
   }, [trafficData, selectedInterfaces]);
 
   // Get selected interfaces list
