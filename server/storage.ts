@@ -438,7 +438,7 @@ export class DatabaseStorage implements IStorage {
     const user = await this.getUser(userId);
     if (!user) return [];
 
-    if (user.role === 'superadmin') {
+    if (user.isSuperadmin) {
       // Superadmin sees all monitored ports
       const result = await db
         .select()
