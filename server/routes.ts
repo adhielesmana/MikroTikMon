@@ -1413,7 +1413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Track active router polling for cleanup
     let activeRouterId: string | null = null;
     
-    ws.on('message', (message: string) => {
+    ws.on('message', async (message: string) => {
       try {
         const data = JSON.parse(message);
         console.log(`[WebSocket] Received message type: ${data.type}`, data);
@@ -1442,20 +1442,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return;
           }
           
-          console.log(`[WebSocket] Starting real-time polling for router ${data.routerId}`);
-          activeRouterId = data.routerId;
-          startRealtimePolling(data.routerId, ws);
-          ws.send(JSON.stringify({ type: "realtime_polling_started", routerId: data.routerId }));
+          // Check router ownership or superadmin status
+          try {
+            const router = await storage.getRouter(data.routerId);
+            if (!router) {
+              console.log(`[WebSocket] Router ${data.routerId} not found`);
+              ws.send(JSON.stringify({ type: "error", message: "Router not found" }));
+              return;
+            }
+            
+            // Check if user owns the router or is superadmin
+            if (!userId) {
+              console.log(`[WebSocket] User not authenticated`);
+              ws.send(JSON.stringify({ type: "error", message: "Not authenticated" }));
+              return;
+            }
+            const user = await storage.getUser(userId);
+            const hasAccess = router.userId === userId || (user && user.isSuperadmin);
+            
+            if (!hasAccess) {
+              console.log(`[WebSocket] User ${userId} does not have access to router ${data.routerId}`);
+              ws.send(JSON.stringify({ type: "error", message: "Forbidden: You don't have access to this router" }));
+              return;
+            }
+            
+            console.log(`[WebSocket] Starting real-time polling for router ${data.routerId}`);
+            activeRouterId = data.routerId;
+            startRealtimePolling(data.routerId, ws);
+            ws.send(JSON.stringify({ type: "realtime_polling_started", routerId: data.routerId }));
+          } catch (error) {
+            console.error(`[WebSocket] Error checking router access:`, error);
+            ws.send(JSON.stringify({ type: "error", message: "Failed to verify router access" }));
+          }
         }
         
         // Handle stop real-time traffic polling
         if (data.type === "stop_realtime_polling" && data.routerId) {
           console.log(`[WebSocket] Stopping real-time polling for router ${data.routerId}`);
-          stopRealtimePolling(data.routerId, ws);
-          if (activeRouterId === data.routerId) {
-            activeRouterId = null;
+          
+          // Check router ownership or superadmin status (same as start)
+          try {
+            const router = await storage.getRouter(data.routerId);
+            if (!router) {
+              console.log(`[WebSocket] Router ${data.routerId} not found`);
+              ws.send(JSON.stringify({ type: "error", message: "Router not found" }));
+              return;
+            }
+            
+            if (!userId) {
+              console.log(`[WebSocket] User not authenticated`);
+              ws.send(JSON.stringify({ type: "error", message: "Not authenticated" }));
+              return;
+            }
+            const user = await storage.getUser(userId);
+            const hasAccess = router.userId === userId || (user && user.isSuperadmin);
+            
+            if (!hasAccess) {
+              console.log(`[WebSocket] User ${userId} does not have access to router ${data.routerId}`);
+              ws.send(JSON.stringify({ type: "error", message: "Forbidden: You don't have access to this router" }));
+              return;
+            }
+            
+            stopRealtimePolling(data.routerId, ws);
+            if (activeRouterId === data.routerId) {
+              activeRouterId = null;
+            }
+            ws.send(JSON.stringify({ type: "realtime_polling_stopped", routerId: data.routerId }));
+          } catch (error) {
+            console.error(`[WebSocket] Error checking router access:`, error);
+            ws.send(JSON.stringify({ type: "error", message: "Failed to verify router access" }));
           }
-          ws.send(JSON.stringify({ type: "realtime_polling_stopped", routerId: data.routerId }));
         }
       } catch (error) {
         console.error('[WebSocket] Error parsing message:', error);
