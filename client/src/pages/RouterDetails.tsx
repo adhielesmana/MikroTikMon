@@ -99,6 +99,13 @@ export default function RouterDetails() {
         } else if (message.type === "realtime_polling_started" && message.routerId === id) {
           console.log("[RouterDetails] Real-time polling started");
           pollingStarted = true;
+        } else if (message.type === "error") {
+          console.error("[RouterDetails] WebSocket error:", message.message);
+          toast({
+            title: "Real-time monitoring error",
+            description: message.message || "Unable to start real-time monitoring",
+            variant: "destructive",
+          });
         }
       } catch (error) {
         console.error("[RouterDetails] Error parsing WebSocket message:", error);

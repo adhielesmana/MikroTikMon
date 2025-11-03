@@ -993,7 +993,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (router.userId !== userId) {
         const user = await storage.getUser(userId);
-        if (!user || user.role !== "admin") {
+        if (!user || !user.isSuperadmin) {
           return res.status(403).json({ message: "Forbidden" });
         }
       }
