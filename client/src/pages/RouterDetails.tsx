@@ -457,7 +457,10 @@ export default function RouterDetails() {
             <Skeleton className="h-80 w-full" />
           ) : chartData.length > 0 && selectedInterfaces.size > 0 ? (
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData}>
+              <LineChart 
+                data={chartData}
+                key={`chart-${chartData.length}-${chartData[chartData.length - 1]?.time || 'empty'}`}
+              >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis
                   dataKey="time"
@@ -488,6 +491,7 @@ export default function RouterDetails() {
                         name={`${interfaceName} RX`}
                         strokeWidth={2}
                         dot={false}
+                        isAnimationActive={false}
                       />
                       <Line
                         type="monotone"
@@ -496,6 +500,7 @@ export default function RouterDetails() {
                         name={`${interfaceName} TX`}
                         strokeWidth={2}
                         dot={false}
+                        isAnimationActive={false}
                       />
                     </Fragment>
                   );
