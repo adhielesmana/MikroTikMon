@@ -84,6 +84,7 @@ export interface IStorage {
   updateMonitoredPort(id: string, data: Partial<InsertMonitoredPort>): Promise<MonitoredPort>;
   deleteMonitoredPort(id: string): Promise<void>;
   getAllEnabledPorts(): Promise<(MonitoredPort & { router: Router })[]>;
+  getAllMonitoredPorts(userId: string): Promise<(MonitoredPort & { router: Router; portComment?: string })[]>;
 
   // Traffic Data operations
   insertTrafficData(data: Omit<TrafficData, "id" | "timestamp">): Promise<void>;
@@ -429,6 +430,34 @@ export class DatabaseStorage implements IStorage {
       .where(eq(monitoredPorts.enabled, true));
 
     return result.map(r => ({ ...r.monitored_ports, router: r.routers }));
+  }
+
+  async getAllMonitoredPorts(userId: string): Promise<(MonitoredPort & { router: Router; portComment?: string })[]> {
+    // For superadmins, return all monitored ports
+    // For normal users, return only ports from their assigned routers
+    const user = await this.getUser(userId);
+    if (!user) return [];
+
+    if (user.role === 'superadmin') {
+      // Superadmin sees all monitored ports
+      const result = await db
+        .select()
+        .from(monitoredPorts)
+        .innerJoin(routers, eq(monitoredPorts.routerId, routers.id))
+        .orderBy(routers.name, monitoredPorts.portName);
+
+      return result.map(r => ({ ...r.monitored_ports, router: r.routers, portComment: undefined }));
+    } else {
+      // Normal users see only their assigned routers' ports
+      const result = await db
+        .select()
+        .from(monitoredPorts)
+        .innerJoin(routers, eq(monitoredPorts.routerId, routers.id))
+        .where(eq(routers.userId, userId))
+        .orderBy(routers.name, monitoredPorts.portName);
+
+      return result.map(r => ({ ...r.monitored_ports, router: r.routers, portComment: undefined }));
+    }
   }
 
   // Traffic Data operations

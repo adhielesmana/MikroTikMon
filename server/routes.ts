@@ -548,6 +548,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Monitored Ports routes
+  // Get all monitored ports across all routers
+  app.get("/api/monitored-ports", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const ports = await storage.getAllMonitoredPorts(userId);
+      res.json(ports);
+    } catch (error) {
+      console.error("Error fetching all monitored ports:", error);
+      res.status(500).json({ message: "Failed to fetch monitored ports" });
+    }
+  });
+
   app.get("/api/routers/:id/ports", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
       const userId = getUserId(req);
