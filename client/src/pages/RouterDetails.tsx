@@ -180,14 +180,8 @@ export default function RouterDetails() {
 
     if (interfaceData.length === 0) {
       console.log("[RouterDetails] No data for selected interface:", selectedInterface);
-      const availableInterfaces = Array.from(new Set(realtimeTrafficData.map(d => d.portName)));
-      console.log("[RouterDetails] Available interfaces in data:", availableInterfaces.join(", "));
-      
-      // Auto-switch to first available interface with data
-      if (availableInterfaces.length > 0) {
-        console.log("[RouterDetails] Auto-switching to:", availableInterfaces[0]);
-        setSelectedInterface(availableInterfaces[0]);
-      }
+      // Don't auto-switch - just show 0 speed
+      setCurrentSpeed({ rx: 0, tx: 0 });
       return;
     }
 
