@@ -9,25 +9,31 @@ export default function Logs() {
   const [logContent, setLogContent] = useState("");
   const [connected, setConnected] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Connect to WebSocket log stream
+  // Connect to SSE log stream
   useEffect(() => {
-    if (!liveView) return;
+    if (!liveView) {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      setConnected(false);
+      return;
+    }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/logs-stream`;
+    const sseUrl = `/api/logs/stream`;
     
-    console.log('[Logs] Connecting to WebSocket:', wsUrl);
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    console.log('[Logs] Connecting to SSE:', sseUrl);
+    const eventSource = new EventSource(sseUrl);
+    eventSourceRef.current = eventSource;
 
-    ws.onopen = () => {
-      console.log('[Logs] WebSocket connected');
+    eventSource.onopen = () => {
+      console.log('[Logs] SSE connected');
       setConnected(true);
     };
 
-    ws.onmessage = (event) => {
+    eventSource.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'log') {
@@ -38,19 +44,15 @@ export default function Logs() {
       }
     };
 
-    ws.onerror = (error) => {
-      console.error('[Logs] WebSocket error:', error);
+    eventSource.onerror = (error) => {
+      console.error('[Logs] SSE error:', error);
       setConnected(false);
-    };
-
-    ws.onclose = () => {
-      console.log('[Logs] WebSocket disconnected');
-      setConnected(false);
+      eventSource.close();
     };
 
     return () => {
-      ws.close();
-      wsRef.current = null;
+      eventSource.close();
+      eventSourceRef.current = null;
     };
   }, [liveView]);
 

@@ -1332,60 +1332,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Logs route - Real-time streaming of latest workflow logs (admin only)
-  app.get("/api/logs/stream", isAuthenticated, isAdmin, async (_req, res) => {
-    try {
-      // Disable caching to ensure fresh content on every request
-      res.set({
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
+  // SSE endpoint for real-time log streaming (admin only)
+  app.get("/api/logs/stream", isAuthenticated, isAdmin, async (req, res) => {
+    console.log('[LogsSSE] Client connected to log stream');
+    
+    // Set headers for Server-Sent Events
+    res.set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no' // Disable nginx buffering
+    });
+    
+    res.flushHeaders();
+    
+    let lastSize = 0;
+    let currentLogFile: string | null = null;
+    let isStreaming = true;
+    
+    const streamLogs = async () => {
+      if (!isStreaming) return;
+      
+      try {
+        const logsDir = '/tmp/logs';
+        const files = await fs.readdir(logsDir);
+        
+        // Find the latest "Start_application" log file
+        const workflowLogs = files.filter(f => 
+          f.startsWith('Start_application_') && f.endsWith('.log')
+        );
+        
+        if (workflowLogs.length === 0) {
+          if (lastSize === 0) {
+            res.write(`data: ${JSON.stringify({ type: 'log', data: 'Waiting for logs...\n' })}\n\n`);
+          }
+          return;
+        }
 
-      const logsDir = '/tmp/logs';
-      const files = await fs.readdir(logsDir);
-      
-      // Find the latest "Start_application" log file
-      const workflowLogs = files.filter(f => 
-        f.startsWith('Start_application_') && f.endsWith('.log')
-      );
-      
-      if (workflowLogs.length === 0) {
-        return res.json({
-          content: "No workflow logs available yet...",
-          lines: 1,
-          timestamp: Date.now()
-        });
+        // Get file stats to find the most recent
+        const logFiles = await Promise.all(
+          workflowLogs.map(async (filename) => {
+            const filePath = path.join(logsDir, filename);
+            const stats = await fs.stat(filePath);
+            return { filename, modified: stats.mtime };
+          })
+        );
+
+        // Sort by modified date (newest first)
+        logFiles.sort((a, b) => b.modified.getTime() - a.modified.getTime());
+        const latestLog = logFiles[0].filename;
+        const logPath = path.join(logsDir, latestLog);
+
+        // If log file changed, reset and send full content
+        if (currentLogFile !== latestLog) {
+          console.log(`[LogsSSE] Switching to new log file: ${latestLog}`);
+          currentLogFile = latestLog;
+          lastSize = 0;
+          
+          // Send full initial content
+          const content = await fs.readFile(logPath, 'utf-8');
+          res.write(`data: ${JSON.stringify({ type: 'log', data: content })}\n\n`);
+          lastSize = content.length;
+          return;
+        }
+
+        // Check for new content
+        const stats = await fs.stat(logPath);
+        if (stats.size > lastSize) {
+          // Read only the new part
+          const fileHandle = await fs.open(logPath, 'r');
+          const buffer = Buffer.alloc(stats.size - lastSize);
+          await fileHandle.read(buffer, 0, buffer.length, lastSize);
+          await fileHandle.close();
+          
+          const newContent = buffer.toString('utf-8');
+          if (newContent) {
+            res.write(`data: ${JSON.stringify({ type: 'log', data: newContent })}\n\n`);
+            lastSize = stats.size;
+          }
+        }
+      } catch (error) {
+        console.error('[LogsSSE] Error streaming logs:', error);
       }
-
-      // Get file stats to find the most recent
-      const logFiles = await Promise.all(
-        workflowLogs.map(async (filename) => {
-          const filePath = path.join(logsDir, filename);
-          const stats = await fs.stat(filePath);
-          return { filename, modified: stats.mtime };
-        })
-      );
-
-      // Sort by modified date (newest first)
-      logFiles.sort((a, b) => b.modified.getTime() - a.modified.getTime());
-      const latestLog = logFiles[0].filename;
-
-      const logPath = path.join(logsDir, latestLog);
-      
-      // Read the entire file content (fresh on every request)
-      const content = await fs.readFile(logPath, 'utf-8');
-      
-      res.json({
-        content,
-        lines: content.split('\n').length,
-        filename: latestLog,
-        timestamp: Date.now() // Add timestamp to force content change
-      });
-    } catch (error) {
-      console.error("Error reading latest workflow logs:", error);
-      res.status(500).json({ message: "Failed to read logs" });
-    }
+    };
+    
+    // Start streaming immediately
+    streamLogs();
+    
+    // Poll for new content every 500ms
+    const pollInterval = setInterval(streamLogs, 500);
+    
+    req.on('close', () => {
+      console.log('[LogsSSE] Client disconnected from log stream');
+      isStreaming = false;
+      clearInterval(pollInterval);
+    });
   });
 
   // Create HTTP server
@@ -1396,9 +1437,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const userConnections = new Map<string, Set<WebSocket>>();
   
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  
-  // WebSocket server for real-time log streaming (admin only)
-  const logsWss = new WebSocketServer({ server: httpServer, path: '/logs-stream' });
   
   wss.on('connection', (ws: WebSocket, req) => {
     console.log('[WebSocket] Client connected');
@@ -1537,101 +1575,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     ws.on('error', (error) => {
       console.error('[WebSocket] Error:', error);
-    });
-  });
-
-  // WebSocket handler for real-time log streaming
-  logsWss.on('connection', (ws: WebSocket) => {
-    console.log('[LogsWS] Client connected to log stream');
-    
-    let lastSize = 0;
-    let currentLogFile: string | null = null;
-    let isStreaming = true;
-    
-    const streamLogs = async () => {
-      if (!isStreaming || ws.readyState !== ws.OPEN) return;
-      
-      try {
-        const logsDir = '/tmp/logs';
-        const files = await fs.readdir(logsDir);
-        
-        // Find the latest "Start_application" log file
-        const workflowLogs = files.filter(f => 
-          f.startsWith('Start_application_') && f.endsWith('.log')
-        );
-        
-        if (workflowLogs.length === 0) {
-          if (lastSize === 0) {
-            ws.send(JSON.stringify({ type: 'log', data: 'Waiting for logs...\n' }));
-          }
-          return;
-        }
-
-        // Get file stats to find the most recent
-        const logFiles = await Promise.all(
-          workflowLogs.map(async (filename) => {
-            const filePath = path.join(logsDir, filename);
-            const stats = await fs.stat(filePath);
-            return { filename, modified: stats.mtime };
-          })
-        );
-
-        // Sort by modified date (newest first)
-        logFiles.sort((a, b) => b.modified.getTime() - a.modified.getTime());
-        const latestLog = logFiles[0].filename;
-        const logPath = path.join(logsDir, latestLog);
-
-        // If log file changed, reset and send full content
-        if (currentLogFile !== latestLog) {
-          console.log(`[LogsWS] Switching to new log file: ${latestLog}`);
-          currentLogFile = latestLog;
-          lastSize = 0;
-          
-          // Send full initial content
-          const content = await fs.readFile(logPath, 'utf-8');
-          if (ws.readyState === ws.OPEN) {
-            ws.send(JSON.stringify({ type: 'log', data: content }));
-            lastSize = content.length;
-          }
-          return;
-        }
-
-        // Check for new content
-        const stats = await fs.stat(logPath);
-        if (stats.size > lastSize) {
-          // Read only the new part
-          const fileHandle = await fs.open(logPath, 'r');
-          const buffer = Buffer.alloc(stats.size - lastSize);
-          await fileHandle.read(buffer, 0, buffer.length, lastSize);
-          await fileHandle.close();
-          
-          const newContent = buffer.toString('utf-8');
-          if (newContent && ws.readyState === ws.OPEN) {
-            ws.send(JSON.stringify({ type: 'log', data: newContent }));
-            lastSize = stats.size;
-          }
-        }
-      } catch (error) {
-        console.error('[LogsWS] Error streaming logs:', error);
-      }
-    };
-    
-    // Start streaming immediately
-    streamLogs();
-    
-    // Poll for new content every 500ms
-    const pollInterval = setInterval(streamLogs, 500);
-    
-    ws.on('close', () => {
-      console.log('[LogsWS] Client disconnected from log stream');
-      isStreaming = false;
-      clearInterval(pollInterval);
-    });
-    
-    ws.on('error', (error) => {
-      console.error('[LogsWS] Error:', error);
-      isStreaming = false;
-      clearInterval(pollInterval);
     });
   });
 
