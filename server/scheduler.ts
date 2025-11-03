@@ -197,54 +197,10 @@ async function pollRouterTraffic() {
 
     console.log(`[Scheduler] Polling ${routersWithMonitoredPorts.length} routers with monitored ports`);
 
-    // First, check reachability for routers with monitored ports
-    const reachableRouterIds = new Set<string>();
-    
+    // Collect traffic data for ALL routers (reachability determined by stats fetch success/failure)
+    // This eliminates the separate reachability check, reducing API calls from 2 to 1 per router
     await Promise.all(
       routersWithMonitoredPorts.map(async (router) => {
-        try {
-          const credentials = await storage.getRouterCredentials(router.id);
-          if (!credentials) {
-            console.log(`[Scheduler] Skipping ${router.name} - no credentials`);
-            return;
-          }
-
-          const client = new MikrotikClient({
-            host: router.ipAddress,
-            port: router.port,
-            user: credentials.username,
-            password: credentials.password,
-            cloudDdnsHostname: router.cloudDdnsHostname || undefined,
-            restEnabled: router.restEnabled || false,
-            restPort: router.restPort || 443,
-            snmpEnabled: router.snmpEnabled || false,
-            snmpCommunity: router.snmpCommunity || "public",
-            snmpVersion: router.snmpVersion || "2c",
-            snmpPort: router.snmpPort || 161,
-            interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
-          });
-
-          const isReachable = await client.checkReachability();
-          await storage.updateRouterReachability(router.id, isReachable);
-          
-          if (isReachable) {
-            reachableRouterIds.add(router.id);
-          } else {
-            console.log(`[Scheduler] Router ${router.name} unreachable`);
-            await storage.updateRouterConnection(router.id, false);
-          }
-        } catch (error) {
-          await storage.updateRouterReachability(router.id, false);
-          await storage.updateRouterConnection(router.id, false);
-        }
-      })
-    )
-
-    // Collect traffic data for MONITORED PORTS ONLY on reachable routers
-    await Promise.all(
-      routersWithMonitoredPorts
-        .filter(router => reachableRouterIds.has(router.id))
-        .map(async (router) => {
           try {
             // Get router credentials
             const credentials = await storage.getRouterCredentials(router.id);
@@ -253,6 +209,7 @@ async function pollRouterTraffic() {
             }
 
             // Connect to MikroTik and get stats
+            // This single call serves dual purpose: fetch data AND determine reachability
             const client = new MikrotikClient({
               host: router.ipAddress,
               port: router.port,
@@ -275,9 +232,10 @@ async function pollRouterTraffic() {
             const storedMethod = router.lastSuccessfulConnectionMethod as 'native' | 'rest' | 'snmp' | null;
             
             if (storedMethod) {
-              // Use the cached method directly - if it fails, skip this router
-              console.log(`[Scheduler] Using stored method '${storedMethod}' for ${router.name}`);
+              // Use the cached method directly - ONE API/SNMP call gets ALL interface data
+              console.log(`[Scheduler] Fetching all interfaces via '${storedMethod}' for ${router.name}`);
               stats = await client.getInterfaceStatsWithMethod(storedMethod);
+              console.log(`[Scheduler] Retrieved ${stats.length} interfaces from ${router.name}`);
             } else {
               // No stored method - this means the router hasn't been tested yet
               // Skip this router - it will be tested when user views/edits it
@@ -285,7 +243,8 @@ async function pollRouterTraffic() {
               return;
             }
 
-            // Update router connection status (only if reachable AND data retrieved successfully)
+            // If we reach here, stats fetch succeeded = router is reachable
+            await storage.updateRouterReachability(router.id, true);
             await storage.updateRouterConnection(router.id, true);
 
             // Cloud DDNS hostname extraction: Store separately without replacing IP address
@@ -299,8 +258,10 @@ async function pollRouterTraffic() {
 
             // Get monitored ports for this router
             const monitoredPortsForRouter = portsByRouter.get(router.id) || [];
+            console.log(`[Scheduler] Processing ${monitoredPortsForRouter.length} monitored port(s) from single API response for ${router.name}`);
             
-            // Store traffic data ONLY for monitored ports (not all interfaces)
+            // Process ALL monitored ports from the SINGLE API/SNMP response
+            // No additional API calls needed - all data already fetched above
             const timestamp = new Date();
             for (const port of monitoredPortsForRouter) {
               const stat = stats.find(s => s.name === port.portName);
@@ -329,8 +290,12 @@ async function pollRouterTraffic() {
                 totalBytesPerSecond: stat.totalBytesPerSecond,
               });
             }
+            
+            console.log(`[Scheduler] ✓ Successfully processed ${monitoredPortsForRouter.length} port(s) for ${router.name} with 1 API call`);
           } catch (error: any) {
             console.error(`[Scheduler] Failed to collect traffic for router ${router.name}:`, error?.message || error?.stack || error || 'Unknown error');
+            // Stats fetch failed = router is unreachable
+            await storage.updateRouterReachability(router.id, false);
             await storage.updateRouterConnection(router.id, false);
           }
         })
@@ -456,7 +421,7 @@ async function checkAlerts() {
           continue;
         }
 
-        // Connect to MikroTik and get stats
+        // Connect to MikroTik and get ALL interface stats in ONE API/SNMP call
         const client = new MikrotikClient({
           host: router.ipAddress,
           port: router.port,
@@ -471,9 +436,12 @@ async function checkAlerts() {
           interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
         });
 
+        console.log(`[Scheduler] Fetching all interfaces for alert checking on ${router.name}`);
         const stats = await client.getInterfaceStats();
+        console.log(`[Scheduler] Processing ${ports.length} monitored port(s) from single API response for ${router.name}`);
 
-        // Process each monitored port for alerting
+        // Process ALL monitored ports from the SINGLE API/SNMP response
+        // No additional API calls needed per port
         for (const port of ports) {
           const stat = stats.find(s => s.name === port.portName);
           if (!stat) {
