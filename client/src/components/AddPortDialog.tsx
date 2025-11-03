@@ -65,7 +65,7 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
     resolver: zodResolver(portFormSchema),
     defaultValues: {
       portName: port?.portName || "",
-      minThresholdBps: port?.minThresholdBps || 1048576, // Default 1 MB/s
+      minThresholdBps: port?.minThresholdBps || 102400, // Default 100 KB/s
       enabled: port?.enabled ?? true,
       emailNotifications: port?.emailNotifications ?? true,
       popupNotifications: port?.popupNotifications ?? true,
@@ -221,14 +221,14 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
                   <FormControl>
                     <Input 
                       type="number" 
-                      placeholder="1048576" 
+                      placeholder="102400" 
                       {...field}
                       onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                       data-testid="input-port-threshold"
                     />
                   </FormControl>
                   <FormDescription>
-                    Alert when traffic drops below this value (1 MB/s = 1048576)
+                    Alert when traffic drops below this value (100 KB/s = 102400, editable)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
