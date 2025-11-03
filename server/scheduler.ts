@@ -781,10 +781,23 @@ async function pollSingleRouterRealtime(routerId: string) {
     const stats = await client.getInterfaceStatsWithMethod(storedMethod);
     console.log(`[RealtimePoll] Retrieved ${stats.length} interfaces for ${router.name}`);
     
+    // Get monitored ports to update their metadata
+    const monitoredPorts = await storage.getMonitoredPorts(router.id);
+    
     // Store all interfaces in memory
     const timestamp = new Date();
     for (const stat of stats) {
       console.log(`[RealtimePoll] Storing ${stat.name}: RX ${(stat.rxBytesPerSecond/1024/1024).toFixed(2)} Mbps`);
+      
+      // Update interface metadata if this interface is a monitored port
+      const monitoredPort = monitoredPorts.find(p => p.portName === stat.name);
+      if (monitoredPort) {
+        await storage.updateInterfaceMetadata(router.id, stat.name, {
+          interfaceComment: stat.comment || null,
+          interfaceMacAddress: stat.macAddress || null,
+        });
+      }
+      
       addRealtimeTraffic(router.id, {
         portName: stat.name,
         comment: stat.comment,
