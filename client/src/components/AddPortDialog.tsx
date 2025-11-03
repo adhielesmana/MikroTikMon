@@ -50,6 +50,17 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
     enabled: open && !isEditing, // Only fetch when dialog is open and adding new port
   });
 
+  // Fetch already monitored ports to filter them out
+  const { data: monitoredPorts } = useQuery<MonitoredPort[]>({
+    queryKey: ["/api/routers", routerId, "ports"],
+    enabled: open && !isEditing,
+  });
+
+  // Filter out already monitored interfaces
+  const availableInterfaces = interfacesData?.interfaces.filter(
+    (iface) => !monitoredPorts?.some((port) => port.portName === iface.name)
+  ) || [];
+
   const form = useForm<PortFormData>({
     resolver: zodResolver(portFormSchema),
     defaultValues: {
@@ -159,8 +170,8 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <span className="text-sm text-muted-foreground">Loading interfaces...</span>
                     </div>
-                  ) : interfacesData?.interfaces && interfacesData.interfaces.length > 0 ? (
-                    // Show dropdown with available interfaces
+                  ) : availableInterfaces.length > 0 ? (
+                    // Show dropdown with available (unmonitored) interfaces
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-port-name">
@@ -168,13 +179,18 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {interfacesData.interfaces.map((iface) => (
+                        {availableInterfaces.map((iface) => (
                           <SelectItem key={iface.name} value={iface.name}>
                             {iface.name}{iface.comment ? ` - ${iface.comment}` : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                  ) : interfacesData?.interfaces && interfacesData.interfaces.length > 0 ? (
+                    // All interfaces are already monitored
+                    <div className="text-sm text-muted-foreground p-3 border rounded-md bg-muted">
+                      All interfaces are already being monitored.
+                    </div>
                   ) : (
                     // Fallback to manual input if no interfaces loaded
                     <FormControl>
