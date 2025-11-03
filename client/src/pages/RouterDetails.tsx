@@ -253,6 +253,7 @@ export default function RouterDetails() {
   // Transform traffic data for multi-interface chart
   const chartData = useMemo(() => {
     if (!trafficData || !Array.isArray(trafficData) || selectedInterfaces.size === 0) {
+      console.log("[RouterDetails] No chart data - traffic or interfaces missing");
       return [];
     }
 
@@ -286,7 +287,7 @@ export default function RouterDetails() {
       .map(([, data]) => data);
 
     // Fill in missing interface data with 0 to ensure continuous lines
-    return sortedData.map(point => {
+    const filledData = sortedData.map(point => {
       const filledPoint = { ...point };
       selectedInterfacesArray.forEach(interfaceName => {
         if (filledPoint[`${interfaceName}_rx`] === undefined) {
@@ -298,6 +299,18 @@ export default function RouterDetails() {
       });
       return filledPoint;
     });
+
+    // Debug logging - check first and last few points
+    if (filledData.length > 0) {
+      console.log("[RouterDetails] Chart data summary:", {
+        totalPoints: filledData.length,
+        firstPoint: filledData[0],
+        lastPoint: filledData[filledData.length - 1],
+        selectedInterfaces: Array.from(selectedInterfaces),
+      });
+    }
+
+    return filledData;
   }, [trafficData, selectedInterfaces]);
 
   // Get selected interfaces list
