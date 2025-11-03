@@ -1397,6 +1397,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
+  // WebSocket server for real-time log streaming (admin only)
+  const logsWss = new WebSocketServer({ server: httpServer, path: '/logs-stream' });
+  
   wss.on('connection', (ws: WebSocket, req) => {
     console.log('[WebSocket] Client connected');
     let userId: string | null = null;
@@ -1534,6 +1537,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     ws.on('error', (error) => {
       console.error('[WebSocket] Error:', error);
+    });
+  });
+
+  // WebSocket handler for real-time log streaming
+  logsWss.on('connection', (ws: WebSocket) => {
+    console.log('[LogsWS] Client connected to log stream');
+    
+    let watcher: any = null;
+    let lastSize = 0;
+    let currentLogFile: string | null = null;
+    
+    const streamLogs = async () => {
+      try {
+        const logsDir = '/tmp/logs';
+        const files = await fs.readdir(logsDir);
+        
+        // Find the latest "Start_application" log file
+        const workflowLogs = files.filter(f => 
+          f.startsWith('Start_application_') && f.endsWith('.log')
+        );
+        
+        if (workflowLogs.length === 0) {
+          ws.send(JSON.stringify({ type: 'log', data: 'Waiting for logs...\n' }));
+          return;
+        }
+
+        // Get file stats to find the most recent
+        const logFiles = await Promise.all(
+          workflowLogs.map(async (filename) => {
+            const filePath = path.join(logsDir, filename);
+            const stats = await fs.stat(filePath);
+            return { filename, modified: stats.mtime };
+          })
+        );
+
+        // Sort by modified date (newest first)
+        logFiles.sort((a, b) => b.modified.getTime() - a.modified.getTime());
+        const latestLog = logFiles[0].filename;
+        const logPath = path.join(logsDir, latestLog);
+
+        // If log file changed, reset position and send full content
+        if (currentLogFile !== latestLog) {
+          console.log(`[LogsWS] Switching to new log file: ${latestLog}`);
+          currentLogFile = latestLog;
+          lastSize = 0;
+          
+          // Stop old watcher if exists
+          if (watcher) {
+            watcher.close();
+          }
+          
+          // Send full initial content
+          const content = await fs.readFile(logPath, 'utf-8');
+          ws.send(JSON.stringify({ type: 'log', data: content }));
+          lastSize = content.length;
+          
+          // Watch for changes
+          const watch = await import('fs');
+          watcher = watch.watch(logPath, async (eventType: string) => {
+            if (eventType === 'change') {
+              try {
+                const stats = await fs.stat(logPath);
+                if (stats.size > lastSize) {
+                  // Read only the new part
+                  const stream = watch.createReadStream(logPath, {
+                    start: lastSize,
+                    encoding: 'utf-8'
+                  });
+                  
+                  let newContent = '';
+                  stream.on('data', (chunk: string) => {
+                    newContent += chunk;
+                  });
+                  
+                  stream.on('end', () => {
+                    if (newContent && ws.readyState === ws.OPEN) {
+                      ws.send(JSON.stringify({ type: 'log', data: newContent }));
+                      lastSize = stats.size;
+                    }
+                  });
+                }
+              } catch (err) {
+                console.error('[LogsWS] Error reading log changes:', err);
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error('[LogsWS] Error streaming logs:', error);
+        ws.send(JSON.stringify({ type: 'error', message: 'Failed to stream logs' }));
+      }
+    };
+    
+    // Start streaming
+    streamLogs();
+    
+    // Check for log file changes every 5 seconds
+    const fileCheckInterval = setInterval(streamLogs, 5000);
+    
+    ws.on('close', () => {
+      console.log('[LogsWS] Client disconnected from log stream');
+      clearInterval(fileCheckInterval);
+      if (watcher) {
+        watcher.close();
+      }
+    });
+    
+    ws.on('error', (error) => {
+      console.error('[LogsWS] Error:', error);
+      clearInterval(fileCheckInterval);
+      if (watcher) {
+        watcher.close();
+      }
     });
   });
 

@@ -1,40 +1,65 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, Play, Pause } from "lucide-react";
-
-interface LogFile {
-  filename: string;
-  size: number;
-  modified: string;
-  type: "server" | "browser";
-}
-
-interface LogContent {
-  filename: string;
-  content: string;
-  lines: number;
-}
+import { Play, Pause } from "lucide-react";
 
 export default function Logs() {
-  const [liveView, setLiveView] = useState(true); // Auto-enable live view
+  const [liveView, setLiveView] = useState(true);
+  const [logContent, setLogContent] = useState("");
+  const [connected, setConnected] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  const { data: logContent, isLoading: isLoadingContent, refetch } = useQuery<LogContent>({
-    queryKey: ["/api/logs/stream"],
-    refetchInterval: liveView ? 500 : false, // Refresh every 0.5s in live mode for smoother streaming
-  });
-
-  // Auto-scroll to bottom in live view
+  // Connect to WebSocket log stream
   useEffect(() => {
-    if (liveView && scrollRef.current && logContent) {
+    if (!liveView) return;
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/logs-stream`;
+    
+    console.log('[Logs] Connecting to WebSocket:', wsUrl);
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('[Logs] WebSocket connected');
+      setConnected(true);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'log') {
+          setLogContent(prev => prev + message.data);
+        }
+      } catch (err) {
+        console.error('[Logs] Error parsing message:', err);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('[Logs] WebSocket error:', error);
+      setConnected(false);
+    };
+
+    ws.onclose = () => {
+      console.log('[Logs] WebSocket disconnected');
+      setConnected(false);
+    };
+
+    return () => {
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [liveView]);
+
+  // Auto-scroll to bottom when new content arrives
+  useEffect(() => {
+    if (liveView && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [liveView, logContent]);
+  }, [logContent, liveView]);
 
   return (
     <div className="space-y-6">
@@ -45,7 +70,7 @@ export default function Logs() {
             Application Logs
           </h1>
           <p className="text-sm text-muted-foreground">
-            Live streaming logs from the application workflow
+            Real-time terminal stream from the application workflow
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -57,53 +82,39 @@ export default function Logs() {
               data-testid="switch-live-view"
             />
             <Label htmlFor="live-view" className="flex items-center gap-2 cursor-pointer">
-              {liveView ? <Play className="h-4 w-4 text-green-500" /> : <Pause className="h-4 w-4" />}
-              <span>Live Stream</span>
+              {liveView && connected ? (
+                <Play className="h-4 w-4 text-green-500 animate-pulse" />
+              ) : (
+                <Pause className="h-4 w-4" />
+              )}
+              <span>{connected ? 'Connected' : 'Disconnected'}</span>
             </Label>
           </div>
-          <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-logs">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
         </div>
       </div>
 
-      {/* Single Log Stream */}
+      {/* Terminal Stream */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            Application Workflow Logs
+          <CardTitle className="flex items-center gap-2">
+            <span>Application Workflow</span>
+            {connected && (
+              <span className="flex items-center gap-1 text-xs font-normal text-green-500">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                Live
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoadingContent ? (
-            <div className="space-y-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                <Skeleton key={i} className="h-4 w-full" />
-              ))}
-            </div>
-          ) : logContent ? (
-            <div 
-              ref={scrollRef}
-              className="h-[calc(100vh-280px)] w-full overflow-auto bg-black/95 dark:bg-black rounded-md relative"
-            >
-              <pre className="text-xs font-mono p-4 text-green-400">
-                {logContent.content}
-              </pre>
-              {liveView && (
-                <div className="sticky bottom-0 left-0 right-0 bg-green-500/10 border-t border-green-500/20 p-2 text-center backdrop-blur-sm">
-                  <div className="flex items-center justify-center gap-2 text-xs text-green-400">
-                    <Play className="h-3 w-3 animate-pulse" />
-                    <span>Live streaming • Updates every second</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <p className="text-sm text-muted-foreground">No logs available</p>
-            </div>
-          )}
+          <div 
+            ref={scrollRef}
+            className="h-[calc(100vh-240px)] w-full overflow-auto bg-black rounded-md p-4"
+          >
+            <pre className="text-xs font-mono text-green-400 whitespace-pre-wrap">
+              {logContent || (liveView ? 'Connecting to log stream...' : 'Enable live stream to view logs')}
+            </pre>
+          </div>
         </CardContent>
       </Card>
     </div>
