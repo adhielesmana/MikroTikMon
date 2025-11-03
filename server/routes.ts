@@ -134,7 +134,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const data = insertRouterSchema.parse(req.body);
       
       const router = await storage.createRouter(data, userId);
-      res.json(router);
+      
+      // Immediately check reachability after router creation
+      try {
+        const credentials = await storage.getRouterCredentials(router.id);
+        if (credentials) {
+          const client = new MikrotikClient({
+            host: router.ipAddress,
+            port: router.port,
+            user: credentials.username,
+            password: credentials.password,
+            cloudDdnsHostname: router.cloudDdnsHostname || undefined,
+            restEnabled: router.restEnabled || false,
+            restPort: router.restPort || 443,
+            snmpEnabled: router.snmpEnabled || false,
+            snmpCommunity: router.snmpCommunity || "public",
+            snmpVersion: router.snmpVersion || "2c",
+            snmpPort: router.snmpPort || 161,
+            interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
+          });
+
+          const isReachable = await client.checkReachability();
+          await storage.updateRouterReachability(router.id, isReachable);
+          
+          console.log(`[Router Creation] ${router.name} reachability check: ${isReachable ? 'REACHABLE' : 'UNREACHABLE'}`);
+          
+          // Return updated router with reachability status
+          const updatedRouter = await storage.getRouter(router.id);
+          res.json(updatedRouter);
+        } else {
+          res.json(router);
+        }
+      } catch (reachabilityError) {
+        console.error("Error checking reachability after router creation:", reachabilityError);
+        // Still return the router even if reachability check fails
+        res.json(router);
+      }
     } catch (error: any) {
       console.error("Error creating router:", error);
       if (error.name === "ZodError") {
@@ -190,7 +225,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updated = await storage.updateRouter(req.params.id, req.body);
-      res.json(updated);
+      
+      // Immediately check reachability after router update (in case connection details changed)
+      try {
+        const credentials = await storage.getRouterCredentials(updated.id);
+        if (credentials) {
+          const client = new MikrotikClient({
+            host: updated.ipAddress,
+            port: updated.port,
+            user: credentials.username,
+            password: credentials.password,
+            cloudDdnsHostname: updated.cloudDdnsHostname || undefined,
+            restEnabled: updated.restEnabled || false,
+            restPort: updated.restPort || 443,
+            snmpEnabled: updated.snmpEnabled || false,
+            snmpCommunity: updated.snmpCommunity || "public",
+            snmpVersion: updated.snmpVersion || "2c",
+            snmpPort: updated.snmpPort || 161,
+            interfaceDisplayMode: (updated.interfaceDisplayMode as "static" | "none" | "all") || 'static',
+          });
+
+          const isReachable = await client.checkReachability();
+          await storage.updateRouterReachability(updated.id, isReachable);
+          
+          console.log(`[Router Update] ${updated.name} reachability check: ${isReachable ? 'REACHABLE' : 'UNREACHABLE'}`);
+          
+          // Return updated router with reachability status
+          const finalRouter = await storage.getRouter(updated.id);
+          res.json(finalRouter);
+        } else {
+          res.json(updated);
+        }
+      } catch (reachabilityError) {
+        console.error("Error checking reachability after router update:", reachabilityError);
+        // Still return the router even if reachability check fails
+        res.json(updated);
+      }
     } catch (error) {
       console.error("Error updating router:", error);
       res.status(500).json({ message: "Failed to update router" });
