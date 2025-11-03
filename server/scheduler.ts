@@ -92,6 +92,26 @@ function cleanupStaleViolationCounters(): void {
   }
 }
 
+// Get all users who should receive alerts for a router (owner + assigned users)
+async function getAllAlertRecipients(routerId: string, ownerId: string): Promise<string[]> {
+  const userIds = new Set<string>();
+  
+  // Add router owner
+  userIds.add(ownerId);
+  
+  // Add all assigned users
+  try {
+    const assignments = await storage.getRouterAssignments(routerId);
+    for (const assignment of assignments) {
+      userIds.add(assignment.userId);
+    }
+  } catch (error) {
+    console.error(`[Scheduler] Error getting router assignments for ${routerId}:`, error);
+  }
+  
+  return Array.from(userIds);
+}
+
 export function getRealtimeTraffic(routerId: string, since?: Date): RealtimeTrafficData[] {
   const routerData = realtimeTrafficStore.get(routerId);
   if (!routerData) return [];
@@ -337,6 +357,11 @@ async function checkAlerts() {
           
           // Create router down alert only after 5 consecutive checks
           if (violationCount >= 5 && !routerDownAlert) {
+            // Get all users who should receive this alert (owner + assigned users)
+            const recipientUserIds = await getAllAlertRecipients(router.id, router.userId);
+            console.log(`[Scheduler] Router down alert for ${router.name} will notify ${recipientUserIds.length} user(s)`);
+            
+            // Create ONE alert for the router (using owner's userId for the alert record)
             const alert = await storage.createAlert({
               routerId: router.id,
               portId: null,
@@ -349,38 +374,41 @@ async function checkAlerts() {
               thresholdBps: null,
             });
 
-            // Create notification
-            const notification = await storage.createNotification({
-              userId: router.userId,
-              alertId: alert.id,
-              type: "popup",
-              title: `Router Down: ${router.name}`,
-              message: alert.message,
-            });
+            // Create notifications and send alerts to ALL users (owner + assigned)
+            for (const userId of recipientUserIds) {
+              // Create notification for this user
+              const notification = await storage.createNotification({
+                userId: userId,
+                alertId: alert.id,
+                type: "popup",
+                title: `Router Down: ${router.name}`,
+                message: alert.message,
+              });
 
-            // Send email notification - get user email
-            const user = await storage.getUser(router.userId);
-            if (user?.email) {
-              await emailService.sendAlertEmail(user.email, {
-                routerName: router.name,
-                portName: 'Router Connectivity',
-                currentTraffic: 'N/A',
-                threshold: 'N/A',
+              // Send email notification
+              const user = await storage.getUser(userId);
+              if (user?.email) {
+                await emailService.sendAlertEmail(user.email, {
+                  routerName: router.name,
+                  portName: 'Router Connectivity',
+                  currentTraffic: 'N/A',
+                  threshold: 'N/A',
+                  severity: alert.severity,
+                });
+              }
+
+              // Broadcast real-time notification via WebSocket
+              broadcastNotification(userId, {
+                id: notification.id,
+                title: notification.title,
+                message: notification.message,
                 severity: alert.severity,
+                routerName: router.name,
+                portName: null,
               });
             }
 
-            // Broadcast real-time notification via WebSocket
-            broadcastNotification(router.userId, {
-              id: notification.id,
-              title: notification.title,
-              message: notification.message,
-              severity: alert.severity,
-              routerName: router.name,
-              portName: null,
-            });
-
-            console.log(`[Scheduler] Router down alert created for ${router.name} (confirmed after 3 checks)`);
+            console.log(`[Scheduler] Router down alert created for ${router.name} and sent to ${recipientUserIds.length} user(s) (confirmed after 5 checks)`);
             resetViolationCount(`router_down_${router.id}`); // Reset after alert created
           }
         } else {
@@ -466,6 +494,11 @@ async function checkAlerts() {
             
             // Create port down alert only after 5 consecutive checks
             if (violationCount >= 5 && (!hasActiveAlert || !isPortDownAlert)) {
+              // Get all users who should receive this alert (owner + assigned users)
+              const recipientUserIds = await getAllAlertRecipients(router.id, router.userId);
+              console.log(`[Scheduler] Port down alert for ${router.name} - ${port.portName} will notify ${recipientUserIds.length} user(s)`);
+              
+              // Create ONE alert for the port (using owner's userId for the alert record)
               const alert = await storage.createAlert({
                 routerId: port.routerId,
                 portId: port.id,
@@ -478,27 +511,30 @@ async function checkAlerts() {
                 thresholdBps: port.minThresholdBps,
               });
 
-              // Create notification
-              const notification = await storage.createNotification({
-                userId: router.userId,
-                alertId: alert.id,
-                type: "popup",
-                title: `Port Down: ${router.name}`,
-                message: alert.message,
-              });
+              // Create notifications and send alerts to ALL users (owner + assigned)
+              for (const userId of recipientUserIds) {
+                // Create notification for this user
+                const notification = await storage.createNotification({
+                  userId: userId,
+                  alertId: alert.id,
+                  type: "popup",
+                  title: `Port Down: ${router.name}`,
+                  message: alert.message,
+                });
 
-              // Broadcast real-time notification via WebSocket
-              broadcastNotification(router.userId, {
-                id: notification.id,
-                title: notification.title,
-                message: notification.message,
-                severity: alert.severity,
-                routerName: router.name,
-                portName: port.portName,
-                portComment: stat.comment || null,
-              });
+                // Broadcast real-time notification via WebSocket
+                broadcastNotification(userId, {
+                  id: notification.id,
+                  title: notification.title,
+                  message: notification.message,
+                  severity: alert.severity,
+                  routerName: router.name,
+                  portName: port.portName,
+                  portComment: stat.comment || null,
+                });
+              }
 
-              console.log(`[Scheduler] Port down alert created for ${router.name} - ${port.portName} (confirmed after 5 checks)`);
+              console.log(`[Scheduler] Port down alert created for ${router.name} - ${port.portName} and sent to ${recipientUserIds.length} user(s) (confirmed after 5 checks)`);
               resetViolationCount(`port_down_${port.id}`); // Reset after alert created
             }
             resetViolationCount(`traffic_${port.id}`); // Reset traffic violation count
@@ -534,6 +570,10 @@ async function checkAlerts() {
             
             // Only create alert after 5 consecutive checks AND no active traffic alert
             if (violationCount >= 5 && (!hasActiveAlert || isPortDownAlert)) {
+              // Get all users who should receive this alert (owner + assigned users)
+              const recipientUserIds = await getAllAlertRecipients(router.id, router.userId);
+              console.log(`[Scheduler] Traffic alert for ${router.name} - ${port.portName} will notify ${recipientUserIds.length} user(s)`);
+              
               // Determine severity based on how far below threshold
               const percentBelow = ((port.minThresholdBps - currentTotalTraffic) / port.minThresholdBps) * 100;
               let severity = "warning";
@@ -541,7 +581,7 @@ async function checkAlerts() {
               else if (percentBelow > 25) severity = "warning";
               else severity = "info";
 
-              // Create alert
+              // Create ONE alert for the port (using owner's userId for the alert record)
               const alert = await storage.createAlert({
                 routerId: port.routerId,
                 portId: port.id,
@@ -554,54 +594,57 @@ async function checkAlerts() {
                 thresholdBps: port.minThresholdBps,
               });
 
-              // Create notification
-              const notification = await storage.createNotification({
-                userId: router.userId,
-                alertId: alert.id,
-                type: "popup",
-                title: `Traffic Alert: ${router.name}`,
-                message: alert.message,
-              });
+              // Create notifications and send alerts to ALL users (owner + assigned)
+              for (const userId of recipientUserIds) {
+                // Create notification for this user
+                const notification = await storage.createNotification({
+                  userId: userId,
+                  alertId: alert.id,
+                  type: "popup",
+                  title: `Traffic Alert: ${router.name}`,
+                  message: alert.message,
+                });
 
-              // Broadcast real-time notification via WebSocket
-              broadcastNotification(router.userId, {
-                id: notification.id,
-                title: notification.title,
-                message: notification.message,
-                severity: alert.severity,
-                routerName: router.name,
-                portName: port.portName,
-                portComment: stat.comment || null,
-              });
+                // Broadcast real-time notification via WebSocket
+                broadcastNotification(userId, {
+                  id: notification.id,
+                  title: notification.title,
+                  message: notification.message,
+                  severity: alert.severity,
+                  routerName: router.name,
+                  portName: port.portName,
+                  portComment: stat.comment || null,
+                });
 
-              // Send email notification if enabled
-              if (port.emailNotifications) {
-                const user = await storage.getUser(router.userId);
-                if (user && user.email) {
-                  try {
-                    await emailService.sendAlertEmail(user.email, {
-                      routerName: router.name,
-                      portName: port.portName,
-                      currentTraffic: `${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX sum)`,
-                      threshold: `${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
-                      severity: alert.severity,
-                    });
+                // Send email notification if enabled
+                if (port.emailNotifications) {
+                  const user = await storage.getUser(userId);
+                  if (user && user.email) {
+                    try {
+                      await emailService.sendAlertEmail(user.email, {
+                        routerName: router.name,
+                        portName: port.portName,
+                        currentTraffic: `${(currentTotalTraffic / 1024).toFixed(2)} KB/s (RX+TX sum)`,
+                        threshold: `${(port.minThresholdBps / 1024).toFixed(2)} KB/s`,
+                        severity: alert.severity,
+                      });
 
-                    // Record email notification
-                    await storage.createNotification({
-                      userId: router.userId,
-                      alertId: alert.id,
-                      type: "email",
-                      title: notification.title,
-                      message: notification.message,
-                    });
-                  } catch (error) {
-                    console.error(`[Scheduler] Failed to send email for alert ${alert.id}:`, error);
+                      // Record email notification
+                      await storage.createNotification({
+                        userId: userId,
+                        alertId: alert.id,
+                        type: "email",
+                        title: `Traffic Alert: ${router.name}`,
+                        message: alert.message,
+                      });
+                    } catch (error) {
+                      console.error(`[Scheduler] Failed to send email for alert ${alert.id}:`, error);
+                    }
                   }
                 }
               }
 
-              console.log(`[Scheduler] Alert created for ${router.name} - ${port.portName} (confirmed after 5 checks)`);
+              console.log(`[Scheduler] Traffic alert created for ${router.name} - ${port.portName} and sent to ${recipientUserIds.length} user(s) (confirmed after 5 checks)`);
               resetViolationCount(`traffic_${port.id}`); // Reset after alert created
             }
           } else {
