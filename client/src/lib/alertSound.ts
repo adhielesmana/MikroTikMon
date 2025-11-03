@@ -17,7 +17,7 @@ export function initAudioContext() {
 
 /**
  * Play a 3-second alert sound
- * Creates an urgent emergency beep alarm pattern (repeating beeps)
+ * Creates a loud emergency buzzer alarm (continuous warbling sound)
  */
 export function playAlertSound() {
   try {
@@ -29,40 +29,46 @@ export function playAlertSound() {
     }
 
     const now = ctx.currentTime;
+    const duration = 3.0; // 3 seconds total
     
-    // Create 6 urgent beeps over 3 seconds (classic emergency alarm pattern)
-    // Each beep: 0.25s on, 0.25s off
-    const beepDuration = 0.25;
-    const beepGap = 0.25;
-    const totalBeeps = 6;
+    // Create continuous emergency buzzer with warbling effect
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
     
-    for (let i = 0; i < totalBeeps; i++) {
-      const startTime = now + (i * (beepDuration + beepGap));
-      
-      // Create oscillator for each beep
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-      
-      // Connect nodes
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      
-      // Emergency alarm frequency (1000Hz - very attention-grabbing)
-      oscillator.frequency.setValueAtTime(1000, startTime);
-      oscillator.type = 'sine'; // Sine wave for clearer, louder beep
-      
-      // Volume envelope - loud with sharp attack and release
-      gainNode.gain.setValueAtTime(0, startTime);
-      gainNode.gain.linearRampToValueAtTime(0.5, startTime + 0.01); // Very quick attack - LOUD
-      gainNode.gain.setValueAtTime(0.5, startTime + beepDuration - 0.05); // Hold at loud volume
-      gainNode.gain.linearRampToValueAtTime(0, startTime + beepDuration); // Quick release
-      
-      // Start and stop the beep
-      oscillator.start(startTime);
-      oscillator.stop(startTime + beepDuration);
+    // Connect nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    // Use sawtooth wave for harsh, loud buzzer sound
+    oscillator.type = 'sawtooth';
+    
+    // Create warbling effect by rapidly alternating between two frequencies
+    // This creates the classic emergency siren/buzzer sound
+    const lowFreq = 400;  // Low pitch
+    const highFreq = 600; // High pitch
+    const warblingSpeed = 0.15; // Alternate every 0.15 seconds (fast warble)
+    
+    let currentTime = now;
+    let isHigh = false;
+    
+    // Create rapid frequency alternation for full 3 seconds
+    while (currentTime < now + duration) {
+      oscillator.frequency.setValueAtTime(isHigh ? highFreq : lowFreq, currentTime);
+      currentTime += warblingSpeed;
+      isHigh = !isHigh;
     }
     
-    console.log('[AlertSound] Playing 3-second emergency beep alarm (6 beeps)');
+    // LOUD volume envelope - sustained throughout
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(0.6, now + 0.02); // Very quick attack - VERY LOUD
+    gainNode.gain.setValueAtTime(0.6, now + duration - 0.1); // Sustained loud volume
+    gainNode.gain.linearRampToValueAtTime(0, now + duration); // Quick fade out
+    
+    // Start and stop the buzzer
+    oscillator.start(now);
+    oscillator.stop(now + duration);
+    
+    console.log('[AlertSound] Playing 3-second LOUD emergency buzzer alarm');
   } catch (error) {
     console.error('[AlertSound] Failed to play sound:', error);
   }
