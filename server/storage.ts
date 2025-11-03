@@ -434,7 +434,7 @@ export class DatabaseStorage implements IStorage {
 
   async getAllMonitoredPorts(userId: string): Promise<(MonitoredPort & { router: Router; portComment?: string })[]> {
     // For superadmins, return all monitored ports
-    // For normal users, return only ports from their assigned routers
+    // For normal users, return only ports from their owned + assigned routers
     const user = await this.getUser(userId);
     if (!user) return [];
 
@@ -448,15 +448,42 @@ export class DatabaseStorage implements IStorage {
 
       return result.map(r => ({ ...r.monitored_ports, router: r.routers, portComment: undefined }));
     } else {
-      // Normal users see only their assigned routers' ports
-      const result = await db
+      // Normal users see ports from their own routers + assigned routers
+      // Get owned routers' monitored ports
+      const ownedPorts = await db
         .select()
         .from(monitoredPorts)
         .innerJoin(routers, eq(monitoredPorts.routerId, routers.id))
         .where(eq(routers.userId, userId))
         .orderBy(routers.name, monitoredPorts.portName);
 
-      return result.map(r => ({ ...r.monitored_ports, router: r.routers, portComment: undefined }));
+      // Get assigned routers' monitored ports
+      const assignedPorts = await db
+        .select()
+        .from(monitoredPorts)
+        .innerJoin(routers, eq(monitoredPorts.routerId, routers.id))
+        .innerJoin(userRouters, and(
+          eq(userRouters.routerId, routers.id),
+          eq(userRouters.userId, userId)
+        ))
+        .orderBy(routers.name, monitoredPorts.portName);
+
+      // Merge and deduplicate based on port id
+      const portMap = new Map<string, MonitoredPort & { router: Router; portComment?: string }>();
+      
+      ownedPorts.forEach(r => {
+        portMap.set(r.monitored_ports.id, { ...r.monitored_ports, router: r.routers, portComment: undefined });
+      });
+      
+      assignedPorts.forEach(r => {
+        portMap.set(r.monitored_ports.id, { ...r.monitored_ports, router: r.routers, portComment: undefined });
+      });
+
+      return Array.from(portMap.values()).sort((a, b) => {
+        // Sort by router name, then port name
+        const routerCompare = a.router.name.localeCompare(b.router.name);
+        return routerCompare !== 0 ? routerCompare : a.portName.localeCompare(b.portName);
+      });
     }
   }
 
