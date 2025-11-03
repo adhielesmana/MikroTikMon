@@ -290,6 +290,12 @@ async function pollRouterTraffic() {
                 continue;
               }
               
+              // Update interface metadata (comment, MAC) seamlessly during polling
+              await storage.updateInterfaceMetadata(router.id, port.portName, {
+                interfaceComment: stat.comment || null,
+                interfaceMacAddress: stat.macAddress || null,
+              });
+              
               // Store in-memory for alert checking
               addRealtimeTraffic(router.id, {
                 portName: stat.name,
@@ -476,6 +482,12 @@ async function checkAlerts() {
             console.warn(`[Scheduler] Port ${port.portName} not found in router stats`);
             continue;
           }
+
+          // Update interface metadata (comment, MAC) seamlessly during alert checking
+          await storage.updateInterfaceMetadata(router.id, port.portName, {
+            interfaceComment: stat.comment || null,
+            interfaceMacAddress: stat.macAddress || null,
+          });
 
           // Check if there's already a recent unacknowledged alert for this port
           let latestAlert = await storage.getLatestUnacknowledgedAlertForPort(port.id);
