@@ -190,8 +190,10 @@ export default function RouterDetails() {
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     )[0];
 
-    const rxMbps = latestData.rxBytesPerSecond / 1024 / 1024;
-    const txMbps = latestData.txBytesPerSecond / 1024 / 1024;
+    // Convert bytes per second to Megabits per second (Mbps)
+    // Formula: (bytes/sec × 8 bits/byte) ÷ 1,000,000 = Mbps
+    const rxMbps = (latestData.rxBytesPerSecond * 8) / 1000000;
+    const txMbps = (latestData.txBytesPerSecond * 8) / 1000000;
 
     setCurrentSpeed({
       rx: rxMbps,
@@ -226,8 +228,8 @@ export default function RouterDetails() {
     },
   });
 
-  // Calculate max speed for gauge scale (default 1000 Mbps = 1 Gbps)
-  const maxSpeed = 1000;
+  // Calculate max speed for gauge scale (10,000 Mbps = 10 Gbps)
+  const maxSpeed = 10000;
 
   // Prepare data for radial gauges
   const rxGaugeData = [

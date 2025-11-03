@@ -83,8 +83,9 @@ export default function GraphHistory() {
       
       const timeData = dataByTime.get(time);
       // Store RX and TX separately for each interface
-      timeData[`${d.portName}_rx`] = d.rxBytesPerSecond / 1024 / 1024; // Convert to MB/s
-      timeData[`${d.portName}_tx`] = d.txBytesPerSecond / 1024 / 1024;
+      // Convert bytes per second to Megabits per second (Mbps)
+      timeData[`${d.portName}_rx`] = (d.rxBytesPerSecond * 8) / 1000000;
+      timeData[`${d.portName}_tx`] = (d.txBytesPerSecond * 8) / 1000000;
     });
 
     // Sort by timestamp
