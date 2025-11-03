@@ -991,9 +991,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
+      console.log(`[API /interfaces] Authorization check - router.userId: "${router.userId}", userId: "${userId}", match: ${router.userId === userId}`);
+      
       if (router.userId !== userId) {
         const user = await storage.getUser(userId);
+        console.log(`[API /interfaces] User not owner - checking superadmin. user: ${JSON.stringify(user)}`);
         if (!user || !user.isSuperadmin) {
+          console.log(`[API /interfaces] FORBIDDEN - User ${userId} cannot access router ${req.params.id} (owner: ${router.userId})`);
           return res.status(403).json({ message: "Forbidden" });
         }
       }
@@ -1460,8 +1464,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const user = await storage.getUser(userId);
             const hasAccess = router.userId === userId || (user && user.isSuperadmin);
             
+            console.log(`[WebSocket] Authorization check - router.userId: ${router.userId}, userId: ${userId}, user.isSuperadmin: ${user?.isSuperadmin}, hasAccess: ${hasAccess}`);
+            
             if (!hasAccess) {
-              console.log(`[WebSocket] User ${userId} does not have access to router ${data.routerId}`);
+              console.log(`[WebSocket] FORBIDDEN - User ${userId} does not have access to router ${data.routerId} (owner: ${router.userId})`);
               ws.send(JSON.stringify({ type: "error", message: "Forbidden: You don't have access to this router" }));
               return;
             }
