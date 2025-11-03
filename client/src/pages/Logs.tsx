@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -13,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText, Server, Globe, RefreshCw, Download } from "lucide-react";
+import { FileText, Server, Globe, RefreshCw, Download, Play, Pause } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface LogFile {
@@ -31,16 +33,36 @@ interface LogContent {
 
 export default function Logs() {
   const [selectedLog, setSelectedLog] = useState<string | null>(null);
+  const [liveView, setLiveView] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: logFiles, isLoading, refetch } = useQuery<LogFile[]>({
     queryKey: ["/api/logs"],
-    refetchInterval: 10000, // Auto-refresh every 10 seconds
+    refetchInterval: liveView ? 2000 : 10000, // 2s in live mode, 10s otherwise
   });
+
+  // Auto-select newest server log in live view mode
+  useEffect(() => {
+    if (liveView && logFiles && logFiles.length > 0) {
+      const newestServerLog = logFiles.find(f => f.type === 'server');
+      if (newestServerLog && selectedLog !== newestServerLog.filename) {
+        setSelectedLog(newestServerLog.filename);
+      }
+    }
+  }, [liveView, logFiles]);
 
   const { data: logContent, isLoading: isLoadingContent } = useQuery<LogContent>({
     queryKey: ["/api/logs", selectedLog],
     enabled: !!selectedLog,
+    refetchInterval: liveView ? 1000 : false, // Refresh every 1s in live mode
   });
+
+  // Auto-scroll to bottom in live view
+  useEffect(() => {
+    if (liveView && scrollRef.current && logContent) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [liveView, logContent]);
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return "0 B";
@@ -76,10 +98,24 @@ export default function Logs() {
             View server and browser console logs for debugging and monitoring
           </p>
         </div>
-        <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-logs">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Switch 
+              id="live-view" 
+              checked={liveView}
+              onCheckedChange={setLiveView}
+              data-testid="switch-live-view"
+            />
+            <Label htmlFor="live-view" className="flex items-center gap-2 cursor-pointer">
+              {liveView ? <Play className="h-4 w-4 text-green-500" /> : <Pause className="h-4 w-4" />}
+              <span>Live View</span>
+            </Label>
+          </div>
+          <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-logs">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -188,11 +224,22 @@ export default function Logs() {
                 ))}
               </div>
             ) : logContent ? (
-              <ScrollArea className="h-[600px] w-full">
-                <pre className="text-xs font-mono bg-muted p-4 rounded-md overflow-x-auto">
+              <div 
+                ref={scrollRef}
+                className="h-[600px] w-full overflow-auto bg-muted rounded-md"
+              >
+                <pre className="text-xs font-mono p-4">
                   {logContent.content}
                 </pre>
-              </ScrollArea>
+                {liveView && (
+                  <div className="sticky bottom-0 left-0 right-0 bg-green-500/10 border-t border-green-500/20 p-2 text-center">
+                    <div className="flex items-center justify-center gap-2 text-xs text-green-600 dark:text-green-400">
+                      <Play className="h-3 w-3 animate-pulse" />
+                      <span>Live streaming - Updates every 1 second</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="text-center py-16">
                 <p className="text-sm text-muted-foreground">Failed to load log content</p>
