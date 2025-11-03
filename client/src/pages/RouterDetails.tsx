@@ -102,7 +102,7 @@ export default function RouterDetails() {
       }
     };
 
-    const ws = (window as any).ws;
+    const ws = (window as any).__appWebSocket;
     if (!ws) {
       console.error("[RouterDetails] Global WebSocket not available");
       return;
