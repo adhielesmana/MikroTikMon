@@ -548,61 +548,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Monitored Ports routes
-  // Get all monitored ports across all routers with interface comments
+  // Get all monitored ports across all routers
+  // Note: Interface comments are NOT fetched here to avoid timeout issues
+  // Comments are fetched per-router on the RouterDetails page
   app.get("/api/monitored-ports", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
       const userId = getUserId(req);
       const ports = await storage.getAllMonitoredPorts(userId);
-      
-      // Group ports by router to fetch comments efficiently
-      const portsByRouter = new Map<string, typeof ports>();
-      for (const port of ports) {
-        if (!portsByRouter.has(port.router.id)) {
-          portsByRouter.set(port.router.id, []);
-        }
-        portsByRouter.get(port.router.id)!.push(port);
-      }
-      
-      // Fetch interface comments for each router
-      const portsWithComments = [];
-      for (const [routerId, routerPorts] of Array.from(portsByRouter.entries())) {
-        const router = routerPorts[0].router;
-        
-        try {
-          const { decryptPassword } = await import("./storage.js");
-          const decryptedPassword = decryptPassword(router.encryptedPassword);
-          
-          const client = new MikrotikClient({
-            host: router.cloudDdnsHostname || router.ipAddress,
-            user: router.username,
-            password: decryptedPassword,
-            port: router.port,
-            restEnabled: router.restEnabled || false,
-            restPort: router.restPort || 443,
-            snmpEnabled: router.snmpEnabled || false,
-            snmpCommunity: router.snmpCommunity || 'public',
-            snmpPort: router.snmpPort || 161,
-            interfaceDisplayMode: (router.interfaceDisplayMode || 'static') as 'static' | 'none' | 'all',
-          });
-          
-          const interfaces = await client.getInterfaceStats();
-          const interfaceMap = new Map(interfaces.map((iface: any) => [iface.name, iface.comment]));
-          
-          // Add comments to this router's ports
-          for (const port of routerPorts) {
-            portsWithComments.push({
-              ...port,
-              portComment: interfaceMap.get(port.portName) || undefined,
-            });
-          }
-        } catch (interfaceError) {
-          // If we can't fetch interface comments for this router, return ports without comments
-          console.error(`Failed to fetch interface comments for router ${router.name}:`, interfaceError);
-          portsWithComments.push(...routerPorts);
-        }
-      }
-      
-      res.json(portsWithComments);
+      res.json(ports);
     } catch (error) {
       console.error("Error fetching all monitored ports:", error);
       res.status(500).json({ message: "Failed to fetch monitored ports" });
