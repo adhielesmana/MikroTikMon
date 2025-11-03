@@ -106,9 +106,18 @@ export default function RouterDetails() {
         const message = JSON.parse(event.data);
         
         if (message.type === "realtime_traffic" && message.routerId === id && isSubscribed) {
-          // Update real-time traffic data
+          // Update real-time traffic data - append new points and keep reasonable limit
           console.log("[RouterDetails] Received real-time traffic data:", message.data.length, "points");
-          setRealtimeTrafficData(message.data);
+          setRealtimeTrafficData((prev) => {
+            // Combine previous and new data
+            const combined = [...prev, ...message.data];
+            // Keep only the most recent points (limit to 7200 points = 2 hours at 1s interval)
+            const maxPoints = 7200;
+            if (combined.length > maxPoints) {
+              return combined.slice(combined.length - maxPoints);
+            }
+            return combined;
+          });
         } else if (message.type === "realtime_polling_started" && message.routerId === id) {
           console.log("[RouterDetails] Real-time polling started confirmation received");
           pollingStarted = true;
