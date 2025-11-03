@@ -1544,11 +1544,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   logsWss.on('connection', (ws: WebSocket) => {
     console.log('[LogsWS] Client connected to log stream');
     
-    let watcher: any = null;
     let lastSize = 0;
     let currentLogFile: string | null = null;
+    let isStreaming = true;
     
     const streamLogs = async () => {
+      if (!isStreaming || ws.readyState !== ws.OPEN) return;
+      
       try {
         const logsDir = '/tmp/logs';
         const files = await fs.readdir(logsDir);
@@ -1559,7 +1561,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         if (workflowLogs.length === 0) {
-          ws.send(JSON.stringify({ type: 'log', data: 'Waiting for logs...\n' }));
+          if (lastSize === 0) {
+            ws.send(JSON.stringify({ type: 'log', data: 'Waiting for logs...\n' }));
+          }
           return;
         }
 
@@ -1577,79 +1581,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const latestLog = logFiles[0].filename;
         const logPath = path.join(logsDir, latestLog);
 
-        // If log file changed, reset position and send full content
+        // If log file changed, reset and send full content
         if (currentLogFile !== latestLog) {
           console.log(`[LogsWS] Switching to new log file: ${latestLog}`);
           currentLogFile = latestLog;
           lastSize = 0;
           
-          // Stop old watcher if exists
-          if (watcher) {
-            watcher.close();
-          }
-          
           // Send full initial content
           const content = await fs.readFile(logPath, 'utf-8');
-          ws.send(JSON.stringify({ type: 'log', data: content }));
-          lastSize = content.length;
+          if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({ type: 'log', data: content }));
+            lastSize = content.length;
+          }
+          return;
+        }
+
+        // Check for new content
+        const stats = await fs.stat(logPath);
+        if (stats.size > lastSize) {
+          // Read only the new part
+          const fileHandle = await fs.open(logPath, 'r');
+          const buffer = Buffer.alloc(stats.size - lastSize);
+          await fileHandle.read(buffer, 0, buffer.length, lastSize);
+          await fileHandle.close();
           
-          // Watch for changes
-          const watch = await import('fs');
-          watcher = watch.watch(logPath, async (eventType: string) => {
-            if (eventType === 'change') {
-              try {
-                const stats = await fs.stat(logPath);
-                if (stats.size > lastSize) {
-                  // Read only the new part
-                  const stream = watch.createReadStream(logPath, {
-                    start: lastSize,
-                    encoding: 'utf-8'
-                  });
-                  
-                  let newContent = '';
-                  stream.on('data', (chunk: string) => {
-                    newContent += chunk;
-                  });
-                  
-                  stream.on('end', () => {
-                    if (newContent && ws.readyState === ws.OPEN) {
-                      ws.send(JSON.stringify({ type: 'log', data: newContent }));
-                      lastSize = stats.size;
-                    }
-                  });
-                }
-              } catch (err) {
-                console.error('[LogsWS] Error reading log changes:', err);
-              }
-            }
-          });
+          const newContent = buffer.toString('utf-8');
+          if (newContent && ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({ type: 'log', data: newContent }));
+            lastSize = stats.size;
+          }
         }
       } catch (error) {
         console.error('[LogsWS] Error streaming logs:', error);
-        ws.send(JSON.stringify({ type: 'error', message: 'Failed to stream logs' }));
       }
     };
     
-    // Start streaming
+    // Start streaming immediately
     streamLogs();
     
-    // Check for log file changes every 5 seconds
-    const fileCheckInterval = setInterval(streamLogs, 5000);
+    // Poll for new content every 500ms
+    const pollInterval = setInterval(streamLogs, 500);
     
     ws.on('close', () => {
       console.log('[LogsWS] Client disconnected from log stream');
-      clearInterval(fileCheckInterval);
-      if (watcher) {
-        watcher.close();
-      }
+      isStreaming = false;
+      clearInterval(pollInterval);
     });
     
     ws.on('error', (error) => {
       console.error('[LogsWS] Error:', error);
-      clearInterval(fileCheckInterval);
-      if (watcher) {
-        watcher.close();
-      }
+      isStreaming = false;
+      clearInterval(pollInterval);
     });
   });
 
