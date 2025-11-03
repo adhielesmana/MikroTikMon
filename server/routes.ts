@@ -1335,6 +1335,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Logs route - Real-time streaming of latest workflow logs (admin only)
   app.get("/api/logs/stream", isAuthenticated, isAdmin, async (_req, res) => {
     try {
+      // Disable caching to ensure fresh content on every request
+      res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+
       const logsDir = '/tmp/logs';
       const files = await fs.readdir(logsDir);
       
@@ -1346,7 +1353,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (workflowLogs.length === 0) {
         return res.json({
           content: "No workflow logs available yet...",
-          lines: 1
+          lines: 1,
+          timestamp: Date.now()
         });
       }
 
@@ -1365,13 +1373,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const logPath = path.join(logsDir, latestLog);
       
-      // Read the entire file content
+      // Read the entire file content (fresh on every request)
       const content = await fs.readFile(logPath, 'utf-8');
       
       res.json({
         content,
         lines: content.split('\n').length,
-        filename: latestLog
+        filename: latestLog,
+        timestamp: Date.now() // Add timestamp to force content change
       });
     } catch (error) {
       console.error("Error reading latest workflow logs:", error);
