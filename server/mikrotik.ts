@@ -805,22 +805,40 @@ export class MikrotikClient {
         }
       }
 
-      // Get interface traffic statistics
-      const stats = await api.write("/interface/monitor-traffic", [
-        "=interface=all",
-        "=once="
+      // Get interface traffic statistics using byte counters (not monitor-traffic which returns 0 sometimes)
+      const interfaceStats = await api.write("/interface/print", [
+        "?disabled=false"
       ]);
 
       await api.close();
 
-      // Transform the data into our format
+      // Transform the data into our format using byte counters (same approach as REST/SNMP)
       const allResults: InterfaceStats[] = [];
+      const now = Date.now();
       
-      if (Array.isArray(stats)) {
-        for (const stat of stats) {
-          const name = stat.name || stat.interface || "unknown";
-          const rxRate = parseInt(stat["rx-bits-per-second"] || "0") / 8; // Convert bits to bytes
-          const txRate = parseInt(stat["tx-bits-per-second"] || "0") / 8;
+      if (Array.isArray(interfaceStats)) {
+        for (const iface of interfaceStats) {
+          const name = iface.name;
+          const rxBytes = parseInt(iface['rx-byte'] || '0');
+          const txBytes = parseInt(iface['tx-byte'] || '0');
+          
+          // Use cache to calculate rates (prevents 0 values on first poll)
+          const cacheKey = `native-${this.connection.host}-${name}`;
+          const cached = snmpByteCountCache.get(cacheKey);
+          
+          let rxRate = 0;
+          let txRate = 0;
+          
+          if (cached) {
+            const timeDelta = (now - cached.timestamp) / 1000; // seconds
+            if (timeDelta > 0) {
+              rxRate = Math.max(0, (rxBytes - cached.rx) / timeDelta);
+              txRate = Math.max(0, (txBytes - cached.tx) / timeDelta);
+            }
+          }
+          
+          // Update cache for next poll
+          snmpByteCountCache.set(cacheKey, { rx: rxBytes, tx: txBytes, timestamp: now });
 
           allResults.push({
             name,
@@ -828,7 +846,7 @@ export class MikrotikClient {
             rxBytesPerSecond: rxRate,
             txBytesPerSecond: txRate,
             totalBytesPerSecond: rxRate + txRate,
-            running: stat.running === "true" || stat.running === true, // Port status
+            running: iface.running === "true" || iface.running === true || iface.disabled === "false" || iface.disabled === false,
           });
         }
       }
