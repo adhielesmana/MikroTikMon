@@ -60,6 +60,9 @@ export default function RouterDetails() {
   });
   
   const allInterfaces = interfacesData?.interfaces || [];
+  
+  console.log("[RouterDetails] All interfaces:", allInterfaces.length, allInterfaces.map(i => i.name));
+  console.log("[RouterDetails] Selected interface:", selectedInterface);
 
   // Auto-select first monitored port or first interface
   useEffect(() => {
@@ -374,7 +377,18 @@ export default function RouterDetails() {
             <label className="text-sm font-medium">Select Interface:</label>
             <Select value={selectedInterface} onValueChange={setSelectedInterface}>
               <SelectTrigger className="w-64" data-testid="select-interface">
-                <SelectValue placeholder="Choose interface..." />
+                <SelectValue>
+                  {loadingInterfaces ? (
+                    "Loading..."
+                  ) : selectedInterface ? (
+                    (() => {
+                      const iface = allInterfaces.find(i => i.name === selectedInterface);
+                      return iface ? `${iface.name}${iface.comment ? ` (${iface.comment})` : ''}` : selectedInterface;
+                    })()
+                  ) : (
+                    "Choose interface..."
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {allInterfaces.map(iface => (
