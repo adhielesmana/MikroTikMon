@@ -8,13 +8,27 @@ export default function Logs() {
   const [liveView, setLiveView] = useState(true);
   const [logContent, setLogContent] = useState("");
   const [connected, setConnected] = useState(false);
+  const [isPageVisible, setIsPageVisible] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Connect to SSE log stream
+  // Track page visibility
   useEffect(() => {
-    if (!liveView) {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Connect to SSE log stream only when page is visible and liveView is enabled
+  useEffect(() => {
+    if (!liveView || !isPageVisible) {
       if (eventSourceRef.current) {
+        console.log('[Logs] Closing SSE connection (page hidden or live view disabled)');
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
@@ -25,6 +39,9 @@ export default function Logs() {
     const sseUrl = `/api/logs/stream`;
     
     console.log('[Logs] Connecting to SSE:', sseUrl);
+    // Clear previous logs when reconnecting
+    setLogContent('');
+    
     const eventSource = new EventSource(sseUrl);
     eventSourceRef.current = eventSource;
 
@@ -37,7 +54,6 @@ export default function Logs() {
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'clear') {
-          // Clear the log content when switching to a new log file
           setLogContent('');
         } else if (message.type === 'log') {
           setLogContent(prev => prev + message.data);
@@ -54,10 +70,11 @@ export default function Logs() {
     };
 
     return () => {
+      console.log('[Logs] Cleanup - closing SSE connection');
       eventSource.close();
       eventSourceRef.current = null;
     };
-  }, [liveView]);
+  }, [liveView, isPageVisible]);
 
   // Auto-scroll to bottom when new content arrives
   useEffect(() => {
