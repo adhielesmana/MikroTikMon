@@ -1394,13 +1394,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const latestLog = workflowLogs[0];
         const logPath = path.join(logsDir, latestLog);
 
-        // If log file changed, reset and send full content
+        // If log file changed, reset and send clear command + full new content
         if (currentLogFile !== latestLog) {
-          console.log(`[LogsSSE] Switching to new log file: ${latestLog}`);
+          console.log(`[LogsSSE] Switching from ${currentLogFile || 'none'} to new log file: ${latestLog}`);
           currentLogFile = latestLog;
           lastSize = 0;
           
-          // Send full initial content, stripping XML wrapper
+          // Send clear command first to reset the frontend display
+          res.write(`data: ${JSON.stringify({ type: 'clear' })}\n\n`);
+          
+          // Then send full content from new file, stripping XML wrapper
           const rawContent = await fs.readFile(logPath, 'utf-8');
           const content = extractLogContent(rawContent);
           res.write(`data: ${JSON.stringify({ type: 'log', data: content })}\n\n`);

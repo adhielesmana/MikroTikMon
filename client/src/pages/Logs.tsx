@@ -36,7 +36,10 @@ export default function Logs() {
     eventSource.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        if (message.type === 'log') {
+        if (message.type === 'clear') {
+          // Clear the log content when switching to a new log file
+          setLogContent('');
+        } else if (message.type === 'log') {
           setLogContent(prev => prev + message.data);
         }
       } catch (err) {
