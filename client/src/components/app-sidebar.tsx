@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Server, Bell, Settings, Users, LogOut, TrendingUp, Network } from "lucide-react";
+import { LayoutDashboard, Server, Bell, Settings, Users, LogOut, TrendingUp, Network, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
@@ -148,6 +148,20 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/logs"}
+                    data-testid="sidebar-logs"
+                  >
+                    <Link href="/logs">
+                      <FileText className="h-4 w-4" />
+                      <span>Logs</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

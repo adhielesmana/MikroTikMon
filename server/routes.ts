@@ -1330,6 +1330,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logs routes (admin only)
+  app.get("/api/logs", isAuthenticated, isAdmin, async (_req, res) => {
+    try {
+      const logsDir = '/tmp/logs';
+      const files = await fs.readdir(logsDir);
+      
+      // Get file stats for each log file
+      const logFiles = await Promise.all(
+        files
+          .filter(f => f.endsWith('.log'))
+          .map(async (filename) => {
+            const filePath = path.join(logsDir, filename);
+            const stats = await fs.stat(filePath);
+            return {
+              filename,
+              size: stats.size,
+              modified: stats.mtime,
+              type: filename.includes('browser_console') ? 'browser' : 'server'
+            };
+          })
+      );
+
+      // Sort by modified date (newest first)
+      logFiles.sort((a, b) => b.modified.getTime() - a.modified.getTime());
+
+      res.json(logFiles);
+    } catch (error) {
+      console.error("Error reading logs directory:", error);
+      res.status(500).json({ message: "Failed to read logs" });
+    }
+  });
+
+  app.get("/api/logs/:filename", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { filename } = req.params;
+      
+      // Security: prevent directory traversal
+      if (filename.includes('..') || filename.includes('/')) {
+        return res.status(400).json({ message: "Invalid filename" });
+      }
+
+      const logPath = path.join('/tmp/logs', filename);
+      
+      // Check if file exists
+      try {
+        await fs.access(logPath);
+      } catch {
+        return res.status(404).json({ message: "Log file not found" });
+      }
+
+      // Read file content
+      const content = await fs.readFile(logPath, 'utf-8');
+      
+      res.json({
+        filename,
+        content,
+        lines: content.split('\n').length
+      });
+    } catch (error) {
+      console.error("Error reading log file:", error);
+      res.status(500).json({ message: "Failed to read log file" });
+    }
+  });
+
   // Create HTTP server
   const httpServer = createServer(app);
 
