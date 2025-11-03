@@ -212,7 +212,7 @@ export default function Routers() {
                         {router.name}
                       </TableCell>
                       <TableCell className="font-mono text-sm" data-testid={`text-router-ip-${router.id}`}>
-                        {router.ipAddress}:{router.port}
+                        {router.cloudDdnsHostname || router.ipAddress}:{router.port}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
