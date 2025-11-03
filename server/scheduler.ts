@@ -738,10 +738,12 @@ async function pollSingleRouterRealtime(routerId: string) {
     }
 
     const stats = await client.getInterfaceStatsWithMethod(storedMethod);
+    console.log(`[RealtimePoll] Retrieved ${stats.length} interfaces for ${router.name}`);
     
     // Store all interfaces in memory
     const timestamp = new Date();
     for (const stat of stats) {
+      console.log(`[RealtimePoll] Storing ${stat.name}: RX ${(stat.rxBytesPerSecond/1024/1024).toFixed(2)} Mbps`);
       addRealtimeTraffic(router.id, {
         portName: stat.name,
         comment: stat.comment,
@@ -751,6 +753,8 @@ async function pollSingleRouterRealtime(routerId: string) {
         totalBytesPerSecond: stat.totalBytesPerSecond,
       });
     }
+    console.log(`[RealtimePoll] Stored ${stats.length} interfaces in memory`);
+
 
     // Broadcast real-time data to connected clients via WebSocket
     const pollingState = activeRealtimePolling.get(routerId);
