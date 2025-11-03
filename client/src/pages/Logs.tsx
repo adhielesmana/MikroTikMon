@@ -24,18 +24,9 @@ export default function Logs() {
   const [liveView, setLiveView] = useState(true); // Auto-enable live view
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: logFiles } = useQuery<LogFile[]>({
-    queryKey: ["/api/logs"],
-    refetchInterval: 2000, // Poll for new log files
-  });
-
-  // Auto-select newest server log (Start application workflow)
-  const selectedLog = logFiles?.find(f => f.type === 'server')?.filename || null;
-
   const { data: logContent, isLoading: isLoadingContent, refetch } = useQuery<LogContent>({
-    queryKey: ["/api/logs", selectedLog],
-    enabled: !!selectedLog,
-    refetchInterval: liveView ? 1000 : false, // Refresh every 1s in live mode
+    queryKey: ["/api/logs/stream"],
+    refetchInterval: liveView ? 500 : false, // Refresh every 0.5s in live mode for smoother streaming
   });
 
   // Auto-scroll to bottom in live view
@@ -81,7 +72,7 @@ export default function Logs() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {selectedLog ? "Start application" : "Loading..."}
+            Application Workflow Logs
           </CardTitle>
         </CardHeader>
         <CardContent>
