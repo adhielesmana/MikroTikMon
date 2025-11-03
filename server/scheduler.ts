@@ -527,6 +527,7 @@ async function checkAlerts() {
                 severity: alert.severity,
                 routerName: router.name,
                 portName: port.portName,
+                portComment: stat.comment || null,
               });
 
               console.log(`[Scheduler] Port down alert created for ${router.name} - ${port.portName} (confirmed after 3 checks)`);
@@ -603,6 +604,7 @@ async function checkAlerts() {
                 severity: alert.severity,
                 routerName: router.name,
                 portName: port.portName,
+                portComment: stat.comment || null,
               });
 
               // Send email notification if enabled

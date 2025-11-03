@@ -14,6 +14,7 @@ interface NotificationData {
   severity: string;
   routerName: string;
   portName: string;
+  portComment?: string | null;
 }
 
 export function useWebSocket(userId: string | null) {
@@ -116,16 +117,16 @@ export function useWebSocket(userId: string | null) {
   const handleNotification = (notification: NotificationData) => {
     console.log("[WebSocket] Displaying notification:", notification);
 
-    // Determine toast variant based on severity
-    let variant: "default" | "destructive" = "default";
-    if (notification.severity === "critical") {
-      variant = "destructive";
+    // Build port display with comment if available
+    let portDisplay = notification.portName;
+    if (notification.portComment) {
+      portDisplay = `${notification.portName} (${notification.portComment})`;
     }
 
     toast({
       title: notification.title,
-      description: `${notification.routerName} - ${notification.portName}: ${notification.message}`,
-      variant,
+      description: `${notification.routerName} - ${portDisplay}: ${notification.message}`,
+      variant: "destructive", // Always use red color for alerts
       duration: 10000, // Show for 10 seconds for critical alerts
     });
 
