@@ -371,6 +371,22 @@ export class DatabaseStorage implements IStorage {
     return !!assignment;
   }
 
+  async canUserAccessRouter(routerId: string, userId: string): Promise<boolean> {
+    // Check if user is the owner
+    const router = await this.getRouter(routerId);
+    if (!router) return false;
+    
+    if (router.userId === userId) return true;
+    
+    // Check if user is superadmin
+    const user = await this.getUser(userId);
+    if (user?.isSuperadmin) return true;
+    
+    // Check if user is assigned to this router
+    const isAssigned = await this.isRouterAssignedToUser(routerId, userId);
+    return isAssigned;
+  }
+
   // Monitored Ports operations
   async getMonitoredPorts(routerId: string): Promise<(MonitoredPort & { routerName?: string; portComment?: string })[]> {
     const result = await db

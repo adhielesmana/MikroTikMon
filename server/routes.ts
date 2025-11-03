@@ -991,15 +991,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      console.log(`[API /interfaces] Authorization check - router.userId: "${router.userId}", userId: "${userId}", match: ${router.userId === userId}`);
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      console.log(`[API /interfaces] Access check - userId: ${userId}, routerId: ${req.params.id}, hasAccess: ${hasAccess}`);
       
-      if (router.userId !== userId) {
-        const user = await storage.getUser(userId);
-        console.log(`[API /interfaces] User not owner - checking superadmin. user: ${JSON.stringify(user)}`);
-        if (!user || !user.isSuperadmin) {
-          console.log(`[API /interfaces] FORBIDDEN - User ${userId} cannot access router ${req.params.id} (owner: ${router.userId})`);
-          return res.status(403).json({ message: "Forbidden" });
-        }
+      if (!hasAccess) {
+        console.log(`[API /interfaces] FORBIDDEN - User ${userId} cannot access router ${req.params.id}`);
+        return res.status(403).json({ message: "Forbidden" });
       }
       
       // Get unique port names from real-time traffic store
@@ -1455,19 +1453,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return;
             }
             
-            // Check if user owns the router or is superadmin
+            // Check if user has access (owner, assigned user, or superadmin)
             if (!userId) {
               console.log(`[WebSocket] User not authenticated`);
               ws.send(JSON.stringify({ type: "error", message: "Not authenticated" }));
               return;
             }
-            const user = await storage.getUser(userId);
-            const hasAccess = router.userId === userId || (user && user.isSuperadmin);
             
-            console.log(`[WebSocket] Authorization check - router.userId: ${router.userId}, userId: ${userId}, user.isSuperadmin: ${user?.isSuperadmin}, hasAccess: ${hasAccess}`);
+            const hasAccess = await storage.canUserAccessRouter(data.routerId, userId);
+            console.log(`[WebSocket] Access check for start polling - userId: ${userId}, routerId: ${data.routerId}, hasAccess: ${hasAccess}`);
             
             if (!hasAccess) {
-              console.log(`[WebSocket] FORBIDDEN - User ${userId} does not have access to router ${data.routerId} (owner: ${router.userId})`);
+              console.log(`[WebSocket] FORBIDDEN - User ${userId} cannot access router ${data.routerId}`);
               ws.send(JSON.stringify({ type: "error", message: "Forbidden: You don't have access to this router" }));
               return;
             }
@@ -1495,16 +1492,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               return;
             }
             
+            // Check if user has access (owner, assigned user, or superadmin)
             if (!userId) {
               console.log(`[WebSocket] User not authenticated`);
               ws.send(JSON.stringify({ type: "error", message: "Not authenticated" }));
               return;
             }
-            const user = await storage.getUser(userId);
-            const hasAccess = router.userId === userId || (user && user.isSuperadmin);
+            
+            const hasAccess = await storage.canUserAccessRouter(data.routerId, userId);
+            console.log(`[WebSocket] Access check for stop polling - userId: ${userId}, routerId: ${data.routerId}, hasAccess: ${hasAccess}`);
             
             if (!hasAccess) {
-              console.log(`[WebSocket] User ${userId} does not have access to router ${data.routerId}`);
+              console.log(`[WebSocket] FORBIDDEN - User ${userId} cannot access router ${data.routerId}`);
               ws.send(JSON.stringify({ type: "error", message: "Forbidden: You don't have access to this router" }));
               return;
             }
