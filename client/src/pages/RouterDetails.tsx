@@ -177,8 +177,14 @@ export default function RouterDetails() {
 
     if (interfaceData.length === 0) {
       console.log("[RouterDetails] No data for selected interface:", selectedInterface);
-      console.log("[RouterDetails] Available interfaces in data:", 
-        [...new Set(realtimeTrafficData.map(d => d.portName))].join(", "));
+      const availableInterfaces = Array.from(new Set(realtimeTrafficData.map(d => d.portName)));
+      console.log("[RouterDetails] Available interfaces in data:", availableInterfaces.join(", "));
+      
+      // Auto-switch to first available interface with data
+      if (availableInterfaces.length > 0) {
+        console.log("[RouterDetails] Auto-switching to:", availableInterfaces[0]);
+        setSelectedInterface(availableInterfaces[0]);
+      }
       return;
     }
 
