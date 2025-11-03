@@ -85,8 +85,8 @@ export default function MonitoredPorts() {
 
   const startEditing = (port: MonitoredPortWithRouter) => {
     setEditingId(port.id);
-    // Convert bytes per second to Mbps for display
-    setEditedThreshold(((port.minThresholdBps * 8) / 1_000_000).toFixed(2));
+    // Convert bits per second to Mbps for display
+    setEditedThreshold((port.minThresholdBps / 1_000_000).toFixed(2));
   };
 
   const cancelEditing = () => {
@@ -105,8 +105,8 @@ export default function MonitoredPorts() {
       return;
     }
 
-    // Convert Mbps to bytes per second
-    const bps = (mbps * 1_000_000) / 8;
+    // Convert Mbps to bits per second
+    const bps = mbps * 1_000_000;
     updateMutation.mutate({ id, threshold: bps });
   };
 
@@ -164,7 +164,7 @@ export default function MonitoredPorts() {
                 <TableBody>
                   {ports.map((port) => {
                     const isEditing = editingId === port.id;
-                    const thresholdMbps = ((port.minThresholdBps * 8) / 1_000_000).toFixed(2);
+                    const thresholdMbps = (port.minThresholdBps / 1_000_000).toFixed(2);
 
                     return (
                       <TableRow key={port.id} data-testid={`row-port-${port.id}`}>
