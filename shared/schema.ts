@@ -267,6 +267,7 @@ export const alerts = pgTable("alerts", {
   thresholdBps: real("threshold_bps"), // nullable for router-level alerts
   acknowledged: boolean("acknowledged").notNull().default(false),
   acknowledgedAt: timestamp("acknowledged_at"),
+  acknowledgedBy: varchar("acknowledged_by", { length: 255 }), // "system" for auto-acknowledgment or user's full name for manual acknowledgment
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_alerts_user_created").on(table.userId, table.createdAt),

@@ -1137,7 +1137,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Alert not found" });
       }
       
-      await storage.acknowledgeAlert(req.params.id);
+      // Get user's full name for acknowledgment tracking
+      const user = await storage.getUser(userId);
+      const acknowledgedBy = user 
+        ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || user.username || 'Unknown User'
+        : 'Unknown User';
+      
+      await storage.acknowledgeAlert(req.params.id, acknowledgedBy);
       res.json({ success: true });
     } catch (error) {
       console.error("Error acknowledging alert:", error);

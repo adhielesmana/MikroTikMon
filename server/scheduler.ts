@@ -424,7 +424,7 @@ async function checkAlerts() {
           
           // Auto-acknowledge router down alert if exists
           if (routerDownAlert) {
-            await storage.acknowledgeAlert(routerDownAlert.id);
+            await storage.acknowledgeAlert(routerDownAlert.id, "system");
             resetViolationCount(`router_down_${router.id}`);
             console.log(`[Scheduler] Auto-acknowledged router down alert for ${router.name} (router came back online)`);
           }
@@ -563,7 +563,7 @@ async function checkAlerts() {
           
           // Auto-acknowledge port down alert if exists
           if (hasActiveAlert && isPortDownAlert) {
-            await storage.acknowledgeAlert(latestAlert!.id);
+            await storage.acknowledgeAlert(latestAlert!.id, "system");
             resetViolationCount(`port_down_${port.id}`); // Reset counter on auto-acknowledge
             console.log(`[Scheduler] Auto-acknowledged port down alert for ${router.name} - ${port.portName} (port came back up)`);
             
@@ -675,7 +675,7 @@ async function checkAlerts() {
             // Auto-acknowledge traffic alert if traffic returned to normal
             if (hasActiveAlert && isTrafficAlert) {
               console.log(`[Scheduler] Auto-acknowledging traffic alert for ${router.name} - ${port.portName} (traffic returned to normal)`);
-              await storage.acknowledgeAlert(latestAlert!.id);
+              await storage.acknowledgeAlert(latestAlert!.id, "system");
               resetViolationCount(`traffic_${port.id}`); // Ensure counter is reset on auto-acknowledge
               console.log(`[Scheduler] Successfully auto-acknowledged alert for ${router.name} - ${port.portName}`);
             } else {

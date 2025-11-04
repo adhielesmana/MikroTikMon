@@ -100,8 +100,8 @@ export interface IStorage {
   getLatestAlertForPort(portId: string): Promise<Alert | undefined>;
   getLatestUnacknowledgedAlertForPort(portId: string): Promise<Alert | undefined>;
   getLatestUnacknowledgedRouterAlert(routerId: string): Promise<Alert | undefined>;
-  createAlert(alert: Omit<Alert, "id" | "createdAt" | "acknowledged" | "acknowledgedAt">): Promise<Alert>;
-  acknowledgeAlert(id: string): Promise<void>;
+  createAlert(alert: Omit<Alert, "id" | "createdAt" | "acknowledged" | "acknowledgedAt" | "acknowledgedBy">): Promise<Alert>;
+  acknowledgeAlert(id: string, acknowledgedBy: string): Promise<void>;
 
   // Notification operations
   createNotification(notification: Omit<Notification, "id" | "sentAt" | "read">): Promise<Notification>;
@@ -695,12 +695,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(alerts.createdAt));
   }
 
-  async createAlert(alertData: Omit<Alert, "id" | "createdAt" | "acknowledged" | "acknowledgedAt">): Promise<Alert> {
+  async createAlert(alertData: Omit<Alert, "id" | "createdAt" | "acknowledged" | "acknowledgedAt" | "acknowledgedBy">): Promise<Alert> {
     const [alert] = await db.insert(alerts).values(alertData).returning();
     return alert;
   }
 
-  async acknowledgeAlert(id: string): Promise<void> {
+  async acknowledgeAlert(id: string, acknowledgedBy: string): Promise<void> {
     // First get the alert to find its portId
     const [alert] = await db
       .select()
@@ -708,12 +708,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(alerts.id, id))
       .limit(1);
     
-    // Update the alert
+    // Update the alert with acknowledgment info
     await db
       .update(alerts)
       .set({
         acknowledged: true,
         acknowledgedAt: new Date(),
+        acknowledgedBy: acknowledgedBy, // "system" or user's full name
       })
       .where(eq(alerts.id, id));
     

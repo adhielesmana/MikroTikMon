@@ -107,6 +107,7 @@ export default function Alerts() {
                 <TableHead>Traffic</TableHead>
                 <TableHead>Message</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Acknowledged By</TableHead>
                 <TableHead>Date & Time</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
@@ -144,6 +145,12 @@ export default function Alerts() {
                           Active
                         </Badge>
                       )}
+                    </TableCell>
+                    <TableCell className="text-sm" data-testid={`text-alert-acked-by-${alert.id}`}>
+                      {alert.acknowledged 
+                        ? alert.acknowledgedBy || 'N/A'
+                        : '-'
+                      }
                     </TableCell>
                     <TableCell className="text-sm">
                       {formatDateTime(alert.createdAt)}
