@@ -80,7 +80,9 @@ const SpeedGauge = memo(({
         <div className={`text-4xl font-bold ${color === '#10b981' ? 'text-green-600' : 'text-blue-600'}`} data-testid={testId}>
           {speed.toFixed(2)}
         </div>
-        <div className="text-sm text-muted-foreground">Mbps</div>
+        <div className="text-sm text-muted-foreground">
+          Mbps <span className="text-xs opacity-70">(0-{maxSpeed})</span>
+        </div>
       </div>
     </CardContent>
   </Card>
@@ -275,8 +277,20 @@ export default function RouterDetails() {
     },
   });
 
-  // Calculate max speed for gauge scale (10,000 Mbps = 10 Gbps)
-  const maxSpeed = 10000;
+  // Dynamic gauge scale based on current traffic
+  // < 100 Mbps → 0-100 scale
+  // 100-1000 Mbps → 0-1000 scale
+  // > 1000 Mbps → 0-10000 scale
+  const maxSpeed = useMemo(() => {
+    const maxTraffic = Math.max(currentSpeed.rx, currentSpeed.tx);
+    if (maxTraffic < 100) {
+      return 100;
+    } else if (maxTraffic < 1000) {
+      return 1000;
+    } else {
+      return 10000;
+    }
+  }, [currentSpeed.rx, currentSpeed.tx]);
 
   // Memoize gauge data to prevent unnecessary re-renders of chart components
   const rxGaugeData = useMemo(() => [
@@ -285,7 +299,7 @@ export default function RouterDetails() {
       value: Math.min(currentSpeed.rx, maxSpeed),
       fill: "#3b82f6",
     },
-  ], [currentSpeed.rx]);
+  ], [currentSpeed.rx, maxSpeed]);
 
   const txGaugeData = useMemo(() => [
     {
@@ -293,7 +307,7 @@ export default function RouterDetails() {
       value: Math.min(currentSpeed.tx, maxSpeed),
       fill: "#10b981",
     },
-  ], [currentSpeed.tx]);
+  ], [currentSpeed.tx, maxSpeed]);
 
   if (loadingRouter) {
     return (
