@@ -65,7 +65,25 @@ export default function Alerts() {
     return "Traffic Low";
   };
 
-  const formatDateTime = (date: Date | string | undefined) => {
+  const formatTraffic = (bps: number | null | undefined): string => {
+    if (bps === null || bps === undefined) return "N/A";
+    
+    // Convert bits per second to bytes per second
+    const bytesPerSecond = bps / 8;
+    
+    // Convert to KB/s
+    const kbps = bytesPerSecond / 1024;
+    
+    // If > 1024 KB/s, show in MB/s
+    if (kbps >= 1024) {
+      const mbps = kbps / 1024;
+      return `${mbps.toFixed(2)} MB/s`;
+    }
+    
+    return `${kbps.toFixed(2)} KB/s`;
+  };
+
+  const formatDateTime = (date: Date | string | null | undefined) => {
     if (!date) return "N/A";
     const d = new Date(date);
     return d.toLocaleString('en-US', {
@@ -86,6 +104,7 @@ export default function Alerts() {
               <TableRow>
                 <TableHead>Severity</TableHead>
                 <TableHead>Interface - Comment - Router Name</TableHead>
+                <TableHead>Traffic</TableHead>
                 <TableHead>Message</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date & Time</TableHead>
@@ -106,6 +125,9 @@ export default function Alerts() {
                       {alert.portName}
                       {alert.portComment && ` - ${alert.portComment}`}
                       {` - ${alert.routerName}`}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm" data-testid={`text-alert-traffic-${alert.id}`}>
+                      {formatTraffic(alert.currentTrafficBps)}
                     </TableCell>
                     <TableCell data-testid={`text-alert-message-${alert.id}`}>
                       {getSimplifiedMessage(alert)}
