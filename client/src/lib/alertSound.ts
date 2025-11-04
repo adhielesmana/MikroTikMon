@@ -19,13 +19,15 @@ export function initAudioContext() {
  * Play a 3-second alert sound
  * Creates a loud emergency buzzer alarm (continuous warbling sound)
  */
-export function playAlertSound() {
+export async function playAlertSound() {
   try {
     const ctx = initAudioContext();
     
     // Resume context if suspended (browser autoplay policy)
+    // IMPORTANT: Must await resume() to ensure context is ready
     if (ctx.state === 'suspended') {
-      ctx.resume();
+      await ctx.resume();
+      console.log('[AlertSound] Audio context resumed from suspended state');
     }
 
     const now = ctx.currentTime;
@@ -77,6 +79,6 @@ export function playAlertSound() {
 /**
  * Test the alert sound (for settings page)
  */
-export function testAlertSound() {
-  playAlertSound();
+export async function testAlertSound() {
+  await playAlertSound();
 }

@@ -37,9 +37,9 @@ export default function Settings() {
     });
   };
 
-  const handleTestSound = () => {
+  const handleTestSound = async () => {
     try {
-      playAlertSound();
+      await playAlertSound();
       toast({
         title: "Test sound",
         description: "Playing 3-second alert sound",

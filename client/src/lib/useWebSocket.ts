@@ -114,7 +114,7 @@ export function useWebSocket(userId: string | null) {
     };
   };
 
-  const handleNotification = (notification: NotificationData) => {
+  const handleNotification = async (notification: NotificationData) => {
     console.log("[WebSocket] Displaying notification:", notification);
 
     // Build port display with comment if available
@@ -135,7 +135,7 @@ export function useWebSocket(userId: string | null) {
     if (soundEnabled === null || soundEnabled === "true") {
       // Default to enabled if not set
       try {
-        playAlertSound();
+        await playAlertSound();
       } catch (error) {
         console.error("[WebSocket] Failed to play alert sound:", error);
       }
