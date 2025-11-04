@@ -276,6 +276,17 @@ async function pollRouterTraffic() {
               }
             }
 
+            // Cache ALL interfaces to database (zero additional API calls - reusing fetched data)
+            console.log(`[Scheduler] Caching ${stats.length} interfaces to database for ${router.name}`);
+            for (const stat of stats) {
+              await storage.upsertRouterInterface(router.id, {
+                interfaceName: stat.name,
+                interfaceComment: stat.comment || null,
+                interfaceMacAddress: stat.macAddress || null,
+                isRunning: stat.running,
+              });
+            }
+
             // Get monitored ports for this router
             const monitoredPortsForRouter = portsByRouter.get(router.id) || [];
             console.log(`[Scheduler] Processing ${monitoredPortsForRouter.length} monitored port(s) from single API response for ${router.name}`);
@@ -474,6 +485,17 @@ async function checkAlerts() {
         console.log(`[Scheduler] Fetching all interfaces for alert checking on ${router.name}`);
         const stats = await client.getInterfaceStats();
         console.log(`[Scheduler] Processing ${ports.length} monitored port(s) from single API response for ${router.name}`);
+
+        // Cache ALL interfaces to database (zero additional API calls - reusing fetched data)
+        console.log(`[Scheduler] Caching ${stats.length} interfaces to database for ${router.name}`);
+        for (const stat of stats) {
+          await storage.upsertRouterInterface(router.id, {
+            interfaceName: stat.name,
+            interfaceComment: stat.comment || null,
+            interfaceMacAddress: stat.macAddress || null,
+            isRunning: stat.running,
+          });
+        }
 
         // Process ALL monitored ports from the SINGLE API/SNMP response
         // No additional API calls needed per port
@@ -790,6 +812,16 @@ async function pollSingleRouterRealtime(routerId: string) {
     const stats = await client.getInterfaceStatsWithMethod(storedMethod);
     console.log(`[RealtimePoll] Retrieved ${stats.length} interfaces for ${router.name}`);
     
+    // Cache ALL interfaces to database (zero additional API calls - reusing fetched data)
+    for (const stat of stats) {
+      await storage.upsertRouterInterface(router.id, {
+        interfaceName: stat.name,
+        interfaceComment: stat.comment || null,
+        interfaceMacAddress: stat.macAddress || null,
+        isRunning: stat.running,
+      });
+    }
+
     // Get monitored ports to update their metadata
     const monitoredPorts = await storage.getMonitoredPorts(router.id);
     

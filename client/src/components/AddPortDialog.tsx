@@ -42,24 +42,16 @@ export function AddPortDialog({ routerId, port, trigger }: AddPortDialogProps) {
   const { toast } = useToast();
   const isEditing = !!port;
 
-  // Fetch available interfaces from router
+  // Fetch available interfaces from DATABASE CACHE (instant load, zero API calls to router!)
   const { data: interfacesData, isLoading: loadingInterfaces } = useQuery<{ 
     interfaces: Array<{ name: string; comment?: string }> 
   }>({
-    queryKey: ["/api/routers", routerId, "interfaces"],
+    queryKey: ["/api/routers", routerId, "available-interfaces"],
     enabled: open && !isEditing, // Only fetch when dialog is open and adding new port
   });
 
-  // Fetch already monitored ports to filter them out
-  const { data: monitoredPorts } = useQuery<MonitoredPort[]>({
-    queryKey: ["/api/routers", routerId, "ports"],
-    enabled: open && !isEditing,
-  });
-
-  // Filter out already monitored interfaces
-  const availableInterfaces = interfacesData?.interfaces.filter(
-    (iface) => !monitoredPorts?.some((port) => port.portName === iface.name)
-  ) || [];
+  // Available interfaces already filtered by backend (excludes already monitored ports)
+  const availableInterfaces = interfacesData?.interfaces || [];
 
   const form = useForm<PortFormData>({
     resolver: zodResolver(portFormSchema),

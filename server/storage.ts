@@ -85,9 +85,7 @@ export interface IStorage {
     interfaceName: string;
     interfaceComment?: string | null;
     interfaceMacAddress?: string | null;
-    interfaceType?: string | null;
     isRunning?: boolean;
-    isDisabled?: boolean;
   }): Promise<void>;
   getRouterInterfaces(routerId: string): Promise<RouterInterface[]>;
   getAvailableInterfacesForMonitoring(routerId: string): Promise<RouterInterface[]>;
@@ -408,9 +406,7 @@ export class DatabaseStorage implements IStorage {
     interfaceName: string;
     interfaceComment?: string | null;
     interfaceMacAddress?: string | null;
-    interfaceType?: string | null;
     isRunning?: boolean;
-    isDisabled?: boolean;
   }): Promise<void> {
     await db.insert(routerInterfaces)
       .values({
@@ -418,9 +414,7 @@ export class DatabaseStorage implements IStorage {
         interfaceName: interfaceData.interfaceName,
         interfaceComment: interfaceData.interfaceComment || null,
         interfaceMacAddress: interfaceData.interfaceMacAddress || null,
-        interfaceType: interfaceData.interfaceType || null,
         isRunning: interfaceData.isRunning || false,
-        isDisabled: interfaceData.isDisabled || false,
         lastSeen: new Date(),
       })
       .onConflictDoUpdate({
@@ -428,9 +422,7 @@ export class DatabaseStorage implements IStorage {
         set: {
           interfaceComment: interfaceData.interfaceComment || null,
           interfaceMacAddress: interfaceData.interfaceMacAddress || null,
-          interfaceType: interfaceData.interfaceType || null,
           isRunning: interfaceData.isRunning || false,
-          isDisabled: interfaceData.isDisabled || false,
           lastSeen: new Date(),
           updatedAt: new Date(),
         }

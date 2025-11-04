@@ -1045,6 +1045,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get available interfaces for monitoring (from database cache - NEW, INSTANT LOAD)
+  app.get("/api/routers/:id/available-interfaces", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const router = await storage.getRouter(req.params.id);
+      
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Get cached interfaces from database (zero API calls to router!)
+      const availableInterfaces = await storage.getAvailableInterfacesForMonitoring(req.params.id);
+      
+      // Transform to match expected format
+      const interfaces = availableInterfaces.map(iface => ({
+        name: iface.interfaceName,
+        comment: iface.interfaceComment || undefined
+      }));
+      
+      // Set cache headers
+      const responseData = { interfaces };
+      const etag = generateETag(responseData);
+      res.setHeader('Cache-Control', 'private, max-age=30');
+      res.setHeader('ETag', etag);
+      
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
+      }
+      
+      res.json(responseData);
+    } catch (error) {
+      console.error("Error fetching available interfaces:", error);
+      res.status(500).json({ message: "Failed to fetch available interfaces" });
+    }
+  });
+
   // Get all available interfaces for a router (from real-time traffic store)
   app.get("/api/routers/:id/interfaces", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
