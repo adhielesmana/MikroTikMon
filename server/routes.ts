@@ -27,6 +27,15 @@ function getUserId(req: any): string {
   throw new Error("User ID not found in session");
 }
 
+// Helper function to generate ETag from data
+function generateETag(data: any): string {
+  const hash = crypto
+    .createHash('md5')
+    .update(JSON.stringify(data))
+    .digest('hex');
+  return `"${hash}"`;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -216,6 +225,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!isOwner && !isSuperAdmin && !isAssigned) {
         return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Set cache headers with ETag for conditional requests
+      const etag = generateETag(router);
+      res.setHeader('Cache-Control', 'private, max-age=30');
+      res.setHeader('ETag', etag);
+      
+      // Handle conditional requests
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
       }
       
       res.json(router);
@@ -604,10 +623,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           portComment: interfaceMap.get(port.portName) || undefined,
         }));
         
+        // Set cache headers with ETag for conditional requests
+        const etag = generateETag(portsWithComments);
+        res.setHeader('Cache-Control', 'private, max-age=30');
+        res.setHeader('ETag', etag);
+        
+        // Handle conditional requests
+        if (req.headers['if-none-match'] === etag) {
+          return res.status(304).end();
+        }
+        
         res.json(portsWithComments);
       } catch (interfaceError) {
         // If we can't fetch interface comments, just return the ports without comments
         console.error("Failed to fetch interface comments:", interfaceError);
+        
+        // Set cache headers with ETag even for fallback response
+        const etag = generateETag(ports);
+        res.setHeader('Cache-Control', 'private, max-age=30');
+        res.setHeader('ETag', etag);
+        
+        // Handle conditional requests
+        if (req.headers['if-none-match'] === etag) {
+          return res.status(304).end();
+        }
+        
         res.json(ports);
       }
     } catch (error) {
@@ -1039,7 +1079,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // else 'all' - show all interfaces (no filtering)
       
-      res.json({ interfaces });
+      // Set cache headers with ETag for conditional requests
+      const responseData = { interfaces };
+      const etag = generateETag(responseData);
+      res.setHeader('Cache-Control', 'private, max-age=30');
+      res.setHeader('ETag', etag);
+      
+      // Handle conditional requests
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
+      }
+      
+      res.json(responseData);
     } catch (error) {
       console.error("Error fetching interfaces:", error);
       res.status(500).json({ message: "Failed to fetch interfaces" });

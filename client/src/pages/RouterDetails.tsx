@@ -8,7 +8,7 @@ import type { Router, MonitoredPort, TrafficData } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBytesPerSecond, formatRelativeTime } from "@/lib/utils";
 import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from "recharts";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
 import { AddPortDialog } from "@/components/AddPortDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +30,61 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+// Memoized gauge component to prevent unnecessary re-renders
+const SpeedGauge = memo(({ 
+  title, 
+  speed, 
+  color, 
+  gaugeData, 
+  maxSpeed,
+  testId 
+}: { 
+  title: string;
+  speed: number;
+  color: string;
+  gaugeData: Array<{ name: string; value: number; fill: string }>;
+  maxSpeed: number;
+  testId: string;
+}) => (
+  <Card>
+    <CardHeader>
+      <CardTitle className="text-center text-lg">{title}</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <ResponsiveContainer width="100%" height={200}>
+        <RadialBarChart
+          cx="50%"
+          cy="50%"
+          innerRadius="60%"
+          outerRadius="100%"
+          data={gaugeData}
+          startAngle={180}
+          endAngle={0}
+        >
+          <PolarAngleAxis
+            type="number"
+            domain={[0, maxSpeed]}
+            angleAxisId={0}
+            tick={false}
+          />
+          <RadialBar
+            background
+            dataKey="value"
+            cornerRadius={10}
+            fill={color}
+          />
+        </RadialBarChart>
+      </ResponsiveContainer>
+      <div className="text-center mt-4">
+        <div className={`text-4xl font-bold ${color === '#10b981' ? 'text-green-600' : 'text-blue-600'}`} data-testid={testId}>
+          {speed.toFixed(2)}
+        </div>
+        <div className="text-sm text-muted-foreground">Mbps</div>
+      </div>
+    </CardContent>
+  </Card>
+));
 
 export default function RouterDetails() {
   const { id } = useParams<{ id: string }>();
@@ -60,9 +115,6 @@ export default function RouterDetails() {
   });
   
   const allInterfaces = interfacesData?.interfaces || [];
-  
-  console.log("[RouterDetails] All interfaces:", allInterfaces.length, allInterfaces.map(i => i.name));
-  console.log("[RouterDetails] Selected interface:", selectedInterface);
 
   // Auto-select first monitored port or first interface
   useEffect(() => {
@@ -94,10 +146,8 @@ export default function RouterDetails() {
         const message = JSON.parse(event.data);
         
         if (message.type === "realtime_traffic" && message.routerId === id && isSubscribed) {
-          console.log("[RouterDetails] Received real-time traffic data:", message.data.length, "points");
           setRealtimeTrafficData(message.data);
         } else if (message.type === "realtime_polling_started" && message.routerId === id) {
-          console.log("[RouterDetails] Real-time polling started");
           pollingStarted = true;
         } else if (message.type === "error") {
           console.error("[RouterDetails] WebSocket error:", message.message);
@@ -122,11 +172,7 @@ export default function RouterDetails() {
 
     const startPolling = () => {
       if (!isSubscribed) return;
-      if (pollingStarted) {
-        console.log("[RouterDetails] Polling already started, skipping");
-        return;
-      }
-      console.log("[RouterDetails] Starting real-time polling for router", id);
+      if (pollingStarted) return;
       ws.send(JSON.stringify({ type: "start_realtime_polling", routerId: id }));
     };
 
@@ -153,7 +199,6 @@ export default function RouterDetails() {
 
     return () => {
       isSubscribed = false;
-      console.log("[RouterDetails] Cleanup: Stopping real-time polling");
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "stop_realtime_polling", routerId: id }));
       }
@@ -163,57 +208,52 @@ export default function RouterDetails() {
     };
   }, [id]);
 
-  // Update current speed when new data arrives
-  useEffect(() => {
-    console.log("[RouterDetails] Speed update effect triggered", {
-      selectedInterface,
-      dataLength: realtimeTrafficData.length,
-      hasData: realtimeTrafficData.length > 0
-    });
-
-    if (!selectedInterface) {
-      console.log("[RouterDetails] No interface selected");
-      return;
+  // Memoize the latest traffic data for selected interface to avoid expensive filtering/sorting on every render
+  const latestInterfaceData = useMemo(() => {
+    if (!selectedInterface || realtimeTrafficData.length === 0) {
+      return null;
     }
 
-    if (realtimeTrafficData.length === 0) {
-      console.log("[RouterDetails] No traffic data available");
-      return;
-    }
-
-    // Get ALL data for selected interface (not just latest)
+    // Filter data for selected interface
     const interfaceData = realtimeTrafficData.filter(d => d.portName === selectedInterface);
-    console.log("[RouterDetails] Filtered data for", selectedInterface, ":", interfaceData.length, "points");
-
+    
     if (interfaceData.length === 0) {
-      console.log("[RouterDetails] No data for selected interface:", selectedInterface);
-      // Don't auto-switch - just show 0 speed
+      return null;
+    }
+
+    // Get the latest data point (most recent timestamp)
+    const sorted = [...interfaceData].sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    
+    return sorted[0];
+  }, [realtimeTrafficData, selectedInterface]);
+
+  // Throttle chart updates to every 2 seconds to reduce re-renders
+  const lastUpdateRef = useRef<number>(0);
+  
+  useEffect(() => {
+    if (!latestInterfaceData) {
       setCurrentSpeed({ rx: 0, tx: 0 });
       return;
     }
 
-    // Get the latest data point
-    const latestData = interfaceData.sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    )[0];
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastUpdateRef.current;
+    
+    // Throttle updates to every 2 seconds (2000ms)
+    if (timeSinceLastUpdate < 2000) {
+      return;
+    }
+
+    lastUpdateRef.current = now;
 
     // Convert bytes per second to Megabits per second (Mbps)
-    // Formula: (bytes/sec × 8 bits/byte) ÷ 1,000,000 = Mbps
-    const rxMbps = (latestData.rxBytesPerSecond * 8) / 1000000;
-    const txMbps = (latestData.txBytesPerSecond * 8) / 1000000;
+    const rxMbps = (latestInterfaceData.rxBytesPerSecond * 8) / 1000000;
+    const txMbps = (latestInterfaceData.txBytesPerSecond * 8) / 1000000;
 
-    setCurrentSpeed({
-      rx: rxMbps,
-      tx: txMbps,
-    });
-
-    console.log("[RouterDetails] ✅ Speed updated:", {
-      interface: selectedInterface,
-      rx: rxMbps.toFixed(2) + " Mbps",
-      tx: txMbps.toFixed(2) + " Mbps",
-      timestamp: latestData.timestamp
-    });
-  }, [realtimeTrafficData, selectedInterface]);
+    setCurrentSpeed({ rx: rxMbps, tx: txMbps });
+  }, [latestInterfaceData]);
 
   const deletePortMutation = useMutation({
     mutationFn: async (portId: string) => {
@@ -238,22 +278,22 @@ export default function RouterDetails() {
   // Calculate max speed for gauge scale (10,000 Mbps = 10 Gbps)
   const maxSpeed = 10000;
 
-  // Prepare data for radial gauges
-  const rxGaugeData = [
+  // Memoize gauge data to prevent unnecessary re-renders of chart components
+  const rxGaugeData = useMemo(() => [
     {
       name: "RX",
       value: Math.min(currentSpeed.rx, maxSpeed),
       fill: "#3b82f6",
     },
-  ];
+  ], [currentSpeed.rx]);
 
-  const txGaugeData = [
+  const txGaugeData = useMemo(() => [
     {
       name: "TX",
       value: Math.min(currentSpeed.tx, maxSpeed),
       fill: "#10b981",
     },
-  ];
+  ], [currentSpeed.tx]);
 
   if (loadingRouter) {
     return (
@@ -409,86 +449,28 @@ export default function RouterDetails() {
           {/* Speedtest Meters */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* TX Meter */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-center text-lg">Upload (TX)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                  <RadialBarChart
-                    cx="50%"
-                    cy="50%"
-                    innerRadius="60%"
-                    outerRadius="100%"
-                    data={txGaugeData}
-                    startAngle={180}
-                    endAngle={0}
-                  >
-                    <PolarAngleAxis
-                      type="number"
-                      domain={[0, maxSpeed]}
-                      angleAxisId={0}
-                      tick={false}
-                    />
-                    <RadialBar
-                      background
-                      dataKey="value"
-                      cornerRadius={10}
-                      fill="#10b981"
-                    />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <div className="text-center mt-4">
-                  <div className="text-4xl font-bold text-green-600" data-testid="text-tx-speed">
-                    {currentSpeed.tx.toFixed(2)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Mbps</div>
-                </div>
-              </CardContent>
-            </Card>
+            <SpeedGauge
+              title="Upload (TX)"
+              speed={currentSpeed.tx}
+              color="#10b981"
+              gaugeData={txGaugeData}
+              maxSpeed={maxSpeed}
+              testId="text-tx-speed"
+            />
 
             {/* RX Meter */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-center text-lg">Download (RX)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={200}>
-                  <RadialBarChart
-                    cx="50%"
-                    cy="50%"
-                    innerRadius="60%"
-                    outerRadius="100%"
-                    data={rxGaugeData}
-                    startAngle={180}
-                    endAngle={0}
-                  >
-                    <PolarAngleAxis
-                      type="number"
-                      domain={[0, maxSpeed]}
-                      angleAxisId={0}
-                      tick={false}
-                    />
-                    <RadialBar
-                      background
-                      dataKey="value"
-                      cornerRadius={10}
-                      fill="#3b82f6"
-                    />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <div className="text-center mt-4">
-                  <div className="text-4xl font-bold text-blue-600" data-testid="text-rx-speed">
-                    {currentSpeed.rx.toFixed(2)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Mbps</div>
-                </div>
-              </CardContent>
-            </Card>
+            <SpeedGauge
+              title="Download (RX)"
+              speed={currentSpeed.rx}
+              color="#3b82f6"
+              gaugeData={rxGaugeData}
+              maxSpeed={maxSpeed}
+              testId="text-rx-speed"
+            />
           </div>
 
           <p className="text-xs text-muted-foreground text-center">
-            Gauge scale: 0 - {maxSpeed} Mbps • Data updates every second
+            Gauge scale: 0 - {maxSpeed} Mbps • Visual updates every 2 seconds
           </p>
         </CardContent>
       </Card>
