@@ -36,6 +36,36 @@ function generateETag(data: any): string {
   return `"${hash}"`;
 }
 
+// Helper function to update interface metadata in background
+async function updateCachedInterfaceMetadata(routerId: string, interfaces: any[]): Promise<void> {
+  try {
+    // Get all monitored ports for this router
+    const monitoredPorts = await storage.getMonitoredPorts(routerId);
+    
+    // Create a map of interface data for quick lookup
+    const interfaceMap = new Map(
+      interfaces.map(iface => [iface.name, iface])
+    );
+    
+    // Update metadata for each monitored port if interface data is available
+    for (const port of monitoredPorts) {
+      const interfaceData = interfaceMap.get(port.portName);
+      if (interfaceData) {
+        await storage.updateInterfaceMetadata(
+          routerId,
+          port.portName,
+          {
+            interfaceComment: interfaceData.comment || null,
+            interfaceMacAddress: interfaceData.macAddress || null
+          }
+        );
+      }
+    }
+  } catch (error) {
+    console.error(`[Metadata Update] Failed to update interface metadata for router ${routerId}:`, error);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -177,6 +207,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 await storage.updateRouterConnection(router.id, true);
                 await storage.updateLastSuccessfulConnectionMethod(router.id, workingMethod);
                 console.log(`[Router Creation] ${router.name} connection method: ${workingMethod.toUpperCase()}`);
+                
+                // Update interface metadata in background (non-blocking)
+                client.getInterfaceStats().then(interfaces => {
+                  updateCachedInterfaceMetadata(router.id, interfaces);
+                }).catch(err => {
+                  console.error(`[Router Creation] Failed to fetch interface metadata:`, err);
+                });
               } else {
                 await storage.updateRouterConnection(router.id, false);
                 console.log(`[Router Creation] ${router.name} connection test failed - no working method found`);
@@ -294,6 +331,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 await storage.updateRouterConnection(updated.id, true);
                 await storage.updateLastSuccessfulConnectionMethod(updated.id, workingMethod);
                 console.log(`[Router Update] ${updated.name} connection method: ${workingMethod.toUpperCase()}`);
+                
+                // Update interface metadata in background (non-blocking)
+                client.getInterfaceStats().then(interfaces => {
+                  updateCachedInterfaceMetadata(updated.id, interfaces);
+                }).catch(err => {
+                  console.error(`[Router Update] Failed to fetch interface metadata:`, err);
+                });
               } else {
                 await storage.updateRouterConnection(updated.id, false);
                 console.log(`[Router Update] ${updated.name} connection test failed - no working method found`);
@@ -479,6 +523,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (workingMethod) {
         await storage.updateRouterConnection(req.params.id, true);
         await storage.updateLastSuccessfulConnectionMethod(req.params.id, workingMethod);
+        
+        // Update interface metadata in background (non-blocking)
+        client.getInterfaceStats().then(interfaces => {
+          updateCachedInterfaceMetadata(req.params.id, interfaces);
+        }).catch(err => {
+          console.error(`[Test Connection] Failed to fetch interface metadata:`, err);
+        });
+        
         res.json({ 
           success: true, 
           message: "Connection successful",
@@ -594,62 +646,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Forbidden" });
       }
       
+      // Get monitored ports with cached interface metadata from database
+      // This provides instant loading instead of waiting for live API calls
+      // The scheduler updates this metadata during background polling (every 60s)
       const ports = await storage.getMonitoredPorts(req.params.id);
       
-      // Try to fetch interface comments from the router
-      try {
-        const { decryptPassword } = await import("./storage.js");
-        const decryptedPassword = decryptPassword(router.encryptedPassword);
-        
-        const client = new MikrotikClient({
-          host: router.cloudDdnsHostname || router.ipAddress,
-          user: router.username,
-          password: decryptedPassword,
-          port: router.port,
-          restEnabled: router.restEnabled || false,
-          restPort: router.restPort || 443,
-          snmpEnabled: router.snmpEnabled || false,
-          snmpCommunity: router.snmpCommunity || 'public',
-          snmpPort: router.snmpPort || 161,
-          interfaceDisplayMode: (router.interfaceDisplayMode || 'static') as 'static' | 'none' | 'all',
-        });
-        
-        const interfaces = await client.getInterfaceStats();
-        const interfaceMap = new Map(interfaces.map((iface: any) => [iface.name, iface.comment]));
-        
-        // Merge interface comments with monitored ports
-        const portsWithComments = ports.map(port => ({
-          ...port,
-          portComment: interfaceMap.get(port.portName) || undefined,
-        }));
-        
-        // Set cache headers with ETag for conditional requests
-        const etag = generateETag(portsWithComments);
-        res.setHeader('Cache-Control', 'private, max-age=30');
-        res.setHeader('ETag', etag);
-        
-        // Handle conditional requests
-        if (req.headers['if-none-match'] === etag) {
-          return res.status(304).end();
-        }
-        
-        res.json(portsWithComments);
-      } catch (interfaceError) {
-        // If we can't fetch interface comments, just return the ports without comments
-        console.error("Failed to fetch interface comments:", interfaceError);
-        
-        // Set cache headers with ETag even for fallback response
-        const etag = generateETag(ports);
-        res.setHeader('Cache-Control', 'private, max-age=30');
-        res.setHeader('ETag', etag);
-        
-        // Handle conditional requests
-        if (req.headers['if-none-match'] === etag) {
-          return res.status(304).end();
-        }
-        
-        res.json(ports);
+      // Return ports with cached interface comments from database
+      const portsWithComments = ports.map(port => ({
+        ...port,
+        portComment: port.interfaceComment || undefined,
+      }));
+      
+      // Set cache headers with ETag for conditional requests
+      const etag = generateETag(portsWithComments);
+      res.setHeader('Cache-Control', 'private, max-age=30');
+      res.setHeader('ETag', etag);
+      
+      // Handle conditional requests
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
       }
+      
+      res.json(portsWithComments);
     } catch (error) {
       console.error("Error fetching monitored ports:", error);
       res.status(500).json({ message: "Failed to fetch monitored ports" });
