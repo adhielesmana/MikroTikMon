@@ -234,12 +234,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      // Check ownership - admin can modify any router, normal users only their own
-      if (router.userId !== userId) {
-        const user = await storage.getUser(userId);
-        if (!user || user.role !== "admin") {
-          return res.status(403).json({ message: "Forbidden" });
-        }
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
       }
       
       const updated = await storage.updateRouter(req.params.id, req.body);
@@ -312,12 +310,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      // Check ownership - admin can delete any router, normal users only their own
-      if (router.userId !== userId) {
-        const user = await storage.getUser(userId);
-        if (!user || user.role !== "admin") {
-          return res.status(403).json({ message: "Forbidden" });
-        }
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
       }
       
       await storage.deleteRouter(req.params.id);
@@ -432,7 +428,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      if (router.userId !== userId) {
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       
@@ -571,11 +569,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      if (router.userId !== userId) {
-        const user = await storage.getUser(userId);
-        if (!user || user.role !== "admin") {
-          return res.status(403).json({ message: "Forbidden" });
-        }
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
       }
       
       const ports = await storage.getMonitoredPorts(req.params.id);
@@ -628,7 +625,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      if (router.userId !== userId) {
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       
@@ -694,7 +693,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userId = getUserId(req);
-      if (router.userId !== userId) {
+      
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(port.routerId, userId);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       
@@ -721,7 +723,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userId = getUserId(req);
-      if (router.userId !== userId) {
+      
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(port.routerId, userId);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       
@@ -854,7 +859,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const userId = getUserId(req);
-      if (router.userId !== userId) {
+      
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(port.routerId, userId);
+      if (!hasAccess) {
         return res.status(403).json({ message: "Forbidden" });
       }
       
@@ -877,11 +885,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      if (router.userId !== userId) {
-        const user = await storage.getUser(userId);
-        if (!user || user.role !== "admin") {
-          return res.status(403).json({ message: "Forbidden" });
-        }
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
       }
       
       // Parse time range
@@ -924,11 +931,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Router not found" });
       }
       
-      if (router.userId !== userId) {
-        const user = await storage.getUser(userId);
-        if (!user || user.role !== "admin") {
-          return res.status(403).json({ message: "Forbidden" });
-        }
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
       }
       
       // Support custom date range via startDate and endDate query parameters
