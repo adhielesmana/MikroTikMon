@@ -25,7 +25,7 @@ import {
   type InsertUserRouter,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, gte, lt, sql } from "drizzle-orm";
+import { eq, and, or, desc, gte, lt, sql } from "drizzle-orm";
 import CryptoJS from "crypto-js";
 
 const ENCRYPTION_KEY = process.env.SESSION_SECRET || "default-key-change-in-production";
@@ -621,6 +621,9 @@ export class DatabaseStorage implements IStorage {
 
   // Alert operations
   async getAlerts(userId: string): Promise<(Alert & { routerName: string })[]> {
+    // Get alerts for:
+    // 1. Routers owned by the user (alerts.userId = userId)
+    // 2. Routers assigned to the user (via user_routers table)
     const results = await db
       .select({
         alert: alerts,
@@ -628,7 +631,13 @@ export class DatabaseStorage implements IStorage {
       })
       .from(alerts)
       .leftJoin(routers, eq(alerts.routerId, routers.id))
-      .where(eq(alerts.userId, userId))
+      .leftJoin(userRouters, eq(alerts.routerId, userRouters.routerId))
+      .where(
+        or(
+          eq(alerts.userId, userId),           // Owned routers
+          eq(userRouters.userId, userId)       // Assigned routers
+        )
+      )
       .orderBy(desc(alerts.createdAt));
     
     return results.map(r => ({
