@@ -3,6 +3,7 @@ import {
   users,
   routers,
   routerGroups,
+  routerInterfaces,
   monitoredPorts,
   trafficData,
   alerts,
@@ -15,6 +16,8 @@ import {
   type InsertRouter,
   type RouterGroup,
   type InsertRouterGroup,
+  type RouterInterface,
+  type InsertRouterInterface,
   type MonitoredPort,
   type InsertMonitoredPort,
   type TrafficData,
@@ -76,6 +79,18 @@ export interface IStorage {
   getRouterAssignments(routerId: string): Promise<(UserRouter & { user: User })[]>;
   getUserAssignedRouters(userId: string): Promise<Router[]>;
   isRouterAssignedToUser(routerId: string, userId: string): Promise<boolean>;
+
+  // Router Interfaces operations (caching ALL interfaces from routers)
+  upsertRouterInterface(routerId: string, interfaceData: {
+    interfaceName: string;
+    interfaceComment?: string | null;
+    interfaceMacAddress?: string | null;
+    interfaceType?: string | null;
+    isRunning?: boolean;
+    isDisabled?: boolean;
+  }): Promise<void>;
+  getRouterInterfaces(routerId: string): Promise<RouterInterface[]>;
+  getAvailableInterfacesForMonitoring(routerId: string): Promise<RouterInterface[]>;
 
   // Monitored Ports operations
   getMonitoredPorts(routerId: string): Promise<MonitoredPort[]>;
@@ -388,6 +403,60 @@ export class DatabaseStorage implements IStorage {
     return isAssigned;
   }
 
+  // Router Interfaces operations (caching ALL interfaces from routers)
+  async upsertRouterInterface(routerId: string, interfaceData: {
+    interfaceName: string;
+    interfaceComment?: string | null;
+    interfaceMacAddress?: string | null;
+    interfaceType?: string | null;
+    isRunning?: boolean;
+    isDisabled?: boolean;
+  }): Promise<void> {
+    await db.insert(routerInterfaces)
+      .values({
+        routerId,
+        interfaceName: interfaceData.interfaceName,
+        interfaceComment: interfaceData.interfaceComment || null,
+        interfaceMacAddress: interfaceData.interfaceMacAddress || null,
+        interfaceType: interfaceData.interfaceType || null,
+        isRunning: interfaceData.isRunning || false,
+        isDisabled: interfaceData.isDisabled || false,
+        lastSeen: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [routerInterfaces.routerId, routerInterfaces.interfaceName],
+        set: {
+          interfaceComment: interfaceData.interfaceComment || null,
+          interfaceMacAddress: interfaceData.interfaceMacAddress || null,
+          interfaceType: interfaceData.interfaceType || null,
+          isRunning: interfaceData.isRunning || false,
+          isDisabled: interfaceData.isDisabled || false,
+          lastSeen: new Date(),
+          updatedAt: new Date(),
+        }
+      });
+  }
+
+  async getRouterInterfaces(routerId: string): Promise<RouterInterface[]> {
+    return await db
+      .select()
+      .from(routerInterfaces)
+      .where(eq(routerInterfaces.routerId, routerId))
+      .orderBy(routerInterfaces.interfaceName);
+  }
+
+  async getAvailableInterfacesForMonitoring(routerId: string): Promise<RouterInterface[]> {
+    // Get all cached interfaces for this router
+    const allInterfaces = await this.getRouterInterfaces(routerId);
+    
+    // Get already monitored ports
+    const monitoredPorts = await this.getMonitoredPorts(routerId);
+    const monitoredNames = new Set(monitoredPorts.map(p => p.portName));
+    
+    // Filter out already monitored interfaces
+    return allInterfaces.filter(iface => !monitoredNames.has(iface.interfaceName));
+  }
+
   // Monitored Ports operations
   async getMonitoredPorts(routerId: string): Promise<(MonitoredPort & { routerName?: string; portComment?: string })[]> {
     const result = await db
@@ -696,8 +765,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAlert(alertData: Omit<Alert, "id" | "createdAt" | "acknowledged" | "acknowledgedAt" | "acknowledgedBy">): Promise<Alert> {
-    const [alert] = await db.insert(alerts).values(alertData).returning();
-    return alert;
+    try {
+      const [alert] = await db.insert(alerts).values(alertData).returning();
+      return alert;
+    } catch (error: any) {
+      // Handle duplicate alert error gracefully (when multiple app instances try to create same alert)
+      if (error.code === '23505' || error.message?.includes('unique constraint') || error.message?.includes('duplicate')) {
+        console.log(`[Storage] Duplicate alert prevented by unique constraint - this is expected with multiple app instances`);
+        // Return the existing alert instead
+        const existing = await this.getLatestUnacknowledgedAlertForPort(alertData.portId!);
+        if (existing) {
+          return existing;
+        }
+        // If no port ID (router-level alert), get router alert
+        if (!alertData.portId) {
+          const existingRouterAlert = await this.getLatestUnacknowledgedRouterAlert(alertData.routerId);
+          if (existingRouterAlert) {
+            return existingRouterAlert;
+          }
+        }
+        // Fallback - shouldn't reach here but throw original error if we do
+        throw error;
+      }
+      // Re-throw non-duplicate errors
+      throw error;
+    }
   }
 
   async acknowledgeAlert(id: string, acknowledgedBy: string): Promise<void> {

@@ -187,6 +187,27 @@ export const insertUserRouterSchema = createInsertSchema(userRouters).omit({
 export type InsertUserRouter = z.infer<typeof insertUserRouterSchema>;
 export type UserRouter = typeof userRouters.$inferSelect;
 
+// Router Interfaces table - Caches ALL interfaces from each router (monitored + unmonitored)
+export const routerInterfaces = pgTable("router_interfaces", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
+  interfaceName: varchar("interface_name", { length: 255 }).notNull(),
+  interfaceComment: text("interface_comment"),
+  interfaceMacAddress: varchar("interface_mac_address", { length: 17 }),
+  interfaceType: varchar("interface_type", { length: 50 }), // e.g., "ether", "vlan", "bridge"
+  isRunning: boolean("is_running").default(false),
+  isDisabled: boolean("is_disabled").default(false),
+  lastSeen: timestamp("last_seen").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique().on(table.routerId, table.interfaceName),
+  index("idx_router_interfaces_router").on(table.routerId),
+]);
+
+export type RouterInterface = typeof routerInterfaces.$inferSelect;
+export type InsertRouterInterface = typeof routerInterfaces.$inferInsert;
+
 // Monitored Ports table - Stores which ports to monitor and their thresholds
 export const monitoredPorts = pgTable("monitored_ports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -272,6 +293,9 @@ export const alerts = pgTable("alerts", {
 }, (table) => [
   index("idx_alerts_user_created").on(table.userId, table.createdAt),
   index("idx_alerts_router").on(table.routerId),
+  // CRITICAL: Unique constraint to prevent duplicate alerts from multiple app instances
+  // Only one unacknowledged alert per port allowed
+  unique("unique_alert_port_unack").on(table.routerId, table.portId, table.acknowledged),
 ]);
 
 export const alertsRelations = relations(alerts, ({ one }) => ({
