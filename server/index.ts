@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { startAutoUpdate } from "./autoUpdate";
 import path from "path";
 
 const app = express();
@@ -82,5 +83,10 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Start automatic update checker (production only)
+    if (app.get("env") === "production") {
+      startAutoUpdate();
+    }
   });
 })();
