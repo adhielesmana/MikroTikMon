@@ -28,7 +28,7 @@ import {
   type InsertUserRouter,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, desc, gte, lt, sql, isNull } from "drizzle-orm";
+import { eq, and, or, desc, gte, lt, sql, isNull, inArray } from "drizzle-orm";
 import CryptoJS from "crypto-js";
 
 const ENCRYPTION_KEY = process.env.SESSION_SECRET || "default-key-change-in-production";
@@ -683,9 +683,35 @@ export class DatabaseStorage implements IStorage {
 
   // Alert operations
   async getAlerts(userId: string): Promise<(Alert & { routerName: string })[]> {
-    // Get alerts for:
-    // 1. Routers owned by the user (alerts.userId = userId)
-    // 2. Routers assigned to the user (via user_routers table)
+    // Check if user is superadmin
+    const user = await this.getUser(userId);
+    
+    // Superadmins see ALL alerts
+    if (user?.isSuperadmin) {
+      const results = await db
+        .select({
+          alert: alerts,
+          routerName: routers.name,
+        })
+        .from(alerts)
+        .leftJoin(routers, eq(alerts.routerId, routers.id))
+        .orderBy(desc(alerts.createdAt));
+      
+      return results.map(r => ({
+        ...r.alert,
+        routerName: r.routerName || "Unknown Router",
+      }));
+    }
+    
+    // Normal users: Get alerts for owned + assigned routers
+    // Using subquery to avoid duplicates from JOIN
+    const assignedRouterIds = await db
+      .select({ routerId: userRouters.routerId })
+      .from(userRouters)
+      .where(eq(userRouters.userId, userId));
+    
+    const assignedIds = assignedRouterIds.map(r => r.routerId);
+    
     const results = await db
       .select({
         alert: alerts,
@@ -693,11 +719,10 @@ export class DatabaseStorage implements IStorage {
       })
       .from(alerts)
       .leftJoin(routers, eq(alerts.routerId, routers.id))
-      .leftJoin(userRouters, eq(alerts.routerId, userRouters.routerId))
       .where(
         or(
-          eq(alerts.userId, userId),           // Owned routers
-          eq(userRouters.userId, userId)       // Assigned routers
+          eq(alerts.userId, userId),                              // Owned routers
+          assignedIds.length > 0 ? inArray(alerts.routerId, assignedIds) : sql`false`  // Assigned routers
         )
       )
       .orderBy(desc(alerts.createdAt));
