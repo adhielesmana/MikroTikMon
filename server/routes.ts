@@ -1194,6 +1194,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test endpoint to send dummy notification (for testing alert sound)
+  app.post("/api/alerts/test-notification", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Import broadcastNotification from scheduler
+      const { broadcastNotification } = await import("./scheduler");
+      
+      // Send test notification
+      const testNotification = {
+        title: "🔔 Test Alert",
+        routerName: "Test Router",
+        portName: "ether1",
+        portComment: "TEST PORT",
+        message: "This is a test notification to verify alert sound is working. You should hear a 3-second buzzer alarm!",
+      };
+      
+      broadcastNotification(userId, testNotification);
+      
+      console.log(`[Test] Sent test notification to user ${userId} (${user.username})`);
+      
+      res.json({ 
+        success: true, 
+        message: "Test notification sent. Check for popup and listen for sound!",
+        notification: testNotification
+      });
+    } catch (error) {
+      console.error("Error sending test notification:", error);
+      res.status(500).json({ message: "Failed to send test notification" });
+    }
+  });
+
   // Admin routes - User management restricted to superadmin only
   app.get("/api/admin/users", isAuthenticated, isSuperadmin, async (req, res) => {
     try {

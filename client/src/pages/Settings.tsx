@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, User, Shield, Loader2, Volume2 } from "lucide-react";
+import { Mail, User, Shield, Loader2, Volume2, Bell } from "lucide-react";
 import { playAlertSound } from "@/lib/alertSound";
 
 export default function Settings() {
@@ -48,6 +48,32 @@ export default function Settings() {
       toast({
         title: "Error",
         description: "Failed to play alert sound",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleTestNotification = async () => {
+    try {
+      const response = await fetch("/api/alerts/test-notification", {
+        method: "POST",
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to send test notification");
+      }
+      
+      const data = await response.json();
+      
+      toast({
+        title: "Test sent",
+        description: "A popup notification should appear with sound in a moment...",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send test notification",
         variant: "destructive",
       });
     }
@@ -291,6 +317,15 @@ export default function Settings() {
               >
                 <Volume2 className="h-4 w-4 mr-2" />
                 Test Sound
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTestNotification}
+                data-testid="button-test-notification"
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                Test Popup
               </Button>
               <Switch 
                 id="alert-sound" 
