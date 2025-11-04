@@ -200,6 +200,19 @@ export default function App() {
     "--sidebar-width-icon": "3rem",
   };
 
+  // Force browser refresh every 1 hour to keep app fresh
+  useEffect(() => {
+    const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+    
+    const refreshInterval = setInterval(() => {
+      console.log('[App] Auto-refreshing browser after 1 hour...');
+      window.location.reload();
+    }, oneHour);
+
+    // Cleanup on unmount
+    return () => clearInterval(refreshInterval);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
