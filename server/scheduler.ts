@@ -349,11 +349,8 @@ async function checkAlerts() {
         // Check if router is reachable (using database status from pollRouterTraffic)
         const isReachable = router.reachable !== false; // Default to true if not set
         
-        // Check for existing unacknowledged router down alert (efficient query)
-        const routerAlerts = await storage.getAlertsByRouter(router.id);
-        const routerDownAlert = routerAlerts.find(
-          (alert: Alert) => !alert.acknowledgedAt && alert.message.includes("Router is UNREACHABLE")
-        );
+        // Check for existing unacknowledged router down alert (efficient database query)
+        const routerDownAlert = await storage.getLatestUnacknowledgedRouterAlert(router.id);
         
         if (!isReachable) {
           // Router is DOWN - increment violation count
@@ -361,7 +358,8 @@ async function checkAlerts() {
           
           console.log(`[Scheduler] Router ${router.name} is unreachable (check ${violationCount}/5)`);
           
-          // Create router down alert only after 5 consecutive checks
+          // CRITICAL: Only create router down alert if NO active unacknowledged alert exists
+          // This prevents duplicate alerts for the same ongoing issue
           if (violationCount >= 5 && !routerDownAlert) {
             // Get all users who should receive this alert (owner + assigned users)
             const recipientUserIds = await getAllAlertRecipients(router.id, router.userId);
@@ -415,7 +413,10 @@ async function checkAlerts() {
             }
 
             console.log(`[Scheduler] Router down alert created for ${router.name} and sent to ${recipientUserIds.length} user(s) (confirmed after 5 checks)`);
-            resetViolationCount(`router_down_${router.id}`); // Reset after alert created
+            // Do NOT reset counter here - keep counting to prevent creating alerts every 5 minutes
+            // Counter will be reset when router comes back online or alert is acknowledged
+          } else if (violationCount >= 5 && routerDownAlert) {
+            console.log(`[Scheduler] ⚠️  Alert de-duplication: Router ${router.name} still unreachable but alert #${routerDownAlert.id} already active - NOT creating duplicate alert`);
           }
         } else {
           // Router is UP - reset violation count
@@ -489,14 +490,14 @@ async function checkAlerts() {
             interfaceMacAddress: stat.macAddress || null,
           });
 
-          // Check if there's already a recent unacknowledged alert for this port
+          // Check if there's already an unacknowledged alert for this port
           let latestAlert = await storage.getLatestUnacknowledgedAlertForPort(port.id);
           let hasActiveAlert = !!latestAlert;
           let isPortDownAlert = latestAlert && latestAlert.message.includes("is DOWN");
           let isTrafficAlert = latestAlert && !latestAlert.message.includes("is DOWN");
           
           if (hasActiveAlert) {
-            console.log(`[Scheduler] Found unacknowledged alert for ${router.name} - ${port.portName}: ${isPortDownAlert ? 'Port Down' : 'Traffic'} Alert`);
+            console.log(`[Scheduler] Found unacknowledged alert for ${router.name} - ${port.portName}: ${isPortDownAlert ? 'Port Down' : 'Traffic'} Alert #${latestAlert!.id}`);
           }
 
           // Check port status (down/up)
@@ -504,8 +505,9 @@ async function checkAlerts() {
             // Port is DOWN - increment violation count
             const violationCount = incrementViolationCount(`port_down_${port.id}`);
             
-            // Create port down alert only after 5 consecutive checks
-            if (violationCount >= 5 && (!hasActiveAlert || !isPortDownAlert)) {
+            // CRITICAL: Only create port down alert if NO active port down alert exists
+            // This prevents duplicate alerts for the same ongoing issue
+            if (violationCount >= 5 && !isPortDownAlert) {
               // Get all users who should receive this alert (owner + assigned users)
               const recipientUserIds = await getAllAlertRecipients(router.id, router.userId);
               console.log(`[Scheduler] Port down alert for ${router.name} - ${port.portName} will notify ${recipientUserIds.length} user(s)`);
@@ -547,9 +549,12 @@ async function checkAlerts() {
               }
 
               console.log(`[Scheduler] Port down alert created for ${router.name} - ${port.portName} and sent to ${recipientUserIds.length} user(s) (confirmed after 5 checks)`);
-              resetViolationCount(`port_down_${port.id}`); // Reset after alert created
+              // Do NOT reset counter here - keep counting to prevent creating alerts every 5 minutes
+              // Counter will be reset when port comes back up or alert is acknowledged
+            } else if (violationCount >= 5 && isPortDownAlert) {
+              console.log(`[Scheduler] ⚠️  Alert de-duplication: Port ${router.name} - ${port.portName} still down but alert #${latestAlert!.id} already active - NOT creating duplicate alert`);
             }
-            resetViolationCount(`traffic_${port.id}`); // Reset traffic violation count
+            resetViolationCount(`traffic_${port.id}`); // Reset traffic violation count when port is down
             continue; // Skip traffic threshold check for down ports
           }
 
@@ -580,8 +585,9 @@ async function checkAlerts() {
             // Increment violation count
             const violationCount = incrementViolationCount(`traffic_${port.id}`);
             
-            // Only create alert after 5 consecutive checks AND no active traffic alert
-            if (violationCount >= 5 && (!hasActiveAlert || isPortDownAlert)) {
+            // CRITICAL: Only create traffic alert if NO active traffic alert exists
+            // This prevents duplicate alerts for the same ongoing issue
+            if (violationCount >= 5 && !isTrafficAlert) {
               // Get all users who should receive this alert (owner + assigned users)
               const recipientUserIds = await getAllAlertRecipients(router.id, router.userId);
               console.log(`[Scheduler] Traffic alert for ${router.name} - ${port.portName} will notify ${recipientUserIds.length} user(s)`);
@@ -657,7 +663,10 @@ async function checkAlerts() {
               }
 
               console.log(`[Scheduler] Traffic alert created for ${router.name} - ${port.portName} and sent to ${recipientUserIds.length} user(s) (confirmed after 5 checks)`);
-              resetViolationCount(`traffic_${port.id}`); // Reset after alert created
+              // Do NOT reset counter here - keep counting to prevent creating alerts every 5 minutes
+              // Counter will be reset when traffic returns to normal or alert is acknowledged
+            } else if (violationCount >= 5 && isTrafficAlert) {
+              console.log(`[Scheduler] ⚠️  Alert de-duplication: Port ${router.name} - ${port.portName} still below threshold but alert #${latestAlert!.id} already active - NOT creating duplicate alert`);
             }
           } else {
             // Traffic is above threshold - reset violation count

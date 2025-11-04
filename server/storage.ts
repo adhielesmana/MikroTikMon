@@ -25,7 +25,7 @@ import {
   type InsertUserRouter,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, desc, gte, lt, sql } from "drizzle-orm";
+import { eq, and, or, desc, gte, lt, sql, isNull } from "drizzle-orm";
 import CryptoJS from "crypto-js";
 
 const ENCRYPTION_KEY = process.env.SESSION_SECRET || "default-key-change-in-production";
@@ -99,6 +99,7 @@ export interface IStorage {
   getAlertsByRouter(routerId: string): Promise<Alert[]>;
   getLatestAlertForPort(portId: string): Promise<Alert | undefined>;
   getLatestUnacknowledgedAlertForPort(portId: string): Promise<Alert | undefined>;
+  getLatestUnacknowledgedRouterAlert(routerId: string): Promise<Alert | undefined>;
   createAlert(alert: Omit<Alert, "id" | "createdAt" | "acknowledged" | "acknowledgedAt">): Promise<Alert>;
   acknowledgeAlert(id: string): Promise<void>;
 
@@ -661,6 +662,22 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(alerts)
       .where(and(eq(alerts.portId, portId), eq(alerts.acknowledged, false)))
+      .orderBy(desc(alerts.createdAt))
+      .limit(1);
+    return alert;
+  }
+
+  async getLatestUnacknowledgedRouterAlert(routerId: string): Promise<Alert | undefined> {
+    const [alert] = await db
+      .select()
+      .from(alerts)
+      .where(
+        and(
+          eq(alerts.routerId, routerId),
+          isNull(alerts.portId), // Router-level alerts have null portId
+          eq(alerts.acknowledged, false)
+        )
+      )
       .orderBy(desc(alerts.createdAt))
       .limit(1);
     return alert;
