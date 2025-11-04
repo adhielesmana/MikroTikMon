@@ -293,9 +293,9 @@ export const alerts = pgTable("alerts", {
 }, (table) => [
   index("idx_alerts_user_created").on(table.userId, table.createdAt),
   index("idx_alerts_router").on(table.routerId),
-  // CRITICAL: Unique constraint to prevent duplicate alerts from multiple app instances
-  // Only one unacknowledged alert per port allowed
-  unique("unique_alert_port_unack").on(table.routerId, table.portId, table.acknowledged),
+  // CRITICAL: Partial unique index to prevent duplicate UNACKNOWLEDGED alerts from multiple app instances
+  // Allows new alerts after acknowledgement, but prevents duplicates for same ongoing issue
+  // Note: Created via SQL in execute_sql_tool, not via Drizzle (Drizzle doesn't support partial indexes in schema)
 ]);
 
 export const alertsRelations = relations(alerts, ({ one }) => ({

@@ -763,20 +763,22 @@ export class DatabaseStorage implements IStorage {
     } catch (error: any) {
       // Handle duplicate alert error gracefully (when multiple app instances try to create same alert)
       if (error.code === '23505' || error.message?.includes('unique constraint') || error.message?.includes('duplicate')) {
-        console.log(`[Storage] Duplicate alert prevented by unique constraint - this is expected with multiple app instances`);
-        // Return the existing alert instead
-        const existing = await this.getLatestUnacknowledgedAlertForPort(alertData.portId!);
-        if (existing) {
+        console.log(`[Storage] Duplicate alert prevented by partial unique index - checking for existing unacknowledged alert`);
+        
+        // Query for existing UNACKNOWLEDGED alert to verify it's truly a duplicate
+        const existing = alertData.portId 
+          ? await this.getLatestUnacknowledgedAlertForPort(alertData.portId)
+          : await this.getLatestUnacknowledgedRouterAlert(alertData.routerId);
+        
+        if (existing && !existing.acknowledged) {
+          // Found unacknowledged alert - this is a true duplicate, return existing
+          console.log(`[Storage] Returning existing unacknowledged alert #${existing.id}`);
           return existing;
         }
-        // If no port ID (router-level alert), get router alert
-        if (!alertData.portId) {
-          const existingRouterAlert = await this.getLatestUnacknowledgedRouterAlert(alertData.routerId);
-          if (existingRouterAlert) {
-            return existingRouterAlert;
-          }
-        }
-        // Fallback - shouldn't reach here but throw original error if we do
+        
+        // No unacknowledged alert found - this should not happen with partial index
+        // The constraint should only fire when there IS an unacknowledged alert
+        console.error(`[Storage] Unique constraint fired but no unacknowledged alert found - possible race condition`);
         throw error;
       }
       // Re-throw non-duplicate errors
