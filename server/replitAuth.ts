@@ -47,10 +47,12 @@ export function getSession() {
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    rolling: true, // Reset cookie maxAge on every request
     cookie: {
       httpOnly: true,
       secure: useSecureCookies,
-      maxAge: sessionTtl,
+      maxAge: sessionTtl, // 7 days - persists across browser reloads
+      sameSite: 'lax', // CSRF protection while allowing normal navigation
     },
   });
 }

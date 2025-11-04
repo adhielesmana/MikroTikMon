@@ -22,6 +22,25 @@ app.use(express.urlencoded({ extended: false }));
 const attachedAssetsPath = path.resolve(import.meta.dirname, "..", "attached_assets");
 app.use("/attached_assets", express.static(attachedAssetsPath));
 
+// Add cache control headers for static assets
+app.use((req, res, next) => {
+  const url = req.url;
+  
+  // Cache static assets (JS, CSS, images, fonts) for 1 year
+  // Vite adds content hashes to filenames, so these are immutable
+  if (url.match(/\.(js|css|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|webp|ico)$/)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  }
+  // Never cache HTML files - always get fresh version
+  else if (url.endsWith('.html') || url === '/') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
