@@ -195,7 +195,7 @@ function addRealtimeTraffic(routerId: string, data: Omit<RealtimeTrafficData, 'r
   }
 }
 
-// Traffic data collection for monitored ports only (runs every 60 seconds)
+// Traffic data collection for monitored ports + reachability checks for all routers (runs every 60 seconds)
 // Real-time traffic for all interfaces is now handled by on-demand polling when details page is open
 async function pollRouterTraffic() {
   try {
@@ -210,12 +210,13 @@ async function pollRouterTraffic() {
       portsByRouter.set(port.router.id, existing);
     }
 
-    // Get unique routers that have monitored ports
+    // Get ALL routers and split into two groups
     const uniqueRouterIds = new Set(monitoredPorts.map(p => p.router.id));
     const allRouters = await storage.getAllRouters();
     const routersWithMonitoredPorts = allRouters.filter(r => uniqueRouterIds.has(r.id));
+    const routersWithoutMonitoredPorts = allRouters.filter(r => !uniqueRouterIds.has(r.id));
 
-    console.log(`[Scheduler] Polling ${routersWithMonitoredPorts.length} routers with monitored ports`);
+    console.log(`[Scheduler] Polling ${routersWithMonitoredPorts.length} routers with monitored ports + ${routersWithoutMonitoredPorts.length} routers for reachability only`);
 
     // Collect traffic data for ALL routers (reachability determined by stats fetch success/failure)
     // This eliminates the separate reachability check, reducing API calls from 2 to 1 per router
@@ -336,7 +337,48 @@ async function pollRouterTraffic() {
             await storage.updateRouterConnection(router.id, false);
           }
         })
-    )
+    );
+
+    // Check reachability for routers WITHOUT monitored ports (lightweight check only)
+    await Promise.all(
+      routersWithoutMonitoredPorts.map(async (router) => {
+        try {
+          // Get router credentials
+          const credentials = await storage.getRouterCredentials(router.id);
+          if (!credentials) {
+            return;
+          }
+
+          const client = new MikrotikClient({
+            host: router.ipAddress,
+            port: router.port,
+            user: credentials.username,
+            password: credentials.password,
+            cloudDdnsHostname: router.cloudDdnsHostname || undefined,
+            restEnabled: router.restEnabled || false,
+            restPort: router.restPort || 443,
+            snmpEnabled: router.snmpEnabled || false,
+            snmpCommunity: router.snmpCommunity || "public",
+            snmpVersion: router.snmpVersion || "2c",
+            snmpPort: router.snmpPort || 161,
+            interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
+          });
+
+          // Lightweight reachability check (TCP port test)
+          const isReachable = await client.checkReachability();
+          await storage.updateRouterReachability(router.id, isReachable);
+          
+          if (isReachable) {
+            console.log(`[Scheduler] Router ${router.name} is reachable (no monitored ports)`);
+          } else {
+            console.log(`[Scheduler] Router ${router.name} is unreachable (no monitored ports)`);
+          }
+        } catch (error: any) {
+          console.error(`[Scheduler] Failed to check reachability for router ${router.name}:`, error?.message || 'Unknown error');
+          await storage.updateRouterReachability(router.id, false);
+        }
+      })
+    );
   } catch (error) {
     console.error("[Scheduler] Error in traffic polling:", error);
   }
