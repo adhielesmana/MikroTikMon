@@ -131,7 +131,7 @@ export default function Alerts() {
             <TableHeader>
               <TableRow>
                 <TableHead className="whitespace-nowrap">Severity</TableHead>
-                <TableHead className="whitespace-nowrap">Interface - Comment - Router Name</TableHead>
+                <TableHead className="whitespace-nowrap">Interface</TableHead>
                 <TableHead className="whitespace-nowrap">Date</TableHead>
                 <TableHead className="whitespace-nowrap">Traffic</TableHead>
                 <TableHead className="whitespace-nowrap">Message</TableHead>
@@ -147,26 +147,26 @@ export default function Alerts() {
                 const severityConfig = getSeverityBadge(alert.severity);
                 return (
                   <TableRow key={alert.id} data-testid={`alert-row-${alert.id}`}>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       <Badge variant={severityConfig.variant}>
                         {alert.severity}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-medium" data-testid={`text-alert-port-${alert.id}`}>
+                    <TableCell className="font-medium whitespace-nowrap" data-testid={`text-alert-port-${alert.id}`}>
                       {alert.portName}
                       {alert.portComment && ` - ${alert.portComment}`}
                       {` - ${alert.routerName}`}
                     </TableCell>
-                    <TableCell className="text-sm" data-testid={`text-alert-created-${alert.id}`}>
+                    <TableCell className="text-sm whitespace-nowrap" data-testid={`text-alert-created-${alert.id}`}>
                       {formatDateTime(alert.createdAt)}
                     </TableCell>
-                    <TableCell className="font-mono text-sm" data-testid={`text-alert-traffic-${alert.id}`}>
+                    <TableCell className="font-mono text-sm whitespace-nowrap" data-testid={`text-alert-traffic-${alert.id}`}>
                       {formatTraffic(alert.currentTrafficBps)}
                     </TableCell>
-                    <TableCell data-testid={`text-alert-message-${alert.id}`}>
+                    <TableCell className="whitespace-nowrap" data-testid={`text-alert-message-${alert.id}`}>
                       {getSimplifiedMessage(alert)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {alert.acknowledged ? (
                         <Badge variant="outline" className="w-fit">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -179,25 +179,25 @@ export default function Alerts() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm" data-testid={`text-alert-acked-by-${alert.id}`}>
+                    <TableCell className="text-sm whitespace-nowrap" data-testid={`text-alert-acked-by-${alert.id}`}>
                       {alert.acknowledged 
                         ? alert.acknowledgedBy || 'N/A'
                         : '-'
                       }
                     </TableCell>
-                    <TableCell className="text-sm" data-testid={`text-alert-acked-time-${alert.id}`}>
+                    <TableCell className="text-sm whitespace-nowrap" data-testid={`text-alert-acked-time-${alert.id}`}>
                       {alert.acknowledged && alert.acknowledgedAt
                         ? formatDateTime(alert.acknowledgedAt)
                         : '-'
                       }
                     </TableCell>
-                    <TableCell className="text-sm" data-testid={`text-alert-duration-${alert.id}`}>
+                    <TableCell className="text-sm whitespace-nowrap" data-testid={`text-alert-duration-${alert.id}`}>
                       {alert.acknowledged && alert.acknowledgedAt
                         ? calculateDuration(alert.createdAt, alert.acknowledgedAt)
                         : '-'
                       }
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
                       {!alert.acknowledged && (
                         <Button
                           size="sm"
