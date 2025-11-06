@@ -95,6 +95,34 @@ export default function Alerts() {
     });
   };
 
+  const calculateDuration = (startDate: Date | string | null | undefined, endDate: Date | string | null | undefined): string => {
+    if (!startDate || !endDate) return "N/A";
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffMs = end.getTime() - start.getTime();
+    
+    if (diffMs < 0) return "N/A";
+    
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffDays > 0) {
+      const hours = diffHours % 24;
+      return `${diffDays}d ${hours}h`;
+    } else if (diffHours > 0) {
+      const minutes = diffMinutes % 60;
+      return `${diffHours}h ${minutes}m`;
+    } else if (diffMinutes > 0) {
+      const seconds = diffSeconds % 60;
+      return `${diffMinutes}m ${seconds}s`;
+    } else {
+      return `${diffSeconds}s`;
+    }
+  };
+
   const AlertTable = ({ alertsList }: { alertsList: AlertWithRouter[] }) => (
     <Card>
       <CardContent className="p-0">
@@ -102,14 +130,16 @@ export default function Alerts() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Severity</TableHead>
-                <TableHead>Interface - Comment - Router Name</TableHead>
-                <TableHead>Traffic</TableHead>
-                <TableHead>Message</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Acknowledged By</TableHead>
-                <TableHead>Date & Time</TableHead>
-                <TableHead className="text-right">Action</TableHead>
+                <TableHead className="whitespace-nowrap">Severity</TableHead>
+                <TableHead className="whitespace-nowrap">Interface - Comment - Router Name</TableHead>
+                <TableHead className="whitespace-nowrap">Date</TableHead>
+                <TableHead className="whitespace-nowrap">Traffic</TableHead>
+                <TableHead className="whitespace-nowrap">Message</TableHead>
+                <TableHead className="whitespace-nowrap">Status</TableHead>
+                <TableHead className="whitespace-nowrap">Ack By</TableHead>
+                <TableHead className="whitespace-nowrap">Ack Time</TableHead>
+                <TableHead className="whitespace-nowrap">Duration</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -126,6 +156,9 @@ export default function Alerts() {
                       {alert.portName}
                       {alert.portComment && ` - ${alert.portComment}`}
                       {` - ${alert.routerName}`}
+                    </TableCell>
+                    <TableCell className="text-sm" data-testid={`text-alert-created-${alert.id}`}>
+                      {formatDateTime(alert.createdAt)}
                     </TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-alert-traffic-${alert.id}`}>
                       {formatTraffic(alert.currentTrafficBps)}
@@ -152,8 +185,17 @@ export default function Alerts() {
                         : '-'
                       }
                     </TableCell>
-                    <TableCell className="text-sm">
-                      {formatDateTime(alert.createdAt)}
+                    <TableCell className="text-sm" data-testid={`text-alert-acked-time-${alert.id}`}>
+                      {alert.acknowledged && alert.acknowledgedAt
+                        ? formatDateTime(alert.acknowledgedAt)
+                        : '-'
+                      }
+                    </TableCell>
+                    <TableCell className="text-sm" data-testid={`text-alert-duration-${alert.id}`}>
+                      {alert.acknowledged && alert.acknowledgedAt
+                        ? calculateDuration(alert.createdAt, alert.acknowledgedAt)
+                        : '-'
+                      }
                     </TableCell>
                     <TableCell className="text-right">
                       {!alert.acknowledged && (
