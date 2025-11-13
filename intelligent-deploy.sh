@@ -204,7 +204,7 @@ install_host_nginx() {
     
     if ! command -v certbot &> /dev/null; then
         print_info "Installing certbot..."
-        apt-get install -y certbot python3-certbot-nginx
+        apt-get install -y certbot
     fi
     
     print_success "Nginx and certbot installed!"
@@ -224,12 +224,87 @@ install_host_nginx() {
         read -p "Enter your domain name: " DOMAIN
         
         if [ ! -z "$EMAIL" ] && [ ! -z "$DOMAIN" ]; then
-            certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
+            print_info "Stopping nginx temporarily for certificate generation..."
+            systemctl stop nginx
             
-            # Setup auto-renewal
-            if ! crontab -l 2>/dev/null | grep -q "certbot renew"; then
-                (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
-                print_success "Auto-renewal configured"
+            print_info "Generating SSL certificate..."
+            certbot certonly --standalone -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
+            
+            if [ $? -eq 0 ]; then
+                print_success "SSL certificate obtained!"
+                
+                # Update nginx config with SSL
+                print_info "Configuring nginx for HTTPS..."
+                cat > /tmp/mikrotik-monitor-ssl.conf << EOF
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name $DOMAIN;
+    return 301 https://\$host\$request_uri;
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+
+    # SSL certificates
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # Proxy to app
+    location / {
+        proxy_pass http://127.0.0.1:$APP_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    # WebSocket endpoint
+    location /ws {
+        proxy_pass http://127.0.0.1:$APP_PORT;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+        proxy_buffering off;
+    }
+}
+EOF
+                mv /tmp/mikrotik-monitor-ssl.conf /etc/nginx/sites-available/mikrotik-monitor
+                
+                print_info "Starting nginx..."
+                systemctl start nginx
+                
+                print_success "HTTPS configured!"
+                
+                # Setup auto-renewal
+                if ! crontab -l 2>/dev/null | grep -q "certbot renew"; then
+                    (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'systemctl reload nginx'") | crontab -
+                    print_success "Auto-renewal configured"
+                fi
+            else
+                print_error "SSL certificate generation failed"
+                print_info "Starting nginx without SSL..."
+                systemctl start nginx
             fi
         fi
     fi

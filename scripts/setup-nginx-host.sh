@@ -49,7 +49,7 @@ print_info "Checking if certbot is installed..."
 if ! command -v certbot &> /dev/null; then
     print_warning "Certbot not found. Installing certbot..."
     apt-get update
-    apt-get install -y certbot python3-certbot-nginx
+    apt-get install -y certbot
     print_success "Certbot installed"
 else
     print_success "Certbot is already installed"
@@ -112,19 +112,91 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         exit 1
     fi
     
-    # Run certbot
-    print_info "Running certbot..."
-    certbot --nginx -d "$DOMAIN_NAME" --email "$EMAIL" --agree-tos --non-interactive
+    # Stop nginx temporarily
+    print_info "Stopping nginx temporarily..."
+    systemctl stop nginx
     
-    print_success "SSL certificate installed!"
+    # Run certbot in standalone mode
+    print_info "Generating SSL certificate..."
+    certbot certonly --standalone -d "$DOMAIN_NAME" --email "$EMAIL" --agree-tos --non-interactive
     
-    # Setup auto-renewal
-    print_info "Setting up automatic certificate renewal..."
-    if ! crontab -l | grep -q "certbot renew"; then
-        (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --post-hook 'systemctl reload nginx'") | crontab -
-        print_success "Auto-renewal configured (runs daily at 3 AM)"
+    if [ $? -eq 0 ]; then
+        print_success "SSL certificate obtained!"
+        
+        # Update nginx config with SSL
+        print_info "Updating nginx configuration for HTTPS..."
+        cat > /etc/nginx/sites-available/mikrotik-monitor << EOF
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name $DOMAIN_NAME;
+    return 301 https://\$host\$request_uri;
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN_NAME;
+
+    # SSL certificates
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem;
+
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # Proxy to app
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    # WebSocket endpoint
+    location /ws {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+        proxy_buffering off;
+    }
+}
+EOF
+        
+        print_info "Starting nginx..."
+        systemctl start nginx
+        
+        print_success "HTTPS configured!"
+        
+        # Setup auto-renewal
+        print_info "Setting up automatic certificate renewal..."
+        if ! crontab -l 2>/dev/null | grep -q "certbot renew"; then
+            (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'systemctl reload nginx'") | crontab -
+            print_success "Auto-renewal configured (runs daily at 3 AM)"
+        else
+            print_info "Auto-renewal already configured"
+        fi
     else
-        print_info "Auto-renewal already configured"
+        print_error "SSL certificate generation failed"
+        print_info "Starting nginx without SSL..."
+        systemctl start nginx
     fi
 else
     print_warning "SSL setup skipped. You can run certbot manually later:"
