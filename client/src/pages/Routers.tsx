@@ -7,6 +7,7 @@ import { AddRouterDialog } from "@/components/AddRouterDialog";
 import { ManageGroupsDialog } from "@/components/ManageGroupsDialog";
 import { ManageRouterAssignmentsDialog } from "@/components/ManageRouterAssignmentsDialog";
 import { useToast } from "@/hooks/use-toast";
+import { usePagination } from "@/hooks/usePagination";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeTime } from "@/lib/utils";
@@ -21,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePaginationFooter } from "@/components/TablePaginationFooter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,6 +71,13 @@ export default function Routers() {
   const filteredRouters = selectedGroup === "all" 
     ? routers 
     : routers?.filter(r => r.groupId === selectedGroup || (selectedGroup === "ungrouped" && !r.groupId));
+
+  // Pagination
+  const pagination = usePagination<Router>({
+    totalItems: filteredRouters?.length || 0,
+    initialPageSize: 15,
+    storageKey: "routers",
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async (routerId: string) => {
@@ -206,7 +215,7 @@ export default function Routers() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRouters.map((router) => (
+                  {pagination.paginateItems(filteredRouters).map((router) => (
                     <TableRow key={router.id} data-testid={`router-row-${router.id}`}>
                       <TableCell className="font-medium" data-testid={`text-router-name-${router.id}`}>
                         <Link href={`/routers/${router.id}`}>
@@ -312,6 +321,18 @@ export default function Routers() {
                   ))}
                 </TableBody>
               </Table>
+
+              <TablePaginationFooter
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                pageSize={pagination.pageSize}
+                totalItems={filteredRouters?.length || 0}
+                itemRange={pagination.itemRange}
+                onPageChange={pagination.setCurrentPage}
+                onPageSizeChange={pagination.setPageSize}
+                dataTestId="pagination-routers"
+                itemLabel="routers"
+              />
             </div>
           </CardContent>
         </Card>

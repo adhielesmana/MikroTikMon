@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { usePagination } from "@/hooks/usePagination";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,22 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { TablePaginationFooter } from "@/components/TablePaginationFooter";
 import { Loader2, Trash2, Save, X, Network, RefreshCw } from "lucide-react";
 import type { MonitoredPort, Router } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -53,11 +39,16 @@ export default function MonitoredPorts() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedThreshold, setEditedThreshold] = useState<string>("");
   const [deletePortId, setDeletePortId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const { data: ports, isLoading } = useQuery<MonitoredPortWithRouter[]>({
     queryKey: ["/api/monitored-ports"],
+  });
+
+  // Pagination
+  const pagination = usePagination<MonitoredPortWithRouter>({
+    totalItems: ports?.length || 0,
+    initialPageSize: 10,
+    storageKey: "monitored-ports",
   });
 
   const updateMutation = useMutation({
@@ -169,63 +160,8 @@ export default function MonitoredPorts() {
     updateMutation.mutate({ id, threshold: bps });
   };
 
-  // Pagination calculations
-  const paginatedPorts = useMemo(() => {
-    if (!ports) return [];
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return ports.slice(startIndex, endIndex);
-  }, [ports, currentPage, itemsPerPage]);
-
-  const totalPages = useMemo(() => {
-    if (!ports) return 0;
-    return Math.ceil(ports.length / itemsPerPage);
-  }, [ports, itemsPerPage]);
-
-  // Reset to page 1 when items per page changes
-  const handleItemsPerPageChange = (value: string) => {
-    setItemsPerPage(parseInt(value));
-    setCurrentPage(1);
-  };
-
-  // Generate page numbers to display
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    const maxVisiblePages = 5;
-
-    if (totalPages <= maxVisiblePages) {
-      // Show all pages if total is small
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Show first page
-      pages.push(1);
-
-      if (currentPage > 3) {
-        pages.push('...');
-      }
-
-      // Show pages around current page
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      if (currentPage < totalPages - 2) {
-        pages.push('...');
-      }
-
-      // Show last page
-      if (totalPages > 1) {
-        pages.push(totalPages);
-      }
-    }
-
-    return pages;
-  };
+  // Get paginated items
+  const paginatedPorts = ports ? pagination.paginateItems(ports) : [];
 
   if (isLoading) {
     return (
@@ -421,78 +357,17 @@ export default function MonitoredPorts() {
               </Table>
 
               {/* Pagination Controls */}
-              {ports && ports.length > 0 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">Items per page:</span>
-                      <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
-                        <SelectTrigger className="w-20" data-testid="select-items-per-page">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="25">25</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                          <SelectItem value="100">100</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, ports.length)} of {ports.length} ports
-                    </div>
-                  </div>
-
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (currentPage > 1) setCurrentPage(currentPage - 1);
-                          }}
-                          className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          data-testid="button-prev-page"
-                        />
-                      </PaginationItem>
-                      
-                      {getPageNumbers().map((page, index) => (
-                        <PaginationItem key={index}>
-                          {page === '...' ? (
-                            <PaginationEllipsis />
-                          ) : (
-                            <PaginationLink
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setCurrentPage(page as number);
-                              }}
-                              isActive={currentPage === page}
-                              className="cursor-pointer"
-                              data-testid={`button-page-${page}`}
-                            >
-                              {page}
-                            </PaginationLink>
-                          )}
-                        </PaginationItem>
-                      ))}
-
-                      <PaginationItem>
-                        <PaginationNext 
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                          }}
-                          className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                          data-testid="button-next-page"
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
-                </div>
-              )}
+              <TablePaginationFooter
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                pageSize={pagination.pageSize}
+                totalItems={ports?.length || 0}
+                itemRange={pagination.itemRange}
+                onPageChange={pagination.setCurrentPage}
+                onPageSizeChange={pagination.setPageSize}
+                dataTestId="pagination-monitored-ports"
+                itemLabel="ports"
+              />
             </div>
           )}
         </CardContent>

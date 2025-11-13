@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { usePagination } from "@/hooks/usePagination";
+import { TablePaginationFooter } from "@/components/TablePaginationFooter";
 import { UserPlus, Mail, Key, Trash2, Shield, ShieldCheck, RotateCw, UserCheck, UserX, Crown } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { User } from "@shared/schema";
@@ -36,6 +38,13 @@ export default function Users() {
 
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
+  });
+
+  // Pagination
+  const pagination = usePagination<User>({
+    totalItems: users?.length || 0,
+    initialPageSize: 15,
+    storageKey: "users",
   });
 
   const createUserMutation = useMutation({
@@ -319,7 +328,7 @@ export default function Users() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {pagination.paginateItems(users).map((user) => (
                     <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -409,6 +418,18 @@ export default function Users() {
                   ))}
                 </TableBody>
               </Table>
+
+              <TablePaginationFooter
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                pageSize={pagination.pageSize}
+                totalItems={users?.length || 0}
+                itemRange={pagination.itemRange}
+                onPageChange={pagination.setCurrentPage}
+                onPageSizeChange={pagination.setPageSize}
+                dataTestId="pagination-users"
+                itemLabel="users"
+              />
             </div>
           )}
         </CardContent>

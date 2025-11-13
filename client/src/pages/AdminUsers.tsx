@@ -9,6 +9,7 @@ import { formatDate } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePagination } from "@/hooks/usePagination";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertDialog,
@@ -30,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePaginationFooter } from "@/components/TablePaginationFooter";
 
 export default function AdminUsers() {
   const { toast } = useToast();
@@ -103,6 +105,25 @@ export default function AdminUsers() {
   const activeUsers = users?.filter(u => u.enabled) || [];
   const pendingUsers = users?.filter(u => !u.enabled) || [];
 
+  // Pagination for different tabs
+  const allPagination = usePagination<User>({
+    totalItems: users?.length || 0,
+    initialPageSize: 15,
+    storageKey: "admin-users-all",
+  });
+
+  const activePagination = usePagination<User>({
+    totalItems: activeUsers.length,
+    initialPageSize: 15,
+    storageKey: "admin-users-active",
+  });
+
+  const pendingPagination = usePagination<User>({
+    totalItems: pendingUsers.length,
+    initialPageSize: 15,
+    storageKey: "admin-users-pending",
+  });
+
   const UserTableRow = ({ user }: { user: User }) => (
     <TableRow data-testid={`user-row-${user.id}`}>
       <TableCell>
@@ -166,26 +187,46 @@ export default function AdminUsers() {
     </TableRow>
   );
 
-  const UsersTable = ({ userList }: { userList: User[] }) => (
-    <Card>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>User</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Joined</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {userList.map(user => (
-            <UserTableRow key={user.id} user={user} />
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
-  );
+  const UsersTable = ({ userList, pagination, paginationId }: { 
+    userList: User[];
+    pagination: ReturnType<typeof usePagination<User>>;
+    paginationId: string;
+  }) => {
+    const paginatedUsers = pagination.paginateItems(userList);
+    
+    return (
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>User</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Joined</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedUsers.map(user => (
+              <UserTableRow key={user.id} user={user} />
+            ))}
+          </TableBody>
+        </Table>
+
+        <TablePaginationFooter
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          pageSize={pagination.pageSize}
+          totalItems={userList.length}
+          itemRange={pagination.itemRange}
+          onPageChange={pagination.setCurrentPage}
+          onPageSizeChange={pagination.setPageSize}
+          dataTestId={`pagination-${paginationId}`}
+          itemLabel="users"
+        />
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -279,7 +320,7 @@ export default function AdminUsers() {
               </div>
             </Card>
           ) : users && users.length > 0 ? (
-            <UsersTable userList={users} />
+            <UsersTable userList={users} pagination={allPagination} paginationId="admin-all-users" />
           ) : (
             <Card>
               <CardContent className="py-16 text-center">
@@ -300,7 +341,7 @@ export default function AdminUsers() {
               </div>
             </Card>
           ) : activeUsers.length > 0 ? (
-            <UsersTable userList={activeUsers} />
+            <UsersTable userList={activeUsers} pagination={activePagination} paginationId="admin-active-users" />
           ) : (
             <Card>
               <CardContent className="py-16 text-center">
@@ -321,7 +362,7 @@ export default function AdminUsers() {
               </div>
             </Card>
           ) : pendingUsers.length > 0 ? (
-            <UsersTable userList={pendingUsers} />
+            <UsersTable userList={pendingUsers} pagination={pendingPagination} paginationId="admin-pending-users" />
           ) : (
             <Card>
               <CardContent className="py-16 text-center">

@@ -8,6 +8,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePagination } from "@/hooks/usePagination";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -17,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TablePaginationFooter } from "@/components/TablePaginationFooter";
 
 type AlertWithRouter = Alert & { routerName: string };
 
@@ -48,6 +50,25 @@ export default function Alerts() {
 
   const activeAlerts = alerts?.filter(a => !a.acknowledged) || [];
   const acknowledgedAlerts = alerts?.filter(a => a.acknowledged) || [];
+
+  // Pagination for different alert tabs
+  const activePagination = usePagination<AlertWithRouter>({
+    totalItems: activeAlerts.length,
+    initialPageSize: 20,
+    storageKey: "alerts-active",
+  });
+
+  const acknowledgedPagination = usePagination<AlertWithRouter>({
+    totalItems: acknowledgedAlerts.length,
+    initialPageSize: 20,
+    storageKey: "alerts-acknowledged",
+  });
+
+  const allPagination = usePagination<AlertWithRouter>({
+    totalItems: alerts?.length || 0,
+    initialPageSize: 20,
+    storageKey: "alerts-all",
+  });
 
   const getSeverityBadge = (severity: string) => {
     const config = {
@@ -123,27 +144,34 @@ export default function Alerts() {
     }
   };
 
-  const AlertTable = ({ alertsList }: { alertsList: AlertWithRouter[] }) => (
-    <Card>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="whitespace-nowrap">Severity</TableHead>
-                <TableHead className="whitespace-nowrap">Interface</TableHead>
-                <TableHead className="whitespace-nowrap">Date</TableHead>
-                <TableHead className="whitespace-nowrap">Traffic</TableHead>
-                <TableHead className="whitespace-nowrap">Message</TableHead>
-                <TableHead className="whitespace-nowrap">Status</TableHead>
-                <TableHead className="whitespace-nowrap">Ack By</TableHead>
-                <TableHead className="whitespace-nowrap">Ack Time</TableHead>
-                <TableHead className="whitespace-nowrap">Duration</TableHead>
-                <TableHead className="text-right whitespace-nowrap">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {alertsList.map((alert) => {
+  const AlertTable = ({ alertsList, pagination, paginationId }: { 
+    alertsList: AlertWithRouter[];
+    pagination: ReturnType<typeof usePagination<AlertWithRouter>>;
+    paginationId: string;
+  }) => {
+    const paginatedAlerts = pagination.paginateItems(alertsList);
+    
+    return (
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="whitespace-nowrap">Severity</TableHead>
+                  <TableHead className="whitespace-nowrap">Interface</TableHead>
+                  <TableHead className="whitespace-nowrap">Date</TableHead>
+                  <TableHead className="whitespace-nowrap">Traffic</TableHead>
+                  <TableHead className="whitespace-nowrap">Message</TableHead>
+                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="whitespace-nowrap">Ack By</TableHead>
+                  <TableHead className="whitespace-nowrap">Ack Time</TableHead>
+                  <TableHead className="whitespace-nowrap">Duration</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedAlerts.map((alert) => {
                 const severityConfig = getSeverityBadge(alert.severity);
                 return (
                   <TableRow key={alert.id} data-testid={`alert-row-${alert.id}`}>
@@ -213,13 +241,26 @@ export default function Alerts() {
                     </TableCell>
                   </TableRow>
                 );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  );
+                })}
+              </TableBody>
+            </Table>
+
+            <TablePaginationFooter
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              pageSize={pagination.pageSize}
+              totalItems={alertsList.length}
+              itemRange={pagination.itemRange}
+              onPageChange={pagination.setCurrentPage}
+              onPageSizeChange={pagination.setPageSize}
+              dataTestId={`pagination-${paginationId}`}
+              itemLabel="alerts"
+            />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const EmptyState = ({ icon: Icon, title, description }: { icon: any, title: string, description: string }) => (
     <Card>
@@ -272,7 +313,7 @@ export default function Alerts() {
               </CardContent>
             </Card>
           ) : activeAlerts.length > 0 ? (
-            <AlertTable alertsList={activeAlerts} />
+            <AlertTable alertsList={activeAlerts} pagination={activePagination} paginationId="active-alerts" />
           ) : (
             <EmptyState
               icon={CheckCircle2}
@@ -294,7 +335,7 @@ export default function Alerts() {
               </CardContent>
             </Card>
           ) : acknowledgedAlerts.length > 0 ? (
-            <AlertTable alertsList={acknowledgedAlerts} />
+            <AlertTable alertsList={acknowledgedAlerts} pagination={acknowledgedPagination} paginationId="acknowledged-alerts" />
           ) : (
             <EmptyState
               icon={Clock}
@@ -316,7 +357,7 @@ export default function Alerts() {
               </CardContent>
             </Card>
           ) : alerts && alerts.length > 0 ? (
-            <AlertTable alertsList={alerts} />
+            <AlertTable alertsList={alerts} pagination={allPagination} paginationId="all-alerts" />
           ) : (
             <EmptyState
               icon={AlertTriangle}
