@@ -26,6 +26,14 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 **Core Tables:** `users` (with roles, username for local auth), `router_groups`, `routers` (with encrypted credentials), `monitored_ports` (with thresholds, cached interface metadata: comment, MAC, lastInterfaceUpdate), `traffic_data` (time-series), `alerts` (with acknowledged status and acknowledgedBy tracking), `notifications`, `sessions`.
 **In-Memory Storage:** Nested Map structure for real-time traffic data, 7,200 entries per interface (2 hours at 1-second intervals).
 
+### Deployment Architecture
+- **Production Setup**: Host nginx + Docker app architecture at mon.maxnetplus.id
+- **Nginx**: Runs on host system (not Docker), handles SSL/TLS, reverse proxy, and WebSocket upgrades
+- **Application**: Runs in Docker container on port 5000, managed by docker-compose
+- **Deployment Script**: `intelligent-deploy.sh` automatically installs/updates nginx, configures reverse proxy, and deploys Docker app
+- **SSL Certificates**: Let's Encrypt via certbot in standalone mode
+- **Auto-Updates**: GitHub polling every 5 minutes, automatic deployment on code changes
+
 ### System Design Choices
 - **UI/UX:** Mobile-first responsive design, dark mode support, collapsible sidebar, touch-friendly interactions, dynamic logo on homepage and sidebar, error handling and dynamic updates for custom logos.
 - **Authentication:** Multi-provider authentication (Google OAuth, Local Admin, Replit Auth) with session management. Default local admin account ("admin"/"admin") with forced password change on first login. User invitation system for super admins with secure temporary passwords and forced password change. Admin password recovery script.
