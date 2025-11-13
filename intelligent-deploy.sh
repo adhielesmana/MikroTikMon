@@ -58,10 +58,24 @@ else
     print_success "Nginx already installed"
 fi
 
+# Install certbot with nginx plugin
+print_step "Checking certbot installation..."
 if ! command -v certbot &> /dev/null; then
-    print_info "Installing certbot..."
-    apt-get install -y certbot
-    print_success "Certbot installed!"
+    print_info "Installing certbot with nginx plugin..."
+    apt-get update
+    apt-get install -y certbot python3-certbot-nginx
+    print_success "Certbot and nginx plugin installed!"
+else
+    print_success "Certbot already installed"
+    
+    # Check if nginx plugin is installed
+    if ! dpkg -l | grep -q python3-certbot-nginx; then
+        print_info "Installing certbot nginx plugin..."
+        apt-get install -y python3-certbot-nginx
+        print_success "Certbot nginx plugin installed!"
+    else
+        print_success "Certbot nginx plugin already installed"
+    fi
 fi
 
 # ========================================
