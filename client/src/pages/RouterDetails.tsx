@@ -10,6 +10,7 @@ import { formatBytesPerSecond, formatRelativeTime } from "@/lib/utils";
 import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from "recharts";
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
 import { AddPortDialog } from "@/components/AddPortDialog";
+import { AddRouterDialog } from "@/components/AddRouterDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -92,6 +93,7 @@ export default function RouterDetails() {
   const { id } = useParams<{ id: string }>();
   const [selectedInterface, setSelectedInterface] = useState<string>("");
   const [currentSpeed, setCurrentSpeed] = useState({ rx: 0, tx: 0 });
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
   
   // WebSocket-based real-time traffic data
@@ -350,12 +352,13 @@ export default function RouterDetails() {
             </p>
           </div>
         </div>
-        <Link href={`/routers/${id}/edit`}>
-          <Button data-testid="button-edit-router">
-            <Pencil className="h-4 w-4 mr-2" />
-            Edit Router
-          </Button>
-        </Link>
+        <Button 
+          onClick={() => setEditDialogOpen(true)}
+          data-testid="button-edit-router"
+        >
+          <Pencil className="h-4 w-4 mr-2" />
+          Edit Router
+        </Button>
       </div>
 
       {/* Status Cards */}
@@ -559,6 +562,13 @@ export default function RouterDetails() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Router Dialog */}
+      <AddRouterDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        router={router}
+      />
     </div>
   );
 }

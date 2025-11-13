@@ -135,6 +135,10 @@ export function AddRouterDialog({ open, onOpenChange, router }: AddRouterDialogP
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/routers"] });
+      // Also invalidate the specific router query when editing
+      if (router) {
+        queryClient.invalidateQueries({ queryKey: ["/api/routers", router.id] });
+      }
       toast({
         title: router ? "Router updated" : "Router added",
         description: router
