@@ -1,5 +1,25 @@
 # Quick Start Deployment Guide
 
+## 🚀 Intelligent Deployment (Recommended)
+
+**The easiest way to deploy - one command, automatic detection:**
+
+```bash
+./intelligent-deploy.sh
+```
+
+The script will:
+- ✅ Auto-detect existing nginx (host or Docker)
+- ✅ Resolve port conflicts automatically
+- ✅ Recommend the best deployment strategy
+- ✅ Guide you through setup interactively
+
+**See [INTELLIGENT_DEPLOYMENT.md](INTELLIGENT_DEPLOYMENT.md) for details.**
+
+---
+
+## 📖 Manual Deployment Options
+
 Choose your deployment method based on your needs:
 
 ## 🚀 Option 1: Host-Level Nginx (Recommended for Production)

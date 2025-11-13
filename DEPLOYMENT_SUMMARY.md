@@ -2,7 +2,26 @@
 
 ## 📦 What's Available
 
-You now have **two complete nginx deployment options** for the MikroTik Monitor application:
+### 🤖 Intelligent Deployment (NEW!)
+
+**One command, automatic setup:**
+
+```bash
+./intelligent-deploy.sh
+```
+
+**Features:**
+- ✅ Auto-detects existing nginx installations
+- ✅ Resolves port conflicts automatically
+- ✅ Provides smart deployment recommendations
+- ✅ Interactive guided setup
+- ✅ Handles fresh installs and updates
+
+**See [INTELLIGENT_DEPLOYMENT.md](INTELLIGENT_DEPLOYMENT.md) for details.**
+
+---
+
+You also have **two complete nginx deployment options** for manual control:
 
 ### 1. 🖥️ Host-Level Nginx (Production Recommended)
 **Files:**
