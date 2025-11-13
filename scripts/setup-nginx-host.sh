@@ -26,12 +26,6 @@ echo "  Nginx Host-Level Setup"
 echo "========================================="
 echo ""
 
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then 
-    print_error "Please run as root (use sudo)"
-    exit 1
-fi
-
 # Get domain name
 read -p "Enter your domain name (e.g., mon.maxnetplus.id): " DOMAIN_NAME
 if [ -z "$DOMAIN_NAME" ]; then
@@ -146,10 +140,10 @@ echo "  • https://$DOMAIN_NAME (with SSL)"
 echo "  • http://$DOMAIN_NAME (redirects to HTTPS)"
 echo ""
 print_info "Useful commands:"
-echo "  • Test config:   sudo nginx -t"
-echo "  • Reload nginx:  sudo systemctl reload nginx"
-echo "  • View logs:     sudo tail -f /var/log/nginx/mikrotik-monitor-*.log"
-echo "  • Renew SSL:     sudo certbot renew"
+echo "  • Test config:   nginx -t"
+echo "  • Reload nginx:  systemctl reload nginx"
+echo "  • View logs:     tail -f /var/log/nginx/mikrotik-monitor-*.log"
+echo "  • Renew SSL:     certbot renew"
 echo ""
 print_info "Next steps:"
 echo "  1. Start your Docker application (without nginx profile)"

@@ -110,9 +110,9 @@ update_host_nginx_config() {
     # Check if config already exists
     if [ -f /etc/nginx/sites-available/mikrotik-monitor ]; then
         print_info "Configuration already exists, updating..."
-        sudo sed "s/server 127\.0\.0\.1:[0-9]\+/server 127.0.0.1:$APP_PORT/g" \
+        sed "s/server 127\.0\.0\.1:[0-9]\+/server 127.0.0.1:$APP_PORT/g" \
             /etc/nginx/sites-available/mikrotik-monitor > /tmp/mikrotik-monitor.conf
-        sudo mv /tmp/mikrotik-monitor.conf /etc/nginx/sites-available/mikrotik-monitor
+        mv /tmp/mikrotik-monitor.conf /etc/nginx/sites-available/mikrotik-monitor
     else
         print_info "Creating new configuration..."
         
@@ -126,33 +126,33 @@ update_host_nginx_config() {
         fi
         
         # Create config from template
-        sudo sed -e "s/mon\.maxnetplus\.id/$domain/g" \
+        sed -e "s/mon\.maxnetplus\.id/$domain/g" \
                  -e "s/127\.0\.0\.1:5000/127.0.0.1:$APP_PORT/g" \
                  nginx-host.conf > /tmp/mikrotik-monitor.conf
-        sudo mv /tmp/mikrotik-monitor.conf /etc/nginx/sites-available/mikrotik-monitor
+        mv /tmp/mikrotik-monitor.conf /etc/nginx/sites-available/mikrotik-monitor
         
         # Enable site
-        sudo ln -sf /etc/nginx/sites-available/mikrotik-monitor /etc/nginx/sites-enabled/
+        ln -sf /etc/nginx/sites-available/mikrotik-monitor /etc/nginx/sites-enabled/
     fi
     
     # Add WebSocket map if not present
-    if ! sudo grep -q "map \$http_upgrade \$connection_upgrade" /etc/nginx/nginx.conf; then
+    if ! grep -q "map \$http_upgrade \$connection_upgrade" /etc/nginx/nginx.conf; then
         print_info "Adding WebSocket support to nginx.conf..."
-        sudo sed -i '/http {/a \    # Smart WebSocket connection handling\n    map $http_upgrade $connection_upgrade {\n        default upgrade;\n        '\'\''      close;\n    }\n' /etc/nginx/nginx.conf
+        sed -i '/http {/a \    # Smart WebSocket connection handling\n    map $http_upgrade $connection_upgrade {\n        default upgrade;\n        '\'\''      close;\n    }\n' /etc/nginx/nginx.conf
     fi
     
     # Add rate limiting zones if not present
-    if ! sudo grep -q "limit_req_zone.*mikrotik_general" /etc/nginx/nginx.conf; then
+    if ! grep -q "limit_req_zone.*mikrotik_general" /etc/nginx/nginx.conf; then
         print_info "Adding rate limiting zones to nginx.conf..."
-        sudo sed -i '/http {/a \    # Rate limiting zones for MikroTik Monitor\n    limit_req_zone $binary_remote_addr zone=mikrotik_general:10m rate=10r/s;\n    limit_req_zone $binary_remote_addr zone=mikrotik_api:10m rate=30r/s;\n' /etc/nginx/nginx.conf
+        sed -i '/http {/a \    # Rate limiting zones for MikroTik Monitor\n    limit_req_zone $binary_remote_addr zone=mikrotik_general:10m rate=10r/s;\n    limit_req_zone $binary_remote_addr zone=mikrotik_api:10m rate=30r/s;\n' /etc/nginx/nginx.conf
     fi
     
     # Test and reload
     print_info "Testing nginx configuration..."
-    sudo nginx -t
+    nginx -t
     
     print_info "Reloading nginx..."
-    sudo systemctl reload nginx
+    systemctl reload nginx
     
     print_success "Host nginx configuration updated!"
 }
@@ -198,13 +198,13 @@ install_host_nginx() {
     
     if ! command -v nginx &> /dev/null; then
         print_info "Installing nginx..."
-        sudo apt-get update
-        sudo apt-get install -y nginx
+        apt-get update
+        apt-get install -y nginx
     fi
     
     if ! command -v certbot &> /dev/null; then
         print_info "Installing certbot..."
-        sudo apt-get install -y certbot python3-certbot-nginx
+        apt-get install -y certbot python3-certbot-nginx
     fi
     
     print_success "Nginx and certbot installed!"
@@ -224,7 +224,7 @@ install_host_nginx() {
         read -p "Enter your domain name: " DOMAIN
         
         if [ ! -z "$EMAIL" ] && [ ! -z "$DOMAIN" ]; then
-            sudo certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
+            certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
             
             # Setup auto-renewal
             if ! crontab -l 2>/dev/null | grep -q "certbot renew"; then
@@ -256,17 +256,17 @@ install_docker_nginx() {
             
             if [ ! -z "$DOMAIN" ] && [ ! -z "$EMAIL" ]; then
                 print_info "Stopping any services on port 80..."
-                sudo systemctl stop nginx 2>/dev/null || true
+                systemctl stop nginx 2>/dev/null || true
                 docker stop mikrotik-monitor-nginx 2>/dev/null || true
                 
                 print_info "Generating SSL certificate..."
-                sudo certbot certonly --standalone -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
+                certbot certonly --standalone -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
                 
                 print_info "Copying certificates to ssl directory..."
                 mkdir -p ssl
-                sudo cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem ssl/
-                sudo cp /etc/letsencrypt/live/$DOMAIN/privkey.pem ssl/
-                sudo chmod 644 ssl/*.pem
+                cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem ssl/
+                cp /etc/letsencrypt/live/$DOMAIN/privkey.pem ssl/
+                chmod 644 ssl/*.pem
                 
                 print_success "SSL certificates configured!"
             fi
