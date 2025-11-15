@@ -1,8 +1,8 @@
 services:
-  # PostgreSQL Database
+  # TimescaleDB Database (PostgreSQL-compatible with time-series optimization)
   # Service name MUST match the host in DATABASE_URL
   mikrotik-monitor-db:
-    image: postgres:16-alpine
+    image: timescale/timescaledb:latest-pg16
     container_name: mikrotik-monitor-db
     restart: unless-stopped
     environment:
@@ -11,7 +11,8 @@ services:
       POSTGRES_PASSWORD: ${PGPASSWORD:?PGPASSWORD not set - run setup.sh first}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+      - ./init-timescale.sql:/docker-entrypoint-initdb.d/02-init-timescale.sql:ro
     # Port mapping commented out for production security
     # Uncomment for local debugging/access (set POSTGRES_PORT=5433 in .env to avoid conflicts):
     # ports:
