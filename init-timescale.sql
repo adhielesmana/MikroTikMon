@@ -26,9 +26,10 @@ ALTER TABLE traffic_data SET (
 -- Automatically compress chunks older than 7 days
 SELECT add_compression_policy('traffic_data', INTERVAL '7 days');
 
--- Add retention policy to automatically delete data older than 2 years
--- This keeps the database size manageable
-SELECT add_retention_policy('traffic_data', INTERVAL '2 years');
+-- NOTE: Data retention policy is now configurable via the Settings UI
+-- Admins can set retention_days in the appSettings table, which will
+-- dynamically add/remove TimescaleDB retention policies at runtime
+-- By default, no retention policy is set (data kept forever)
 
 -- Create continuous aggregate for hourly traffic summaries (optional but recommended)
 -- This pre-computes hourly averages for faster dashboard queries
@@ -81,5 +82,5 @@ SELECT add_continuous_aggregate_policy('traffic_data_daily',
 \echo 'TimescaleDB extension enabled successfully!'
 \echo 'Hypertable created: traffic_data'
 \echo 'Compression policy: 7 days'
-\echo 'Retention policy: 2 years'
+\echo 'Retention policy: Configurable via Settings UI (default: keep forever)'
 \echo 'Continuous aggregates: traffic_data_hourly, traffic_data_daily'
