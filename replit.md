@@ -20,11 +20,18 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 
 ### Technology Stack
 **Frontend:** React with TypeScript, Wouter, TanStack Query, Shadcn UI + Tailwind CSS, Recharts, WebSocket.
-**Backend:** Express.js with TypeScript, PostgreSQL (Neon serverless) with Drizzle ORM, Passport.js (Google OAuth, Local Strategy, Replit OIDC), MikroTik RouterOS API client, Node-cron, Nodemailer, WebSocket server.
+**Backend:** Express.js with TypeScript, TimescaleDB (PostgreSQL time-series database) with Drizzle ORM, Passport.js (Google OAuth, Local Strategy, Replit OIDC), MikroTik RouterOS API client, Node-cron, Nodemailer, WebSocket server.
 
 ### Database Schema
-**Core Tables:** `users` (with roles, username for local auth), `router_groups`, `routers` (with encrypted credentials), `monitored_ports` (with thresholds, cached interface metadata: comment, MAC, lastInterfaceUpdate), `traffic_data` (time-series), `alerts` (with acknowledged status and acknowledgedBy tracking), `notifications`, `sessions`.
+**Core Tables:** `users` (with roles, username for local auth), `router_groups`, `routers` (with encrypted credentials), `monitored_ports` (with thresholds, cached interface metadata: comment, MAC, lastInterfaceUpdate), `traffic_data` (TimescaleDB hypertable for time-series data), `alerts` (with acknowledged status and acknowledgedBy tracking), `notifications`, `sessions`.
 **In-Memory Storage:** Nested Map structure for real-time traffic data, 7,200 entries per interface (2 hours at 1-second intervals).
+**TimescaleDB Features:**
+- **Hypertables**: `traffic_data` table automatically partitioned into 1-day chunks for optimal query performance
+- **Automatic Compression**: Data older than 7 days compressed automatically (90%+ storage savings)
+- **Data Retention**: Automatic deletion of data older than 2 years
+- **Continuous Aggregates**: Pre-computed hourly and daily summaries for fast dashboard queries
+  - `traffic_data_hourly`: 1-hour time buckets with AVG/MAX metrics
+  - `traffic_data_daily`: 1-day time buckets with AVG/MAX metrics
 
 ### Deployment Architecture
 - **Production Setup**: Host nginx + Docker app architecture at mon.maxnetplus.id
