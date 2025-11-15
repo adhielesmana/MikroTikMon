@@ -3,6 +3,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin, isSuperadmin, isEnabled } from "./replitAuth";
 import { MikrotikClient } from "./mikrotik";
 import { emailService } from "./emailService";
@@ -1419,6 +1421,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching app settings:", error);
       res.status(500).json({ message: "Failed to fetch app settings" });
+    }
+  });
+
+  app.put("/api/settings/retention", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { retention_days } = req.body;
+      
+      // Validate retention_days
+      const retentionDays = retention_days === null || retention_days === undefined || retention_days === 0 
+        ? null 
+        : parseInt(retention_days);
+      
+      if (retentionDays !== null && (isNaN(retentionDays) || retentionDays < 1)) {
+        res.status(400).json({ message: "Retention days must be a positive number or null/0 for forever" });
+        return;
+      }
+      
+      // Update settings in database
+      const settings = await storage.updateAppSettings({ retentionDays });
+      
+      // Apply TimescaleDB retention policy
+      try {
+        if (retentionDays === null) {
+          // Remove retention policy (keep data forever)
+          await db.execute(sql`
+            SELECT remove_retention_policy('traffic_data', if_exists => true);
+          `);
+          console.log('[Retention] Retention policy removed - data will be kept forever');
+        } else {
+          // Remove existing policy first (if any)
+          await db.execute(sql`
+            SELECT remove_retention_policy('traffic_data', if_exists => true);
+          `);
+          
+          // Add new retention policy
+          await db.execute(sql`
+            SELECT add_retention_policy('traffic_data', INTERVAL '${sql.raw(retentionDays.toString())} days');
+          `);
+          console.log(`[Retention] Retention policy updated to ${retentionDays} days`);
+        }
+      } catch (dbError) {
+        console.error('[Retention] Error updating TimescaleDB retention policy:', dbError);
+        // Don't fail the request - settings are saved, just log the error
+        // This allows the system to work even if TimescaleDB isn't installed yet
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating retention settings:", error);
+      res.status(500).json({ message: "Failed to update retention settings" });
     }
   });
 

@@ -10,13 +10,14 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, User, Shield, Loader2, Volume2, Bell } from "lucide-react";
+import { Mail, User, Shield, Loader2, Volume2, Bell, Database, Calendar } from "lucide-react";
 import { playAlertSound } from "@/lib/alertSound";
 
 export default function Settings() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const [logoUrl, setLogoUrl] = useState("");
+  const [retentionDays, setRetentionDays] = useState("");
   const [alertSoundEnabled, setAlertSoundEnabled] = useState(true);
 
   // Load alert sound preference from localStorage
@@ -105,6 +106,31 @@ export default function Settings() {
     },
   });
 
+  const updateRetentionMutation = useMutation({
+    mutationFn: async (data: { retention_days: number | null }) => {
+      const res = await apiRequest("PUT", "/api/settings/retention", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      const days = data.retentionDays;
+      toast({
+        title: "Retention policy updated",
+        description: days 
+          ? `Traffic data will be kept for ${days} days` 
+          : "Traffic data will be kept forever",
+      });
+      setRetentionDays("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update retention policy",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSaveLogo = () => {
     if (!logoUrl.trim()) {
       toast({
@@ -119,6 +145,32 @@ export default function Settings() {
 
   const handleClearLogo = () => {
     updateSettingsMutation.mutate({ logo_url: "" });
+  };
+
+  const handleSaveRetention = () => {
+    const days = retentionDays.trim();
+    
+    // Handle "keep forever" case
+    if (days === "" || days === "0") {
+      updateRetentionMutation.mutate({ retention_days: null });
+      return;
+    }
+    
+    const parsed = parseInt(days);
+    if (isNaN(parsed) || parsed < 1) {
+      toast({
+        title: "Invalid input",
+        description: "Please enter a positive number of days, or 0 for forever",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    updateRetentionMutation.mutate({ retention_days: parsed });
+  };
+
+  const handleSetRetentionForever = () => {
+    updateRetentionMutation.mutate({ retention_days: null });
   };
 
   return (
@@ -191,6 +243,63 @@ export default function Settings() {
               </div>
               <p className="text-sm text-muted-foreground" data-testid="text-logo-hint">
                 Recommended: PNG or SVG format with transparent background, max width 200px
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-4 border-t">
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="h-4 w-4 text-muted-foreground" />
+                <Label data-testid="label-data-retention">Data Retention Policy</Label>
+              </div>
+              
+              {settings?.retentionDays && (
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="secondary" className="flex items-center gap-1" data-testid="badge-current-retention">
+                    <Calendar className="h-3 w-3" />
+                    Currently: {settings.retentionDays} days
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSetRetentionForever}
+                    disabled={updateRetentionMutation.isPending}
+                    data-testid="button-retention-forever"
+                  >
+                    Keep Forever
+                  </Button>
+                </div>
+              )}
+              
+              {!settings?.retentionDays && (
+                <Badge variant="secondary" className="mb-2" data-testid="badge-retention-forever">
+                  Currently: Keeping data forever
+                </Badge>
+              )}
+              
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="Days (0 = forever)"
+                  value={retentionDays}
+                  onChange={(e) => setRetentionDays(e.target.value)}
+                  disabled={updateRetentionMutation.isPending}
+                  data-testid="input-retention-days"
+                />
+                <Button
+                  onClick={handleSaveRetention}
+                  disabled={updateRetentionMutation.isPending || !retentionDays.trim()}
+                  data-testid="button-save-retention"
+                >
+                  {updateRetentionMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Update
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground" data-testid="text-retention-hint">
+                Traffic data older than this will be automatically deleted. Enter 0 or leave empty to keep data forever. 
+                Common values: 90 (3 months), 365 (1 year), 730 (2 years)
               </p>
             </div>
           </CardContent>
