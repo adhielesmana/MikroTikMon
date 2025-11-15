@@ -113,7 +113,7 @@ export default function Settings() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-      const days = data.retentionDays;
+      const days = data.retentionDays; // Drizzle ORM returns camelCase
       toast({
         title: "Retention policy updated",
         description: days 
