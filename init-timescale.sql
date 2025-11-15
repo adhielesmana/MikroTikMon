@@ -31,6 +31,24 @@ SELECT add_compression_policy('traffic_data', INTERVAL '7 days');
 -- dynamically add/remove TimescaleDB retention policies at runtime
 -- By default, no retention policy is set (data kept forever)
 
+-- Convert interface_graph table to hypertable (5-minute historical snapshots)
+SELECT create_hypertable(
+    'interface_graph',
+    'timestamp',
+    if_not_exists => TRUE,
+    chunk_time_interval => INTERVAL '7 days'
+);
+
+-- Add compression policy for interface_graph
+ALTER TABLE interface_graph SET (
+    timescaledb.compress,
+    timescaledb.compress_orderby = 'timestamp DESC',
+    timescaledb.compress_segmentby = 'router_id, port_name'
+);
+
+-- Automatically compress interface_graph chunks older than 7 days
+SELECT add_compression_policy('interface_graph', INTERVAL '7 days');
+
 -- Create continuous aggregate for hourly traffic summaries (optional but recommended)
 -- This pre-computes hourly averages for faster dashboard queries
 CREATE MATERIALIZED VIEW IF NOT EXISTS traffic_data_hourly
@@ -80,7 +98,8 @@ SELECT add_continuous_aggregate_policy('traffic_data_daily',
 
 -- Display TimescaleDB information
 \echo 'TimescaleDB extension enabled successfully!'
-\echo 'Hypertable created: traffic_data'
-\echo 'Compression policy: 7 days'
+\echo 'Hypertables created: traffic_data, interface_graph'
+\echo 'Compression policy: 7 days (both tables)'
 \echo 'Retention policy: Configurable via Settings UI (default: keep forever)'
 \echo 'Continuous aggregates: traffic_data_hourly, traffic_data_daily'
+\echo 'Interface graph: 5-minute historical snapshots for all monitored ports'

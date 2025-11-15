@@ -274,6 +274,41 @@ export const trafficDataRelations = relations(trafficData, ({ one }) => ({
 
 export type TrafficData = typeof trafficData.$inferSelect;
 
+// Interface Graph table - Stores 5-minute interval traffic snapshots for historical graphs
+// Separate from traffic_data (1s real-time) - this is for scheduled historical data
+export const interfaceGraph = pgTable("interface_graph", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
+  portId: varchar("port_id").references(() => monitoredPorts.id, { onDelete: "cascade" }), // Nullable for non-monitored interfaces
+  portName: varchar("port_name", { length: 255 }).notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  // Cumulative byte counters from router (NOT rates)
+  rxBytesTotal: real("rx_bytes_total").notNull().default(0), // Cumulative RX bytes
+  txBytesTotal: real("tx_bytes_total").notNull().default(0), // Cumulative TX bytes
+  // Calculated rates for this 5-minute interval (bytes per second)
+  rxBytesPerSecond: real("rx_bytes_per_second").notNull().default(0), // Download rate
+  txBytesPerSecond: real("tx_bytes_per_second").notNull().default(0), // Upload rate
+  totalBytesPerSecond: real("total_bytes_per_second").notNull().default(0), // Total rate
+}, (table) => [
+  index("idx_interface_graph_router_port_time").on(table.routerId, table.portName, table.timestamp),
+  index("idx_interface_graph_timestamp").on(table.timestamp),
+  unique().on(table.routerId, table.portName, table.timestamp), // Prevent duplicate samples
+]);
+
+export const interfaceGraphRelations = relations(interfaceGraph, ({ one }) => ({
+  router: one(routers, {
+    fields: [interfaceGraph.routerId],
+    references: [routers.id],
+  }),
+  port: one(monitoredPorts, {
+    fields: [interfaceGraph.portId],
+    references: [monitoredPorts.id],
+  }),
+}));
+
+export type InterfaceGraph = typeof interfaceGraph.$inferSelect;
+export type InsertInterfaceGraph = typeof interfaceGraph.$inferInsert;
+
 // Alerts table - Stores triggered alerts (supports both port-level and router-level alerts)
 export const alerts = pgTable("alerts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

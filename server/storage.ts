@@ -6,6 +6,7 @@ import {
   routerInterfaces,
   monitoredPorts,
   trafficData,
+  interfaceGraph,
   alerts,
   notifications,
   appSettings,
@@ -21,6 +22,8 @@ import {
   type MonitoredPort,
   type InsertMonitoredPort,
   type TrafficData,
+  type InterfaceGraph,
+  type InsertInterfaceGraph,
   type Alert,
   type Notification,
   type AppSettings,
@@ -105,6 +108,11 @@ export interface IStorage {
   getTrafficDataByPortName(routerId: string, portName: string, since: Date): Promise<TrafficData[]>;
   getRecentTraffic(routerId: string, since: Date, until?: Date): Promise<TrafficData[]>;
   cleanupOldTrafficData(before: Date): Promise<number>;
+
+  // Interface Graph operations (5-minute historical data)
+  insertInterfaceGraphSamples(samples: InsertInterfaceGraph[]): Promise<void>;
+  getInterfaceGraphData(routerId: string, portName: string, since: Date, until?: Date): Promise<InterfaceGraph[]>;
+  getLatestInterfaceGraphSample(routerId: string, portName: string): Promise<InterfaceGraph | undefined>;
 
   // Alert operations
   getAlerts(userId: string): Promise<(Alert & { routerName: string })[]>;
@@ -679,6 +687,50 @@ export class DatabaseStorage implements IStorage {
       .where(lt(trafficData.timestamp, before));
     
     return result.rowCount || 0;
+  }
+
+  // Interface Graph operations (5-minute historical snapshots)
+  async insertInterfaceGraphSamples(samples: InsertInterfaceGraph[]): Promise<void> {
+    if (samples.length === 0) return;
+    
+    await db
+      .insert(interfaceGraph)
+      .values(samples)
+      .onConflictDoNothing(); // Ignore duplicates (same router/port/timestamp)
+  }
+
+  async getInterfaceGraphData(routerId: string, portName: string, since: Date, until?: Date): Promise<InterfaceGraph[]> {
+    const conditions = [
+      eq(interfaceGraph.routerId, routerId),
+      eq(interfaceGraph.portName, portName),
+      gte(interfaceGraph.timestamp, since)
+    ];
+
+    if (until) {
+      conditions.push(lt(interfaceGraph.timestamp, until));
+    }
+
+    return db
+      .select()
+      .from(interfaceGraph)
+      .where(and(...conditions))
+      .orderBy(interfaceGraph.timestamp);
+  }
+
+  async getLatestInterfaceGraphSample(routerId: string, portName: string): Promise<InterfaceGraph | undefined> {
+    const [sample] = await db
+      .select()
+      .from(interfaceGraph)
+      .where(
+        and(
+          eq(interfaceGraph.routerId, routerId),
+          eq(interfaceGraph.portName, portName)
+        )
+      )
+      .orderBy(desc(interfaceGraph.timestamp))
+      .limit(1);
+    
+    return sample;
   }
 
   // Alert operations
