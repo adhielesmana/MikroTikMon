@@ -1,0 +1,53 @@
+./deploy.sh 
+
+=========================================
+  MikroTik Monitor - Deploy Script
+=========================================
+
+ℹ Creating required directories...
+✓ Directories ready
+ℹ Checking prerequisites...
+✓ Docker is ready
+ℹ Starting MikroTik Monitor...
+ℹ Building Docker images...
+[+] Building 0.5s (25/25) FINISHED                                                                                                                                                                          
+ => [internal] load local bake definitions                                                                                                                                                             0.0s
+ => => reading from stdin 483B                                                                                                                                                                         0.0s
+ => [internal] load build definition from Dockerfile                                                                                                                                                   0.0s
+ => => transferring dockerfile: 1.83kB                                                                                                                                                                 0.0s
+ => [internal] load metadata for docker.io/library/node:20-alpine                                                                                                                                      0.3s
+ => [internal] load .dockerignore                                                                                                                                                                      0.0s
+ => => transferring context: 530B                                                                                                                                                                      0.0s
+ => [internal] load build context                                                                                                                                                                      0.0s
+ => => transferring context: 9.09kB                                                                                                                                                                    0.0s
+ => [builder 1/7] FROM docker.io/library/node:20-alpine@sha256:6178e78b972f79c335df281f4b7674a2d85071aae2af020ffa39f0a770265435                                                                        0.0s
+ => CACHED [stage-1  2/12] RUN apk add --no-cache dumb-init                                                                                                                                            0.0s
+ => CACHED [stage-1  3/12] RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001                                                                                                                 0.0s
+ => CACHED [stage-1  4/12] WORKDIR /app                                                                                                                                                                0.0s
+ => CACHED [stage-1  5/12] COPY package*.json ./                                                                                                                                                       0.0s
+ => CACHED [builder 2/7] RUN apk add --no-cache python3 make g++                                                                                                                                       0.0s
+ => CACHED [builder 3/7] WORKDIR /app                                                                                                                                                                  0.0s
+ => CACHED [builder 4/7] COPY package*.json ./                                                                                                                                                         0.0s
+ => CACHED [builder 5/7] RUN npm ci                                                                                                                                                                    0.0s
+ => CACHED [builder 6/7] COPY . .                                                                                                                                                                      0.0s
+ => CACHED [builder 7/7] RUN npm run build                                                                                                                                                             0.0s
+ => CACHED [stage-1  6/12] COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist                                                                                                                  0.0s
+ => CACHED [stage-1  7/12] COPY --chown=nodejs:nodejs shared ./shared                                                                                                                                  0.0s
+ => CACHED [stage-1  8/12] COPY --chown=nodejs:nodejs server ./server                                                                                                                                  0.0s
+ => CACHED [stage-1  9/12] COPY --chown=nodejs:nodejs scripts ./scripts                                                                                                                                0.0s
+ => CACHED [stage-1 10/12] COPY --chown=nodejs:nodejs drizzle.config.ts ./                                                                                                                             0.0s
+ => CACHED [stage-1 11/12] RUN npm ci && npm cache clean --force                                                                                                                                       0.0s
+ => CACHED [stage-1 12/12] RUN mkdir -p /app/attached_assets/logos /app/logs &&     chown -R nodejs:nodejs /app/attached_assets /app/logs                                                              0.0s
+ => exporting to image                                                                                                                                                                                 0.0s
+ => => exporting layers                                                                                                                                                                                0.0s
+ => => writing image sha256:aa771c5b54e529765da8a10259f7d1133b14d497ecfe592c0a50a3da2d8f6b7a                                                                                                           0.0s
+ => => naming to docker.io/library/mikrotikmon-app                                                                                                                                                     0.0s
+ => resolving provenance for metadata file                                                                                                                                                             0.0s
+[+] Building 1/1
+ ✔ mikrotikmon-app  Built                                                                                                                                                                              0.0s 
+✓ Images built successfully
+ℹ Starting containers...
+[+] Running 1/2
+ ✔ Container mikrotik-monitor-db   Healthy                                                                                                                                                             0.5s 
+ ⠹ Container mikrotik-monitor-app  Starting                                                                                                                                                            0.3s 
+Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint mikrotik-monitor-app (d0a729b2493d42ac427901d572d7c72f1dbeef96d556b9adfa211211cd65ea70): Bind for 0.0.0.0:5000 failed: port is already allocated
