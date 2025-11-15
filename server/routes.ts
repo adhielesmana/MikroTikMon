@@ -1485,7 +1485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const settings = await storage.updateAppSettings(localLogoPath);
+      const settings = await storage.updateAppSettings({ logoUrl: localLogoPath });
       res.json(settings);
     } catch (error) {
       console.error("Error updating app settings:", error);

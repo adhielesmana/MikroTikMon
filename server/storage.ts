@@ -866,7 +866,7 @@ export class DatabaseStorage implements IStorage {
     return settings;
   }
 
-  async updateAppSettings(logoUrl: string | null): Promise<AppSettings> {
+  async updateAppSettings(data: Partial<Pick<AppSettings, 'logoUrl' | 'retentionDays'>>): Promise<AppSettings> {
     // Check if settings exist
     const existing = await this.getAppSettings();
     
@@ -874,7 +874,7 @@ export class DatabaseStorage implements IStorage {
       // Update existing
       const [updated] = await db
         .update(appSettings)
-        .set({ logoUrl, updatedAt: new Date() })
+        .set({ ...data, updatedAt: new Date() })
         .where(eq(appSettings.id, existing.id))
         .returning();
       return updated;
@@ -882,7 +882,7 @@ export class DatabaseStorage implements IStorage {
       // Create new
       const [created] = await db
         .insert(appSettings)
-        .values({ logoUrl })
+        .values(data)
         .returning();
       return created;
     }
