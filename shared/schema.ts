@@ -346,6 +346,7 @@ export type Notification = typeof notifications.$inferSelect;
 export const appSettings = pgTable("app_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   logoUrl: text("logo_url"), // Can be a file upload URL or external URL
+  retentionDays: integer("retention_days"), // Number of days to retain traffic data (null = forever)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
