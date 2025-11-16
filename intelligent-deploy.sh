@@ -281,6 +281,22 @@ else
 fi
 
 # ========================================
+# Prepare Host Directories for Docker Mounts
+# ========================================
+
+print_step "Preparing host directories for Docker volumes..."
+
+# Create directories on the HOST (required for Docker volume mounts)
+mkdir -p attached_assets/logos
+mkdir -p logs
+
+# Set proper permissions
+chmod -R 755 attached_assets
+chmod -R 755 logs
+
+print_success "Host directories created: attached_assets/logos, logs"
+
+# ========================================
 # Deploy Docker App
 # ========================================
 

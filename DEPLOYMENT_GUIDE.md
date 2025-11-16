@@ -82,12 +82,23 @@ FORCE_NGINX_RECONFIGURE=1 bash intelligent-deploy.sh
 - ✅ Safe to run `intelligent-deploy.sh` anytime for app updates
 - ✅ Your custom Nginx tweaks are never overwritten
 - ✅ SSL certificates remain untouched
+- ✅ **Host directories automatically created** (attached_assets/logos, logs)
 - ✅ Zero downtime deployments
 - ✅ Auto-update from GitHub works seamlessly
 
 ---
 
-## 🔧 Manual Directory Creation (If Needed)
+## 🎨 Logo Upload - Now Works Automatically!
+
+The deployment script now **automatically creates** host directories:
+- ✅ `attached_assets/logos/` - For custom logo storage
+- ✅ `logs/` - For application logs
+
+**No manual intervention needed!** Just deploy and upload your logo.
+
+---
+
+## 🔧 Manual Directory Creation (Legacy - Not Needed Anymore!)
 
 **For Production Server:**
 ```bash
