@@ -10,9 +10,16 @@ echo ""
 cd ~/MikroTikMon
 source .env
 
+# Determine docker-compose command
+if docker compose version &> /dev/null 2>&1; then
+    DOCKER_COMPOSE="docker compose"
+else
+    DOCKER_COMPOSE="docker-compose"
+fi
+
 # Stop application
 echo "1. Stopping application..."
-docker-compose stop app
+$DOCKER_COMPOSE stop app
 
 # Clean the backup file - remove empty lines from COPY blocks
 echo "2. Cleaning backup file..."
@@ -51,7 +58,7 @@ rm /tmp/backup_cleaned.sql
 
 # Start application
 echo "7. Starting application..."
-docker-compose start app
+$DOCKER_COMPOSE start app
 
 # Verify restoration
 echo ""
