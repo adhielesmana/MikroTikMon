@@ -3,7 +3,7 @@
 # ========================================
 # MikroTik Monitor - Database Migration Script
 # ========================================
-# Automatically runs all pending migrations
+# Runs SAFE migrations only (excludes destructive fresh-init scripts)
 
 set -e
 
@@ -21,7 +21,7 @@ print_error() { echo -e "${RED}✗${NC} $1"; }
 
 echo ""
 echo "========================================="
-echo "  Database Migration Runner"
+echo "  Database Migration Runner (SAFE MODE)"
 echo "========================================="
 echo ""
 
@@ -45,31 +45,80 @@ fi
 
 print_success "Database container is running"
 
+# Check if database has existing data (safety check)
+print_info "Checking database state..."
+USER_COUNT=$(docker exec mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" -t -c "SELECT COUNT(*) FROM users WHERE is_superadmin = true" 2>/dev/null || echo "0")
+USER_COUNT=$(echo $USER_COUNT | tr -d '[:space:]')
+
+if [ "$USER_COUNT" -gt "0" ]; then
+    print_success "Existing database detected (contains $USER_COUNT superadmin user(s))"
+    FRESH_INSTALL=false
+else
+    print_warning "Empty or fresh database detected"
+    FRESH_INSTALL=true
+fi
+
 # Check if migrations directory exists
 if [ ! -d "migrations" ]; then
     print_warning "No migrations directory found"
     exit 0
 fi
 
-# Count migration files
-MIGRATION_COUNT=$(ls -1 migrations/*.sql 2>/dev/null | wc -l)
+# Get list of migration files (EXCLUDING fresh init scripts)
+MIGRATION_FILES=$(ls -1 migrations/*.sql 2>/dev/null | grep -v "00_fresh_init.sql" || true)
+MIGRATION_COUNT=$(echo "$MIGRATION_FILES" | grep -v '^$' | wc -l)
 
 if [ "$MIGRATION_COUNT" -eq 0 ]; then
-    print_warning "No migration files found in migrations/"
+    print_info "No upgrade migration files found"
     exit 0
 fi
 
-print_info "Found $MIGRATION_COUNT migration file(s)"
+echo ""
+print_warning "⚠️  SAFETY NOTICE:"
+echo "  This script will run $MIGRATION_COUNT migration file(s)"
+echo "  Fresh installation scripts (00_fresh_init.sql) are EXCLUDED"
+echo ""
 
-# Run each migration
-for migration_file in migrations/*.sql; do
+# List migrations to run
+print_info "Migrations to execute:"
+echo "$MIGRATION_FILES" | grep -v '^$' | while read -r file; do
+    echo "  - $(basename "$file")"
+done
+echo ""
+
+# Confirm before proceeding
+read -p "Continue with migrations? (y/N): " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    print_info "Migration cancelled by user"
+    exit 0
+fi
+
+echo ""
+print_info "Running migrations..."
+
+# Run each migration (excluding 00_fresh_init.sql)
+SUCCESS_COUNT=0
+SKIP_COUNT=0
+
+for migration_file in $MIGRATION_FILES; do
     if [ -f "$migration_file" ]; then
         filename=$(basename "$migration_file")
+        
+        # Skip fresh init scripts
+        if [[ "$filename" == "00_fresh_init.sql" ]]; then
+            print_warning "⊘ Skipping: $filename (fresh installation only)"
+            SKIP_COUNT=$((SKIP_COUNT + 1))
+            continue
+        fi
+        
         print_info "Running migration: $filename"
         
         # Execute migration
-        if docker exec -i mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" < "$migration_file" 2>&1 | grep -v "already exists\|does not exist\|skipping"; then
+        if docker exec -i mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" < "$migration_file" 2>&1 | \
+            grep -v "already exists\|does not exist\|skipping\|NOTICE" || true; then
             print_success "✓ $filename completed"
+            SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
         else
             print_warning "⚠ $filename (may have already been applied)"
         fi
@@ -77,11 +126,18 @@ for migration_file in migrations/*.sql; do
 done
 
 echo ""
-print_success "All migrations completed!"
+if [ $SUCCESS_COUNT -gt 0 ]; then
+    print_success "Successfully ran $SUCCESS_COUNT migration(s)"
+fi
+if [ $SKIP_COUNT -gt 0 ]; then
+    print_info "Skipped $SKIP_COUNT destructive migration(s)"
+fi
 echo ""
 
 # Show table list
 print_info "Current database tables:"
 docker exec -i mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" -c "\dt" | grep -v "^$"
 
+echo ""
+print_success "Migration complete!"
 echo ""
