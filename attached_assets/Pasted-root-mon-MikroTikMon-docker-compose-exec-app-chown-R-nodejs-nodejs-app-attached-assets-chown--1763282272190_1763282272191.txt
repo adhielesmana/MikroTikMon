@@ -1,0 +1,26 @@
+root@mon:~/MikroTikMon# docker compose exec app chown -R nodejs:nodejs /app/attached_assets
+chown: /app/attached_assets/Pasted-psql-tmp-restore-sql-57-ERROR-relation-alerts-already-exists-ALTER-TABLE-psql-tmp-restore-sql-1763273677317_1763273677318.txt: Operation not permitted
+chown: /app/attached_assets/image_1762074736484.png: Operation not permitted
+chown: /app/attached_assets/Pasted--ERROR-stage-1-8-10-COPY-from-builder-chown-nodejs-nodejs-app-client-dist-client-dist--1761961032229_1761961032230.txt: Operation not permitted
+chown: /app/attached_assets/Pasted-psql-tmp-restore-sql-158382-error-backslash-commands-are-restricted-only-unrestrict-is-allowed--1763273568689_1763273568692.txt: Operation not permitted
+chown: /app/attached_assets/Pasted-The-source-list-for-the-Content-Security-Policy-directive-default-src-contains-an-invalid-source--1761556712548_1761556712549.txt: Operation not permitted
+chown: /app/attached_assets/image_1762022919044.png: Operation not permitted
+chown: /app/attached_assets/image_1762089392358.png: Operation not permitted
+chown: /app/attached_assets/image_1761965699015.png: Operation not permitted
+chown: /app/attached_assets/image_1762228998338.png: Operation not permitted
+chown: /app/attached_assets/image_1762182844918.png: Operation not permitted
+chown: /app/attached_assets/image_1762229540128.png: Operation not permitted
+chown: /app/attached_assets/image_1762229205237.png: Operation not permitted
+chown: /app/attached_assets/image_1762218093188.png: Operation not permitted
+chown: /app/attached_assets/image_1761965142230.png: Operation not permitted
+chown: /app/attached_assets/image_1761638774699.png: Operation not permitted
+chown: /app/attached_assets/image_1762019836182.png: Operation not permitted
+chown: /app/attached_assets/logos/logo-56c0f18f272ea0a5.png: Operation not permitted
+chown: /app/attached_assets/logos: Operation not permitted
+chown: /app/attached_assets/logos: Operation not permitted
+chown: /app/attached_assets/image_1763274993950.png: Operation not permitted
+chown: /app/attached_assets/image_1762047978622.png: Operation not permitted
+chown: /app/attached_assets/logo.png: Operation not permitted
+chown: /app/attached_assets/Pasted--deploy-sh-MikroTik-Monitor-Deploy-Script--1763190568056_1763190568057.txt: Operation not permitted
+chown: /app/attached_assets: Operation not permitted
+chown: /app/attached_assets: Operation not permitted
