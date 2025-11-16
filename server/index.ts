@@ -18,10 +18,10 @@ async function ensureDirectoriesExist() {
   for (const dir of directories) {
     try {
       await mkdir(dir, { recursive: true, mode: 0o755 });
-      log(`✓ Ensured directory exists: ${dir}`);
+      console.log(`✓ Ensured directory exists: ${dir}`);
     } catch (error: any) {
       if (error.code !== 'EEXIST') {
-        console.error(`Failed to create directory ${dir}:`, error);
+        console.error(`✗ Failed to create directory ${dir}:`, error);
       }
     }
   }
