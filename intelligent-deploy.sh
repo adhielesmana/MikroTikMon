@@ -283,6 +283,40 @@ else
 fi
 
 # ========================================
+# Run Database Migrations
+# ========================================
+
+print_step "Running database migrations..."
+
+# Source environment variables
+source .env
+
+# Wait for database to be fully ready
+sleep 3
+
+# Check if migrations directory exists
+if [ -d "migrations" ] && [ "$(ls -A migrations/*.sql 2>/dev/null)" ]; then
+    MIGRATION_COUNT=$(ls -1 migrations/*.sql 2>/dev/null | wc -l)
+    print_info "Found $MIGRATION_COUNT migration file(s)"
+    
+    # Run each migration
+    for migration_file in migrations/*.sql; do
+        if [ -f "$migration_file" ]; then
+            filename=$(basename "$migration_file")
+            print_info "Running: $filename"
+            
+            # Execute migration (suppress "already exists" warnings)
+            docker exec -i mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" < "$migration_file" 2>&1 | \
+                grep -v "already exists\|does not exist\|skipping" || true
+        fi
+    done
+    
+    print_success "Database migrations completed!"
+else
+    print_info "No migrations to run"
+fi
+
+# ========================================
 # SSL Certificate Setup (if needed)
 # ========================================
 
