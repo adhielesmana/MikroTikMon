@@ -56,14 +56,34 @@ source .env  # Load environment variables
 bash intelligent-deploy.sh
 ```
 
-### What Happens Automatically:
-1. ✅ **Installs/Updates Nginx** (if not installed)
-2. ✅ **Configures SSL** with Let's Encrypt (if certificates exist)
-3. ✅ **Creates Docker volumes** for persistent storage
-4. ✅ **Builds & starts containers** with health checks
-5. ✅ **Runs database migrations** safely
-6. ✅ **Creates required directories** on first startup
-7. ✅ **Starts auto-update polling** (checks GitHub every 5 min)
+### 🧠 Smart Deployment Behavior:
+
+**First-time deployment:**
+1. ✅ Installs Nginx (if not installed)
+2. ✅ Configures SSL with Let's Encrypt (if certificates exist)
+3. ✅ Creates Nginx reverse proxy configuration
+4. ✅ Builds & starts Docker containers
+5. ✅ Runs database migrations safely
+6. ✅ Creates required directories on first startup
+7. ✅ Starts auto-update polling (checks GitHub every 5 min)
+
+**Subsequent deployments (app updates):**
+1. ✅ **Skips Nginx configuration** (preserves your custom settings!)
+2. ✅ **Skips SSL setup** (doesn't touch existing certificates)
+3. ✅ **Only updates Docker app** (rebuild + restart containers)
+4. ✅ Runs new database migrations (if any)
+
+**Force Nginx reconfiguration (when needed):**
+```bash
+FORCE_NGINX_RECONFIGURE=1 bash intelligent-deploy.sh
+```
+
+**This smart behavior means:**
+- ✅ Safe to run `intelligent-deploy.sh` anytime for app updates
+- ✅ Your custom Nginx tweaks are never overwritten
+- ✅ SSL certificates remain untouched
+- ✅ Zero downtime deployments
+- ✅ Auto-update from GitHub works seamlessly
 
 ---
 

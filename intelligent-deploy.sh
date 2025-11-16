@@ -4,6 +4,13 @@
 # MikroTik Monitor - Host Nginx + Docker App Deployment
 # ========================================
 # Simple deployment: nginx on host, app in Docker
+#
+# SMART BEHAVIOR:
+# - First run: Installs nginx, configures SSL (if available), deploys app
+# - Subsequent runs: Only updates Docker app, skips nginx/SSL
+# - Force nginx reconfigure: FORCE_NGINX_RECONFIGURE=1 ./intelligent-deploy.sh
+#
+# This prevents overwriting custom nginx configurations on app updates!
 
 set -e
 
@@ -97,17 +104,31 @@ fi
 # Get domain from environment or use default
 DOMAIN="${DOMAIN:-mon.maxnetplus.id}"
 
-# Check if we have SSL certificates
-if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
-    print_success "SSL certificates found for $DOMAIN"
-    USE_SSL=true
-else
-    print_warning "No SSL certificates found for $DOMAIN"
-    USE_SSL=false
+# Check if nginx configuration already exists
+NGINX_CONFIG_EXISTS=false
+if [ -f "/etc/nginx/sites-available/mikrotik-monitor" ] && [ -L "/etc/nginx/sites-enabled/mikrotik-monitor" ]; then
+    NGINX_CONFIG_EXISTS=true
+    print_success "Nginx configuration already exists - skipping nginx setup"
+    print_info "To reconfigure nginx, delete /etc/nginx/sites-available/mikrotik-monitor and run this script again"
 fi
 
-# Create nginx configuration
-if [ "$USE_SSL" = true ]; then
+# Only configure nginx if config doesn't exist or FORCE_NGINX_RECONFIGURE=1
+if [ "$NGINX_CONFIG_EXISTS" = false ] || [ "$FORCE_NGINX_RECONFIGURE" = "1" ]; then
+    if [ "$FORCE_NGINX_RECONFIGURE" = "1" ]; then
+        print_warning "Force reconfiguring nginx (FORCE_NGINX_RECONFIGURE=1)"
+    fi
+
+    # Check if we have SSL certificates
+    if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+        print_success "SSL certificates found for $DOMAIN"
+        USE_SSL=true
+    else
+        print_warning "No SSL certificates found for $DOMAIN"
+        USE_SSL=false
+    fi
+
+    # Create nginx configuration
+    if [ "$USE_SSL" = true ]; then
     print_info "Creating HTTPS nginx configuration..."
     cat > /etc/nginx/sites-available/mikrotik-monitor << 'EOF'
 # WebSocket upgrade headers
@@ -231,29 +252,32 @@ server {
     }
 }
 EOF
-fi
+    fi
 
-# Replace placeholders
-sed -i "s|DOMAIN_PLACEHOLDER|$DOMAIN|g" /etc/nginx/sites-available/mikrotik-monitor
-sed -i "s|APP_PORT_PLACEHOLDER|$APP_PORT|g" /etc/nginx/sites-available/mikrotik-monitor
+    # Replace placeholders
+    sed -i "s|DOMAIN_PLACEHOLDER|$DOMAIN|g" /etc/nginx/sites-available/mikrotik-monitor
+    sed -i "s|APP_PORT_PLACEHOLDER|$APP_PORT|g" /etc/nginx/sites-available/mikrotik-monitor
 
-# Enable site
-ln -sf /etc/nginx/sites-available/mikrotik-monitor /etc/nginx/sites-enabled/
+    # Enable site
+    ln -sf /etc/nginx/sites-available/mikrotik-monitor /etc/nginx/sites-enabled/
 
-# Test nginx configuration
-print_info "Testing nginx configuration..."
-nginx -t
+    # Test nginx configuration
+    print_info "Testing nginx configuration..."
+    nginx -t
 
-if [ $? -eq 0 ]; then
-    print_success "Nginx configuration valid!"
-    
-    # Reload nginx
-    print_info "Reloading nginx..."
-    systemctl reload nginx || systemctl restart nginx
-    print_success "Nginx reloaded!"
+    if [ $? -eq 0 ]; then
+        print_success "Nginx configuration valid!"
+        
+        # Reload nginx
+        print_info "Reloading nginx..."
+        systemctl reload nginx || systemctl restart nginx
+        print_success "Nginx reloaded!"
+    else
+        print_error "Nginx configuration test failed!"
+        exit 1
+    fi
 else
-    print_error "Nginx configuration test failed!"
-    exit 1
+    print_info "Skipping nginx configuration (already exists)"
 fi
 
 # ========================================
