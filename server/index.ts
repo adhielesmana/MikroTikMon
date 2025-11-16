@@ -3,8 +3,29 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startAutoUpdate } from "./autoUpdate";
 import path from "path";
+import { mkdir } from "fs/promises";
 
 const app = express();
+
+// Ensure required directories exist on startup
+async function ensureDirectoriesExist() {
+  const directories = [
+    path.resolve(import.meta.dirname, "..", "attached_assets"),
+    path.resolve(import.meta.dirname, "..", "attached_assets", "logos"),
+    path.resolve(import.meta.dirname, "..", "logs"),
+  ];
+
+  for (const dir of directories) {
+    try {
+      await mkdir(dir, { recursive: true, mode: 0o755 });
+      log(`✓ Ensured directory exists: ${dir}`);
+    } catch (error: any) {
+      if (error.code !== 'EEXIST') {
+        console.error(`Failed to create directory ${dir}:`, error);
+      }
+    }
+  }
+}
 
 declare module 'http' {
   interface IncomingMessage {
@@ -72,6 +93,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Ensure all required directories exist before starting the server
+  await ensureDirectoriesExist();
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
