@@ -290,11 +290,14 @@ print_step "Preparing host directories for Docker volumes..."
 mkdir -p attached_assets/logos
 mkdir -p logs
 
-# Set proper permissions
+# Set proper permissions on host
 chmod -R 755 attached_assets
 chmod -R 755 logs
 
 print_success "Host directories created: attached_assets/logos, logs"
+
+# After container starts, fix ownership inside container
+print_info "Note: Ownership will be fixed after container starts"
 
 # ========================================
 # Deploy Docker App
@@ -316,6 +319,11 @@ sleep 5
 # Check if containers are running
 if $DOCKER_COMPOSE ps | grep -q "Up"; then
     print_success "Docker containers started successfully!"
+    
+    # Fix ownership of mounted directories inside container
+    print_info "Fixing directory ownership inside container..."
+    $DOCKER_COMPOSE exec -T app chown -R nodejs:nodejs /app/attached_assets /app/logs 2>/dev/null || true
+    print_success "Directory ownership fixed"
 else
     print_error "Docker containers failed to start!"
     print_info "Check logs with: docker-compose logs"
