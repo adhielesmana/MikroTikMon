@@ -1,0 +1,42 @@
+psql:/tmp/restore.sql:57: ERROR:  relation "alerts" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:66: ERROR:  column "port_comment" of relation "public.alerts" does not exist
+psql:/tmp/restore.sql:78: ERROR:  relation "app_settings" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:100: ERROR:  relation "monitored_ports" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:118: ERROR:  relation "notifications" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:135: ERROR:  relation "router_groups" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:156: ERROR:  relation "router_interfaces" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:188: ERROR:  relation "routers" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:201: ERROR:  relation "sessions" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:219: ERROR:  relation "traffic_data" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:234: ERROR:  relation "user_routers" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:257: ERROR:  relation "users" already exists
+ALTER TABLE
+psql:/tmp/restore.sql:266: ERROR:  column "port_comment" of relation "alerts" does not exist
+psql:/tmp/restore.sql:267: error: invalid command \N
+psql:/tmp/restore.sql:268: error: invalid command \N
+psql:/tmp/restore.sql:269: error: invalid command \N
+psql:/tmp/restore.sql:270: error: invalid command \N
+psql:/tmp/restore.sql:271: error: invalid command \N
+psql:/tmp/restore.sql:272: error: invalid command \N
+psql:/tmp/restore.sql:273: error: invalid command \N
+psql:/tmp/restore.sql:274: error: invalid command \N
+psql:/tmp/restore.sql:275: error: invalid command \N
+psql:/tmp/restore.sql:276: error: invalid command \N
+psql:/tmp/restore.sql:277: error: invalid command \N
+psql:/tmp/restore.sql:278: error: invalid command \N
+psql:/tmp/restore.sql:279: error: invalid command \N
+psql:/tmp/restore.sql:280: error: invalid command \N
+psql:/tmp/restore.sql:281: error: invalid command \N
+psql:/tmp/restore.sql:282: error: invalid command \N
+psql:/tmp/restore.sql:283: error: invalid command \N
+psql:/tmp/restore.sql:284: error: invalid command \N
