@@ -3,6 +3,12 @@
 ## Overview
 A comprehensive, enterprise-grade network monitoring platform for MikroTik routers. It offers real-time traffic analysis, intelligent threshold-based alerting, and multi-user role-based access control. The platform is designed for professional network administrators, providing a production-ready solution for efficient network oversight. The project aims to provide a robust, scalable, and user-friendly system for monitoring MikroTik router performance and health, with features like user invitation, multi-provider authentication, and a three-tier fallback system for router connectivity.
 
+## Recent Updates (Nov 16, 2025)
+- **Smart Deployment Script:** `intelligent-deploy.sh` now skips Nginx/SSL reconfiguration on subsequent runs, only updating Docker app. Preserves custom configurations. Use `FORCE_NGINX_RECONFIGURE=1` to force reconfiguration.
+- **Automatic Directory Creation:** Deployment script automatically creates `attached_assets/logos/` and `logs/` directories on host with proper ownership (UID 1000 for nodejs user).
+- **Logo Upload Fixed:** Resolved permission issues and missing `retention_days` column. Logo upload now works seamlessly on production.
+- **Database Restoration:** Successfully restored production database from backup after second data loss incident.
+
 ## User Preferences
 - Professional, data-dense monitoring interface
 - Mobile and desktop accessibility required
@@ -37,13 +43,18 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 - **Production Setup**: Host nginx + Docker app architecture at mon.maxnetplus.id
 - **Nginx**: Runs on host system (not Docker), handles SSL/TLS, reverse proxy, and WebSocket upgrades
 - **Application**: Runs in Docker container on port 5000, managed by docker-compose
-- **Deployment Script**: `intelligent-deploy.sh` automatically installs/updates nginx, configures reverse proxy, and deploys Docker app
+- **Deployment Script**: `intelligent-deploy.sh` with smart behavior:
+  - **First run**: Installs nginx, configures SSL, creates directories, deploys app
+  - **Subsequent runs**: Skips nginx/SSL (preserves configs), only updates Docker app
+  - **Auto-creates directories**: `attached_assets/logos/`, `logs/` with proper ownership (UID 1000)
+  - **Force reconfigure**: Set `FORCE_NGINX_RECONFIGURE=1` environment variable
 - **SSL Certificates**: Let's Encrypt via certbot in standalone mode
 - **Auto-Updates**: GitHub polling every 5 minutes, automatic deployment on code changes
+- **Directory Ownership**: Host directories owned by UID 1000 (nodejs user in container) for proper write permissions
 
 ### System Design Choices
 - **UI/UX:** Mobile-first responsive design, dark mode support, collapsible sidebar, touch-friendly interactions, dynamic logo on homepage and sidebar, error handling and dynamic updates for custom logos. **Automatic directory creation** on server startup ensures `attached_assets/logos/` and `logs/` directories exist with proper permissions (755) - no manual intervention required.
-- **Logo Management:** Admin settings page accepts logo URLs which are automatically downloaded, stored locally in `attached_assets/logos/` with unique filenames (crypto random hash), and database updated with local file path. Old logos automatically deleted to prevent disk bloat. Seamless local storage for faster loading and offline reliability.
+- **Logo Management:** Admin settings page accepts logo URLs which are automatically downloaded, stored locally in `attached_assets/logos/` with unique filenames (crypto random hash), and database updated with local file path. Old logos automatically deleted to prevent disk bloat. Seamless local storage for faster loading and offline reliability. **Production fix applied:** Directories auto-created with proper ownership (UID 1000), `retention_days` column added to `app_settings` table.
 - **Authentication:** Multi-provider authentication (Google OAuth, Local Admin, Replit Auth) with session management. Default local admin account ("admin"/"admin") with forced password change on first login. User invitation system for super admins with secure temporary passwords and forced password change. Admin password recovery script.
 - **Authorization:** Role-Based Access Control (RBAC) with "admin" and "user" roles. Super admins have full system-wide access to all routers; normal users are restricted to their own. Authorization checks enforce ownership validation on all router operations.
 - **Router Connectivity:** Three-tier fallback system for connecting to MikroTik routers: Native MikroTik API, HTTPS REST API (RouterOS v7.1+), and SNMP (v1/v2c). Automatic host extraction for REST API via SSL certificates. Network reachability status check. Optimized background scheduler using `lastSuccessfulConnectionMethod` to reduce unnecessary connection attempts.
