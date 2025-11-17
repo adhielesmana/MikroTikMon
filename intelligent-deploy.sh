@@ -366,16 +366,6 @@ else
     print_info "No migrations to run"
 fi
 
-# ========================================
-# Sync Database Schema (Drizzle)
-# ========================================
-
-print_step "Syncing database schema with current code..."
-
-# Run Drizzle schema sync to add any missing columns (fixes schema mismatches after restores)
-$DOCKER_COMPOSE exec -T app npm run db:push -- --force 2>&1 | grep -v "Warning\|warn" || true
-
-print_success "Database schema synchronized!"
 
 # ========================================
 # SSL Certificate Setup (if needed)
