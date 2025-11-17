@@ -1663,17 +1663,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Read and parse SQL file to extract only data statements
         const backupContent = await fs.readFile(backupPath, 'utf-8');
         
-        // Filter SQL: Keep only COPY, INSERT, and setval statements
+        // Filter SQL: Keep only COPY statements for core tables (skip problematic tables)
+        const coreTables = ['users', 'router_groups', 'routers', 'user_routers', 'monitored_ports', 'app_settings'];
         const dataStatements: string[] = [];
         const lines = backupContent.split('\n');
         let inCopyBlock = false;
         let copyBuffer: string[] = [];
+        let currentTable = '';
         
         for (const line of lines) {
           // Detect COPY statements (data blocks)
-          if (line.startsWith('COPY ') && line.includes(' FROM stdin;')) {
-            inCopyBlock = true;
-            copyBuffer = [line];
+          if (line.startsWith('COPY public.')) {
+            // Extract table name: "COPY public.users (...) FROM stdin;"
+            const match = line.match(/COPY public\.(\w+)/);
+            if (match) {
+              currentTable = match[1];
+              
+              // Only process core tables, skip alerts/notifications/traffic_data (schema changes)
+              if (coreTables.includes(currentTable)) {
+                inCopyBlock = true;
+                copyBuffer = [line];
+              }
+            }
             continue;
           }
           
@@ -1684,13 +1695,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               inCopyBlock = false;
               dataStatements.push(copyBuffer.join('\n'));
               copyBuffer = [];
+              currentTable = '';
             }
-            continue;
-          }
-          
-          // Keep INSERT statements
-          if (line.trim().startsWith('INSERT INTO ')) {
-            dataStatements.push(line);
             continue;
           }
           
@@ -1702,11 +1708,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (dataStatements.length === 0) {
-          res.status(400).json({ message: "No data statements found in backup file" });
+          res.status(400).json({ message: "No compatible data found in backup file for restore" });
           return;
         }
         
-        console.log(`[Restore] Found ${dataStatements.length} data statements`);
+        console.log(`[Restore] Found ${dataStatements.length} compatible data statements for core tables`);
         
         // Create safe restore script with transaction and FK handling
         const dataOnlySQL = `
@@ -1715,19 +1721,16 @@ BEGIN;
 -- Disable triggers and foreign key checks for fast import
 SET session_replication_role = 'replica';
 
--- Truncate tables in FK-safe order (children first, parents last)
-TRUNCATE TABLE traffic_data CASCADE;
-TRUNCATE TABLE alerts CASCADE;
-TRUNCATE TABLE monitored_ports CASCADE;
-TRUNCATE TABLE notifications CASCADE;
+-- Truncate only core tables we're restoring (preserve alerts/notifications/traffic_data)
 TRUNCATE TABLE user_routers CASCADE;
+TRUNCATE TABLE monitored_ports CASCADE;
 TRUNCATE TABLE routers CASCADE;
 TRUNCATE TABLE router_groups CASCADE;
-TRUNCATE TABLE sessions CASCADE;
 TRUNCATE TABLE users CASCADE;
 TRUNCATE TABLE app_settings CASCADE;
+TRUNCATE TABLE sessions CASCADE;
 
--- Insert data from backup
+-- Insert data from backup (core tables only)
 ${dataStatements.join('\n\n')}
 
 -- Re-enable triggers and foreign key checks
@@ -1751,7 +1754,7 @@ COMMIT;
           );
           
           console.log("[Restore] Data-only restore completed successfully");
-          res.json({ message: "Data restored successfully. Current schema preserved. Please refresh the page." });
+          res.json({ message: "Core data restored (users, routers, groups, monitored ports). Alerts and traffic data preserved. Please refresh the page." });
         } finally {
           // Clean up temp file
           await fs.unlink(tempSQLPath).catch(() => {});
