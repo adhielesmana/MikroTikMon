@@ -1611,7 +1611,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const execAsync = promisify(exec);
       
       const backupScript = path.join(process.cwd(), 'scripts', 'backup-database.sh');
-      const { stdout, stderr } = await execAsync(`bash ${backupScript}`);
+      const { stdout, stderr } = await execAsync(`bash ${backupScript}`, {
+        maxBuffer: 500 * 1024 * 1024 // 500MB buffer for large database backups
+      });
       
       if (stderr && !stderr.includes('WARNING')) {
         console.error("[Backup] Backup stderr:", stderr);
@@ -1670,7 +1672,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ${decompressCmd} | PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d "${process.env.PGDATABASE}"
       `;
       
-      await execAsync(restoreScript, { shell: '/bin/bash' });
+      await execAsync(restoreScript, { 
+        shell: '/bin/bash',
+        maxBuffer: 500 * 1024 * 1024 // 500MB buffer for large database restores
+      });
       
       console.log("[Restore] Database restored successfully");
       res.json({ message: "Database restored successfully. Please refresh the page." });
