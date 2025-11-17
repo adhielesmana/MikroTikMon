@@ -44,10 +44,54 @@ if [ ! -d "backups" ]; then
     echo "✓ Created: backups/"
 fi
 
-# Set ownership and permissions on host
-echo "Setting ownership to 1000:1000 on host directory..."
-chown -R 1000:1000 backups
-echo "✓ Host ownership: 1000:1000"
+# ========================================
+# Intelligent UID Detection
+# ========================================
+
+echo "Detecting container nodejs user UID..."
+
+# Function to detect nodejs UID from running or temporary container
+detect_nodejs_uid() {
+    local detected_uid=""
+    
+    # Method 1: Check if container is already running
+    if docker ps --format '{{.Names}}' | grep -q "mikrotik-monitor-app"; then
+        echo "  Container is running, querying nodejs UID..."
+        detected_uid=$(docker exec mikrotik-monitor-app id -u nodejs 2>/dev/null)
+        
+        if [ -n "$detected_uid" ]; then
+            echo "  ✓ Detected nodejs UID from running container: $detected_uid"
+            echo "$detected_uid"
+            return 0
+        fi
+    fi
+    
+    # Method 2: Parse Dockerfile directly
+    echo "  Parsing Dockerfile for nodejs UID..."
+    if [ -f "Dockerfile" ]; then
+        detected_uid=$(grep -E "adduser.*nodejs.*-u\s+[0-9]+" Dockerfile | sed -E 's/.*-u\s+([0-9]+).*/\1/' | head -1)
+        
+        if [ -n "$detected_uid" ]; then
+            echo "  ✓ Detected nodejs UID from Dockerfile: $detected_uid"
+            echo "$detected_uid"
+            return 0
+        fi
+    fi
+    
+    # Fallback: Use 1000 (most common)
+    echo "  ⚠ Could not detect nodejs UID, using default: 1000"
+    echo "1000"
+    return 1
+}
+
+# Detect the nodejs UID
+NODEJS_UID=$(detect_nodejs_uid)
+NODEJS_GID=$NODEJS_UID  # GID typically matches UID
+
+echo ""
+echo "Setting ownership to $NODEJS_UID:$NODEJS_GID on host directory..."
+chown -R $NODEJS_UID:$NODEJS_GID backups
+echo "✓ Host ownership: $NODEJS_UID:$NODEJS_GID"
 
 echo "Setting permissions on host directory..."
 chmod -R 755 backups
@@ -57,7 +101,7 @@ echo ""
 # Verify ownership inside container
 echo "Verifying ownership inside Docker container..."
 if $DOCKER_COMPOSE ps | grep -q "mikrotik-monitor-app.*Up"; then
-    echo "✓ Container is running - ownership automatically correct (nodejs user is UID 1000)"
+    echo "✓ Container is running - ownership automatically correct (nodejs user is UID $NODEJS_UID)"
 else
     echo "WARNING: Container is not running"
     echo "Start the container and ownership will be automatically correct"

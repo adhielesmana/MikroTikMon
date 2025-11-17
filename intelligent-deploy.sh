@@ -291,17 +291,72 @@ mkdir -p attached_assets/logos
 mkdir -p logs
 mkdir -p backups
 
-# Set proper permissions and ownership on host (UID 1000:1000 matches container user)
-print_info "Setting ownership to 1000:1000 on host directories..."
-chown -R 1000:1000 attached_assets
-chown -R 1000:1000 logs
-chown -R 1000:1000 backups
+# ========================================
+# Intelligent UID Detection
+# ========================================
+
+print_step "Detecting container nodejs user UID..."
+
+# Function to detect nodejs UID from running or temporary container
+detect_nodejs_uid() {
+    local detected_uid=""
+    
+    # Method 1: Check if container is already running
+    if docker ps --format '{{.Names}}' | grep -q "mikrotik-monitor-app"; then
+        print_info "Container is running, querying nodejs UID..."
+        detected_uid=$(docker exec mikrotik-monitor-app id -u nodejs 2>/dev/null)
+        
+        if [ -n "$detected_uid" ]; then
+            print_success "Detected nodejs UID from running container: $detected_uid"
+            echo "$detected_uid"
+            return 0
+        fi
+    fi
+    
+    # Method 2: Build a temporary container to check UID
+    print_info "Building temporary container to detect nodejs UID..."
+    if docker build -t mikrotik-monitor-uid-check -f Dockerfile . >/dev/null 2>&1; then
+        detected_uid=$(docker run --rm mikrotik-monitor-uid-check id -u nodejs 2>/dev/null)
+        
+        if [ -n "$detected_uid" ]; then
+            print_success "Detected nodejs UID from Dockerfile: $detected_uid"
+            echo "$detected_uid"
+            return 0
+        fi
+    fi
+    
+    # Method 3: Parse Dockerfile directly
+    print_info "Parsing Dockerfile for nodejs UID..."
+    detected_uid=$(grep -E "adduser.*nodejs.*-u\s+[0-9]+" Dockerfile | sed -E 's/.*-u\s+([0-9]+).*/\1/' | head -1)
+    
+    if [ -n "$detected_uid" ]; then
+        print_success "Detected nodejs UID from Dockerfile: $detected_uid"
+        echo "$detected_uid"
+        return 0
+    fi
+    
+    # Fallback: Use 1000 (most common)
+    print_warning "Could not detect nodejs UID, using default: 1000"
+    echo "1000"
+    return 1
+}
+
+# Detect the nodejs UID
+NODEJS_UID=$(detect_nodejs_uid)
+NODEJS_GID=$NODEJS_UID  # GID typically matches UID
+
+# Set proper permissions and ownership on host directories
+print_info "Setting ownership to $NODEJS_UID:$NODEJS_GID on host directories..."
+chown -R $NODEJS_UID:$NODEJS_GID attached_assets
+chown -R $NODEJS_UID:$NODEJS_GID logs
+chown -R $NODEJS_UID:$NODEJS_GID backups
 
 chmod -R 755 attached_assets
 chmod -R 755 logs
 chmod -R 755 backups
 
-print_success "Host directories created with 1000:1000 ownership"
+print_success "Host directories created with $NODEJS_UID:$NODEJS_GID ownership"
+print_info "Container nodejs user UID: $NODEJS_UID (auto-detected)"
 
 # ========================================
 # Deploy Docker App

@@ -128,7 +128,7 @@ export default function Routers() {
       queryClient.invalidateQueries({ queryKey: ["/api/routers"] });
       toast({
         title: "Bulk check completed",
-        description: data.message || `Checked all routers successfully`,
+        description: `Checked ${data.total} router(s): ${data.connected} connected, ${data.failed} failed`,
       });
     },
     onError: (error: Error) => {
