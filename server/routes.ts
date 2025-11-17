@@ -16,6 +16,32 @@ import path from "path";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 
+// Helper function to restart the application
+function restartApplication() {
+  console.log("[System] Restarting application...");
+  
+  if (process.env.NODE_ENV === "production") {
+    // In Docker production, restart the container using a self-restart mechanism
+    // The container will restart automatically due to restart policy
+    const { exec } = require('child_process');
+    
+    // Try to restart the Docker container from inside (requires Docker socket mount)
+    exec('docker restart $(hostname)', (error: any) => {
+      if (error) {
+        // Fallback: Just exit process - Docker restart policy will restart it
+        console.log("[System] Container restart failed, using process exit (container will restart via Docker)");
+        process.exit(0);
+      } else {
+        console.log("[System] Container restart initiated");
+      }
+    });
+  } else {
+    // In development (Replit), exit process - workflow will restart it
+    console.log("[System] Development mode: exiting process (workflow will restart)");
+    process.exit(0);
+  }
+}
+
 // Helper function to get user ID from request (handles both OIDC and local/Google auth)
 function getUserId(req: any): string {
   // For OIDC/Replit Auth users, the ID is in claims.sub
@@ -1860,7 +1886,22 @@ COMMIT;
           );
           
           console.log("[Restore] Data-only restore completed successfully");
-          res.json({ message: "Core data restored (users, routers, groups, monitored ports). Alerts and traffic data preserved. Please refresh the page." });
+          
+          // CRITICAL: Restart application to refresh database connections and scheduler
+          console.log("[Restore] Triggering application restart to refresh connections and scheduler...");
+          
+          // Send success response before restart
+          res.json({ 
+            message: "Core data restored successfully. Application restarting to refresh connections...",
+            details: {
+              note: "The application will restart automatically. Please refresh the page in a few seconds."
+            }
+          });
+          
+          // Restart application after a short delay to allow response to be sent
+          setTimeout(() => {
+            restartApplication();
+          }, 1000);
         } finally {
           // Clean up temp file
           await fs.unlink(tempSQLPath).catch(() => {});
@@ -1887,7 +1928,22 @@ COMMIT;
         });
         
         console.log("[Restore] Full restore completed successfully");
-        res.json({ message: "Database restored successfully. Please refresh the page." });
+        
+        // CRITICAL: Restart application to refresh database connections and scheduler
+        console.log("[Restore] Triggering application restart to refresh connections and scheduler...");
+        
+        // Send success response before restart
+        res.json({ 
+          message: "Database restored successfully. Application restarting...",
+          details: {
+            note: "The application will restart automatically. Please refresh the page in a few seconds."
+          }
+        });
+        
+        // Restart application after a short delay to allow response to be sent
+        setTimeout(() => {
+          restartApplication();
+        }, 1000);
       }
     } catch (error: any) {
       console.error("[Restore] Error restoring backup:", error);
