@@ -83,7 +83,11 @@ export default function Settings() {
     }
   };
 
-  const { data: settings } = useQuery({
+  const { data: settings } = useQuery<{
+    id: string;
+    logo_url?: string;
+    retentionDays?: number | null;
+  }>({
     queryKey: ["/api/settings"],
   });
 
@@ -177,7 +181,13 @@ export default function Settings() {
   };
 
   // Backup/Restore queries and mutations
-  const { data: backupsData, refetch: refetchBackups } = useQuery({
+  const { data: backupsData, refetch: refetchBackups } = useQuery<{
+    backups: Array<{
+      filename: string;
+      size: number;
+      created: Date;
+    }>;
+  }>({
     queryKey: ["/api/backups"],
     enabled: isAdmin,
   });
