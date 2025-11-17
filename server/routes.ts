@@ -1792,8 +1792,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (dataOnly) {
         console.log(`[Restore] Data-only restore from: ${filename}`);
         
-        // Read and parse SQL file to extract only data statements
-        const backupContent = await fs.readFile(backupPath, 'utf-8');
+        // Check if file is compressed
+        const isCompressed = filename.endsWith('.gz');
+        let backupContent: string;
+        
+        if (isCompressed) {
+          // Decompress gzipped backup first
+          console.log('[Restore] Decompressing gzipped backup...');
+          const { stdout } = await execAsync(`gunzip -c "${backupPath}"`);
+          backupContent = stdout;
+        } else {
+          // Read plain SQL file
+          backupContent = await fs.readFile(backupPath, 'utf-8');
+        }
         
         // Filter SQL: Keep only COPY statements for core tables (skip problematic tables)
         const coreTables = ['users', 'router_groups', 'routers', 'user_routers', 'monitored_ports', 'app_settings'];
@@ -1840,11 +1851,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         if (dataStatements.length === 0) {
+          console.error('[Restore] No data statements found! Backup may be corrupted or empty.');
           res.status(400).json({ message: "No compatible data found in backup file for restore" });
           return;
         }
         
-        console.log(`[Restore] Found ${dataStatements.length} compatible data statements for core tables`);
+        // Count how many tables we're restoring
+        const tablesFound = new Set<string>();
+        for (const stmt of dataStatements) {
+          const match = stmt.match(/COPY public\.(\w+)/);
+          if (match) {
+            tablesFound.add(match[1]);
+          }
+        }
+        
+        console.log(`[Restore] Found ${dataStatements.length} data statements for ${tablesFound.size} tables: ${Array.from(tablesFound).join(', ')}`);
         
         // Create safe restore script with transaction and FK handling
         const dataOnlySQL = `
