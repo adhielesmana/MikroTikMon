@@ -29,7 +29,7 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 
 ### Deployment Architecture
 - **Production Setup**: Nginx (host system) + Docker application (on port 5000) using docker-compose.
-- **Deployment Script**: `intelligent-deploy.sh` for smart, idempotent deployments (skips Nginx/SSL re-configuration on subsequent runs, auto-creates necessary directories with correct ownership).
+- **Deployment Script**: `intelligent-deploy.sh` for smart, idempotent deployments (skips Nginx/SSL re-configuration on subsequent runs, auto-creates necessary directories with correct ownership). Features intelligent UID detection (queries running container, parses Dockerfile, or falls back to 1000) to ensure correct permissions on any system.
 - **SSL Certificates**: Let's Encrypt via certbot.
 - **Auto-Updates**: GitHub polling every 5 minutes for automatic deployment on code changes.
 
@@ -38,7 +38,7 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 - **Authentication:** Multi-provider (Google OAuth, Local Admin, Replit Auth), session management, user invitation system, admin password recovery.
 - **Authorization:** Role-Based Access Control (RBAC) with "admin" and "user" roles, enforcing ownership validation.
 - **Router Connectivity:** Three-tier fallback (Native API, HTTPS REST API, SNMP), automatic host extraction, network reachability, optimized background scheduling.
-- **Traffic Monitoring:** On-demand real-time (1-second WebSocket) and historical (60-second background polling for monitored ports), 2-year data retention, automatic interface metadata updates.
+- **Traffic Monitoring:** On-demand real-time (1-second WebSocket) and historical (60-second background polling for monitored ports), 2-year data retention, automatic interface metadata updates. **Poller dynamically reloads routers and ports from database every 60 seconds**, ensuring immediate awareness of database changes (e.g., after restore, new routers, new monitored ports).
 - **Alerting:** Configurable thresholds per port, dual Email/In-App Popup notifications, smart de-duplication, auto-acknowledgment on issue resolution, manual acknowledgment tracking, independent port status monitoring, router connectivity alerts.
 - **Security:** Encrypted router credentials (AES), bcrypt password hashing, conditional session cookie security, user approval for new Google OAuth accounts, WebSocket authorization checks, persistent session cookies.
 - **Performance:** HTTP caching with ETags, React Query optimization, memoized data processing, throttled chart updates, background scheduler, aggressive static asset caching, dynamic gauge scaling.
