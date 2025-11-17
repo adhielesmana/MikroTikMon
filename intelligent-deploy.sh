@@ -324,7 +324,7 @@ if $DOCKER_COMPOSE ps | grep -q "Up"; then
     
     # Fix ownership of mounted directories inside container
     print_info "Fixing directory ownership inside container..."
-    $DOCKER_COMPOSE exec -T app chown -R nodejs:nodejs /app/attached_assets /app/logs 2>/dev/null || true
+    $DOCKER_COMPOSE exec -T app chown -R nodejs:nodejs /app/attached_assets /app/logs /app/backups 2>/dev/null || true
     print_success "Directory ownership fixed"
 else
     print_error "Docker containers failed to start!"
