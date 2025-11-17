@@ -1564,6 +1564,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return logsContent + afterWorkflow;
   }
 
+  // Backup/Restore API routes (admin only)
+  app.get("/api/backups", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const backupsDir = path.join(process.cwd(), 'backups');
+      
+      // Check if backups directory exists
+      try {
+        await fs.access(backupsDir);
+      } catch {
+        res.json({ backups: [] });
+        return;
+      }
+      
+      const files = await fs.readdir(backupsDir);
+      const backupFiles = files.filter(f => f.endsWith('.sql.gz') || f.endsWith('.sql'));
+      
+      const backups = await Promise.all(
+        backupFiles.map(async (file) => {
+          const filePath = path.join(backupsDir, file);
+          const stats = await fs.stat(filePath);
+          return {
+            filename: file,
+            size: stats.size,
+            created: stats.mtime,
+          };
+        })
+      );
+      
+      // Sort by date, newest first
+      backups.sort((a, b) => b.created.getTime() - a.created.getTime());
+      
+      res.json({ backups });
+    } catch (error: any) {
+      console.error("[Backups] Error listing backups:", error);
+      res.status(500).json({ message: "Failed to list backups" });
+    }
+  });
+  
+  app.post("/api/backups/create", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      console.log("[Backup] Manual backup requested");
+      
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      
+      const backupScript = path.join(process.cwd(), 'scripts', 'backup-database.sh');
+      const { stdout, stderr } = await execAsync(`bash ${backupScript}`);
+      
+      if (stderr && !stderr.includes('WARNING')) {
+        console.error("[Backup] Backup stderr:", stderr);
+      }
+      
+      console.log("[Backup] Manual backup completed");
+      res.json({ message: "Backup created successfully", output: stdout });
+    } catch (error: any) {
+      console.error("[Backup] Error creating backup:", error);
+      res.status(500).json({ message: `Failed to create backup: ${error.message}` });
+    }
+  });
+  
+  app.post("/api/backups/restore", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { filename } = req.body;
+      
+      if (!filename) {
+        res.status(400).json({ message: "Filename is required" });
+        return;
+      }
+      
+      // Security: Validate filename (prevent path traversal)
+      if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+        res.status(400).json({ message: "Invalid filename" });
+        return;
+      }
+      
+      const backupsDir = path.join(process.cwd(), 'backups');
+      const backupPath = path.join(backupsDir, filename);
+      
+      // Check if backup exists
+      try {
+        await fs.access(backupPath);
+      } catch {
+        res.status(404).json({ message: "Backup file not found" });
+        return;
+      }
+      
+      console.log(`[Restore] Restoring database from: ${filename}`);
+      
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      
+      // Create restore script
+      const isCompressed = filename.endsWith('.gz');
+      const decompressCmd = isCompressed ? `gunzip -c "${backupPath}"` : `cat "${backupPath}"`;
+      
+      const restoreScript = `
+        # Drop and recreate database
+        PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d postgres -c "DROP DATABASE IF EXISTS ${process.env.PGDATABASE};"
+        PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d postgres -c "CREATE DATABASE ${process.env.PGDATABASE};"
+        
+        # Restore data
+        ${decompressCmd} | PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d "${process.env.PGDATABASE}"
+      `;
+      
+      await execAsync(restoreScript, { shell: '/bin/bash' });
+      
+      console.log("[Restore] Database restored successfully");
+      res.json({ message: "Database restored successfully. Please refresh the page." });
+    } catch (error: any) {
+      console.error("[Restore] Error restoring backup:", error);
+      res.status(500).json({ message: `Failed to restore backup: ${error.message}` });
+    }
+  });
+
   // SSE endpoint for real-time log streaming (admin only)
   app.get("/api/logs/stream", isAuthenticated, isAdmin, async (req, res) => {
     console.log('[LogsSSE] Client connected to log stream');

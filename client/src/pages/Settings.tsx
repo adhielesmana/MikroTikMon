@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, User, Shield, Loader2, Volume2, Bell, Database, Calendar } from "lucide-react";
+import { Mail, User, Shield, Loader2, Volume2, Bell, Database, Calendar, HardDrive, Download, Upload, AlertTriangle } from "lucide-react";
 import { playAlertSound } from "@/lib/alertSound";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Settings() {
   const { user, isAdmin } = useAuth();
@@ -19,6 +21,7 @@ export default function Settings() {
   const [logoUrl, setLogoUrl] = useState("");
   const [retentionDays, setRetentionDays] = useState("");
   const [alertSoundEnabled, setAlertSoundEnabled] = useState(true);
+  const [selectedBackup, setSelectedBackup] = useState("");
 
   // Load alert sound preference from localStorage
   useEffect(() => {
@@ -173,6 +176,72 @@ export default function Settings() {
     updateRetentionMutation.mutate({ retention_days: null });
   };
 
+  // Backup/Restore queries and mutations
+  const { data: backupsData, refetch: refetchBackups } = useQuery({
+    queryKey: ["/api/backups"],
+    enabled: isAdmin,
+  });
+
+  const createBackupMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/backups/create", {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Backup created",
+        description: "Database backup created successfully",
+      });
+      refetchBackups();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Backup failed",
+        description: error.message || "Failed to create backup",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const restoreBackupMutation = useMutation({
+    mutationFn: async (filename: string) => {
+      const res = await apiRequest("POST", "/api/backups/restore", { filename });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Database restored",
+        description: "Please wait while the page refreshes...",
+      });
+      // Refresh page after 2 seconds
+      setTimeout(() => window.location.reload(), 2000);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Restore failed",
+        description: error.message || "Failed to restore backup",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRestoreBackup = () => {
+    if (!selectedBackup) {
+      toast({
+        title: "No backup selected",
+        description: "Please select a backup file to restore",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm("This will replace your current database. Are you sure?")) {
+      return;
+    }
+
+    restoreBackupMutation.mutate(selectedBackup);
+  };
+
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Page Header */}
@@ -301,6 +370,108 @@ export default function Settings() {
                 Traffic data older than this will be automatically deleted. Enter 0 or leave empty to keep data forever. 
                 Common values: 90 (3 months), 365 (1 year), 730 (2 years)
               </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Backup/Restore Section (Admin Only) */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HardDrive className="h-5 w-5" />
+              Database Backup & Restore
+            </CardTitle>
+            <CardDescription>
+              Create and restore database backups. Automated backups run daily at 3 AM (production only).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Warning Alert */}
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Important:</strong> Restoring a backup will replace all current data. Make sure to create a backup first if you want to preserve current data.
+              </AlertDescription>
+            </Alert>
+
+            {/* Create Backup Section */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                Create Backup
+              </Label>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => createBackupMutation.mutate()}
+                  disabled={createBackupMutation.isPending}
+                  data-testid="button-create-backup"
+                  className="flex-1"
+                >
+                  {createBackupMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Create Backup Now
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => refetchBackups()}
+                  data-testid="button-refresh-backups"
+                >
+                  Refresh List
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Creates a compressed backup of your entire database including users, routers, and traffic data.
+              </p>
+            </div>
+
+            {/* Restore Backup Section */}
+            <div className="space-y-2 pt-4 border-t">
+              <Label className="flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Restore from Backup
+              </Label>
+              
+              {backupsData?.backups && backupsData.backups.length > 0 ? (
+                <>
+                  <Select value={selectedBackup} onValueChange={setSelectedBackup}>
+                    <SelectTrigger data-testid="select-backup-file">
+                      <SelectValue placeholder="Select a backup file" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {backupsData.backups.map((backup: any) => (
+                        <SelectItem key={backup.filename} value={backup.filename}>
+                          {backup.filename} ({(backup.size / 1024 / 1024).toFixed(2)} MB) - {new Date(backup.created).toLocaleString()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    variant="destructive"
+                    onClick={handleRestoreBackup}
+                    disabled={!selectedBackup || restoreBackupMutation.isPending}
+                    data-testid="button-restore-backup"
+                    className="w-full"
+                  >
+                    {restoreBackupMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Restore Selected Backup
+                  </Button>
+
+                  <p className="text-sm text-muted-foreground">
+                    Found {backupsData.backups.length} backup{backupsData.backups.length !== 1 ? 's' : ''}.
+                    Oldest backups are automatically deleted after 30 days.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground py-4 text-center border rounded-md">
+                  No backups available. Create one using the button above.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
