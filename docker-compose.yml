@@ -58,6 +58,8 @@ services:
       - ./logs:/app/logs
       # Mount for uploaded assets (custom logos, etc.)
       - ./attached_assets:/app/attached_assets
+      # Mount for automated database backups (compressed, daily at 3 AM)
+      - ./backups:/app/backups
     networks:
       - mikrotik-network
     healthcheck:

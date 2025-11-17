@@ -23,8 +23,8 @@ RUN npm run build
 # Stage 2: Production stage
 FROM node:20-alpine
 
-# Install dumb-init to handle signals properly
-RUN apk add --no-cache dumb-init
+# Install dumb-init, postgresql-client (for pg_dump), bash, and gzip (for database backups)
+RUN apk add --no-cache dumb-init postgresql16-client bash gzip bc
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
@@ -47,9 +47,9 @@ COPY --chown=nodejs:nodejs drizzle.config.ts ./
 # This means the bundled code still imports packages from node_modules
 RUN npm ci && npm cache clean --force
 
-# Create directories for runtime assets and ensure proper ownership
-RUN mkdir -p /app/attached_assets/logos /app/logs && \
-    chown -R nodejs:nodejs /app/attached_assets /app/logs
+# Create directories for runtime assets, backups and ensure proper ownership
+RUN mkdir -p /app/attached_assets/logos /app/logs /app/backups && \
+    chown -R nodejs:nodejs /app/attached_assets /app/logs /app/backups
 
 # Switch to non-root user
 USER nodejs

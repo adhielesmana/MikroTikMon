@@ -289,12 +289,14 @@ print_step "Preparing host directories for Docker volumes..."
 # Create directories on the HOST (required for Docker volume mounts)
 mkdir -p attached_assets/logos
 mkdir -p logs
+mkdir -p backups
 
 # Set proper permissions on host
 chmod -R 755 attached_assets
 chmod -R 755 logs
+chmod -R 755 backups
 
-print_success "Host directories created: attached_assets/logos, logs"
+print_success "Host directories created: attached_assets/logos, logs, backups"
 
 # After container starts, fix ownership inside container
 print_info "Note: Ownership will be fixed after container starts"

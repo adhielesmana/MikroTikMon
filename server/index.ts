@@ -13,6 +13,7 @@ async function ensureDirectoriesExist() {
     path.resolve(import.meta.dirname, "..", "attached_assets"),
     path.resolve(import.meta.dirname, "..", "attached_assets", "logos"),
     path.resolve(import.meta.dirname, "..", "logs"),
+    path.resolve(import.meta.dirname, "..", "backups"),
   ];
 
   for (const dir of directories) {

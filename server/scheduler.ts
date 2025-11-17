@@ -4,6 +4,10 @@ import { MikrotikClient } from "./mikrotik";
 import { emailService } from "./emailService";
 import { WebSocket } from "ws";
 import type { Alert } from "@shared/schema";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 let wss: any = null;
 let userConnections: Map<string, Set<WebSocket>> | null = null;
@@ -1037,6 +1041,15 @@ export function startScheduler() {
     });
   });
 
+  // Automated database backup daily at 3 AM (production only)
+  if (process.env.NODE_ENV === "production") {
+    cron.schedule("0 3 * * *", () => {
+      createDatabaseBackup().catch(error => {
+        console.error("[Scheduler] Unhandled error in database backup:", error);
+      });
+    });
+  }
+
   // Run immediately on startup
   setTimeout(() => {
     pollRouterTraffic().catch(error => {
@@ -1047,5 +1060,47 @@ export function startScheduler() {
     });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully (60s traffic polling + alert checking with 5-check confirmation = 5min total alert confirmation time, on-demand real-time traffic when router details page is open, 5min database persistence, 5min counter cleanup, daily data cleanup)");
+  const backupStatus = process.env.NODE_ENV === "production" ? "daily database backup at 3 AM" : "database backup disabled (dev mode)";
+  console.log(`[Scheduler] Scheduler started successfully (60s traffic polling + alert checking with 5-check confirmation = 5min total alert confirmation time, on-demand real-time traffic when router details page is open, 5min database persistence, 5min counter cleanup, daily data cleanup at 2 AM, ${backupStatus})`);
+}
+
+// Create automated database backup (compressed)
+async function createDatabaseBackup(): Promise<void> {
+  try {
+    console.log("[Backup] Starting automated database backup...");
+    
+    const backupScript = "/app/scripts/backup-database.sh";
+    const { stdout, stderr } = await execAsync(`bash ${backupScript}`);
+    
+    if (stdout) {
+      console.log("[Backup] Backup completed successfully");
+      // Log summary line only (last line of output)
+      const summaryLine = stdout.trim().split('\n').slice(-3).join('\n');
+      console.log(summaryLine);
+    }
+    
+    if (stderr && !stderr.includes('WARNING')) {
+      console.error("[Backup] Backup warnings:", stderr);
+    }
+  } catch (error: any) {
+    console.error("[Backup] Failed to create database backup:", error.message);
+    
+    // Send alert to all superadmins
+    try {
+      const superadmins = await storage.getAllUsers();
+      const admins = superadmins.filter(u => u.isSuperadmin);
+      
+      for (const admin of admins) {
+        await storage.createNotification({
+          userId: admin.id,
+          title: "Database Backup Failed",
+          message: `Automated database backup failed: ${error.message}`,
+          type: "error",
+          alertId: null,
+        });
+      }
+    } catch (notifyError) {
+      console.error("[Backup] Failed to send backup failure notification:", notifyError);
+    }
+  }
 }
