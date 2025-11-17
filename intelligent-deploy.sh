@@ -303,40 +303,40 @@ detect_nodejs_uid() {
     
     # Method 1: Check if container is already running
     if docker ps --format '{{.Names}}' | grep -q "mikrotik-monitor-app"; then
-        print_info "Container is running, querying nodejs UID..."
+        print_info "Container is running, querying nodejs UID..." >&2
         detected_uid=$(docker exec mikrotik-monitor-app id -u nodejs 2>/dev/null)
         
         if [ -n "$detected_uid" ]; then
-            print_success "Detected nodejs UID from running container: $detected_uid"
+            print_success "Detected nodejs UID from running container: $detected_uid" >&2
             echo "$detected_uid"
             return 0
         fi
     fi
     
     # Method 2: Build a temporary container to check UID
-    print_info "Building temporary container to detect nodejs UID..."
+    print_info "Building temporary container to detect nodejs UID..." >&2
     if docker build -t mikrotik-monitor-uid-check -f Dockerfile . >/dev/null 2>&1; then
         detected_uid=$(docker run --rm mikrotik-monitor-uid-check id -u nodejs 2>/dev/null)
         
         if [ -n "$detected_uid" ]; then
-            print_success "Detected nodejs UID from Dockerfile: $detected_uid"
+            print_success "Detected nodejs UID from Dockerfile: $detected_uid" >&2
             echo "$detected_uid"
             return 0
         fi
     fi
     
     # Method 3: Parse Dockerfile directly
-    print_info "Parsing Dockerfile for nodejs UID..."
+    print_info "Parsing Dockerfile for nodejs UID..." >&2
     detected_uid=$(grep -E "adduser.*nodejs.*-u\s+[0-9]+" Dockerfile | sed -E 's/.*-u\s+([0-9]+).*/\1/' | head -1)
     
     if [ -n "$detected_uid" ]; then
-        print_success "Detected nodejs UID from Dockerfile: $detected_uid"
+        print_success "Detected nodejs UID from Dockerfile: $detected_uid" >&2
         echo "$detected_uid"
         return 0
     fi
     
     # Fallback: Use 1000 (most common)
-    print_warning "Could not detect nodejs UID, using default: 1000"
+    print_warning "Could not detect nodejs UID, using default: 1000" >&2
     echo "1000"
     return 1
 }

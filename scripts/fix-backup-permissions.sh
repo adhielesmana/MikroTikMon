@@ -56,30 +56,30 @@ detect_nodejs_uid() {
     
     # Method 1: Check if container is already running
     if docker ps --format '{{.Names}}' | grep -q "mikrotik-monitor-app"; then
-        echo "  Container is running, querying nodejs UID..."
+        echo "  Container is running, querying nodejs UID..." >&2
         detected_uid=$(docker exec mikrotik-monitor-app id -u nodejs 2>/dev/null)
         
         if [ -n "$detected_uid" ]; then
-            echo "  ✓ Detected nodejs UID from running container: $detected_uid"
+            echo "  ✓ Detected nodejs UID from running container: $detected_uid" >&2
             echo "$detected_uid"
             return 0
         fi
     fi
     
     # Method 2: Parse Dockerfile directly
-    echo "  Parsing Dockerfile for nodejs UID..."
+    echo "  Parsing Dockerfile for nodejs UID..." >&2
     if [ -f "Dockerfile" ]; then
         detected_uid=$(grep -E "adduser.*nodejs.*-u\s+[0-9]+" Dockerfile | sed -E 's/.*-u\s+([0-9]+).*/\1/' | head -1)
         
         if [ -n "$detected_uid" ]; then
-            echo "  ✓ Detected nodejs UID from Dockerfile: $detected_uid"
+            echo "  ✓ Detected nodejs UID from Dockerfile: $detected_uid" >&2
             echo "$detected_uid"
             return 0
         fi
     fi
     
     # Fallback: Use 1000 (most common)
-    echo "  ⚠ Could not detect nodejs UID, using default: 1000"
+    echo "  ⚠ Could not detect nodejs UID, using default: 1000" >&2
     echo "1000"
     return 1
 }
