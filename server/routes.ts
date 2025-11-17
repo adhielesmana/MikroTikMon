@@ -548,6 +548,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk check all routers
+  app.post("/api/routers/check-all", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      
+      // Get all routers the user has access to (same logic as GET /api/routers)
+      let allRouters: Router[];
+      if (user?.isSuperadmin) {
+        // Super admins can check all routers
+        allRouters = await storage.getAllRouters();
+      } else {
+        // Normal users check their own routers + routers assigned to them
+        const ownRouters = await storage.getRouters(userId);
+        const assignedRouters = await storage.getUserAssignedRouters(userId);
+        
+        // Merge and deduplicate based on router id
+        const routerMap = new Map<string, Router>();
+        ownRouters.forEach(r => routerMap.set(r.id, r));
+        assignedRouters.forEach(r => routerMap.set(r.id, r));
+        
+        allRouters = Array.from(routerMap.values());
+      }
+      
+      console.log(`[Bulk Check] Checking ${allRouters.length} router(s) for user ${userId} (${user?.isSuperadmin ? 'superadmin' : 'normal user'})`);
+      
+      // Check all routers in parallel
+      const results = await Promise.allSettled(
+        allRouters.map(async (router: Router) => {
+          try {
+            const credentials = await storage.getRouterCredentials(router.id);
+            if (!credentials) {
+              console.error(`[Bulk Check] No credentials for router ${router.name}`);
+              return { routerId: router.id, routerName: router.name, success: false, error: "No credentials" };
+            }
+            
+            const client = new MikrotikClient({
+              host: router.ipAddress,
+              port: router.port,
+              user: credentials.username,
+              password: credentials.password,
+              cloudDdnsHostname: router.cloudDdnsHostname || undefined,
+              restEnabled: router.restEnabled || false,
+              restPort: router.restPort || 443,
+              snmpEnabled: router.snmpEnabled || false,
+              snmpCommunity: router.snmpCommunity || "public",
+              snmpVersion: router.snmpVersion || "2c",
+              snmpPort: router.snmpPort || 161,
+              interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
+            });
+            
+            // Test all connection methods and find which one works
+            const workingMethod = await client.findWorkingConnectionMethod();
+            
+            if (workingMethod) {
+              await storage.updateRouterConnection(router.id, true);
+              await storage.updateRouterReachability(router.id, true);
+              await storage.updateLastSuccessfulConnectionMethod(router.id, workingMethod);
+              
+              // Update interface metadata in background (non-blocking)
+              client.getInterfaceStats().then(interfaces => {
+                updateCachedInterfaceMetadata(router.id, interfaces);
+              }).catch(err => {
+                console.error(`[Bulk Check] Failed to fetch interface metadata for ${router.name}:`, err);
+              });
+              
+              console.log(`[Bulk Check] ✓ ${router.name}: Connected via ${workingMethod}`);
+              return { routerId: router.id, routerName: router.name, success: true, method: workingMethod };
+            } else {
+              await storage.updateRouterConnection(router.id, false);
+              await storage.updateRouterReachability(router.id, false);
+              console.log(`[Bulk Check] ✗ ${router.name}: Connection failed`);
+              return { routerId: router.id, routerName: router.name, success: false, error: "Connection failed" };
+            }
+          } catch (error: any) {
+            await storage.updateRouterConnection(router.id, false);
+            await storage.updateRouterReachability(router.id, false);
+            console.error(`[Bulk Check] Error checking router ${router.name}:`, error.message);
+            return { routerId: router.id, routerName: router.name, success: false, error: error.message };
+          }
+        })
+      );
+      
+      // Count successes and failures
+      const processedResults = results.map((r: any) => r.status === 'fulfilled' ? r.value : { success: false, error: 'Promise rejected' });
+      const successCount = processedResults.filter((r: any) => r.success).length;
+      const failureCount = processedResults.filter((r: any) => !r.success).length;
+      
+      console.log(`[Bulk Check] Completed: ${successCount} connected, ${failureCount} failed`);
+      
+      res.json({ 
+        success: true, 
+        message: `Checked ${allRouters.length} router(s): ${successCount} connected, ${failureCount} failed`,
+        results: processedResults,
+        summary: {
+          total: allRouters.length,
+          connected: successCount,
+          failed: failureCount
+        }
+      });
+    } catch (error: any) {
+      console.error("Error bulk checking routers:", error);
+      res.status(500).json({ success: false, message: error.message || "Bulk check failed" });
+    }
+  });
+
 
   // Router Groups routes
   app.get("/api/router-groups", isAuthenticated, isEnabled, async (req: any, res) => {

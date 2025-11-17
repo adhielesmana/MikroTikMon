@@ -120,6 +120,26 @@ export default function Routers() {
     },
   });
 
+  const checkAllMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/routers/check-all", undefined);
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/routers"] });
+      toast({
+        title: "Bulk check completed",
+        description: data.message || `Checked all routers successfully`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Bulk check failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEdit = (router: Router) => {
     setEditingRouter(router);
     setDialogOpen(true);
@@ -152,6 +172,19 @@ export default function Routers() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => checkAllMutation.mutate()}
+              disabled={checkAllMutation.isPending || isLoading || !routers || routers.length === 0}
+              variant="outline"
+              data-testid="button-check-all-routers"
+            >
+              {checkAllMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Check All Routers
+            </Button>
             <ManageGroupsDialog />
             <Button onClick={() => setDialogOpen(true)} data-testid="button-add-router">
               <Plus className="h-4 w-4 mr-2" />
