@@ -2,7 +2,7 @@ services:
   # TimescaleDB Database (PostgreSQL-compatible with time-series optimization)
   # Service name MUST match the host in DATABASE_URL
   mikrotik-monitor-db:
-    image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb:2.14.2-pg16
     container_name: mikrotik-monitor-db
     restart: unless-stopped
     environment:
