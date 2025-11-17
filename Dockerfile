@@ -26,8 +26,8 @@ FROM node:20-alpine
 # Install dumb-init, postgresql-client (for pg_dump), bash, gzip (for database backups), and git (for auto-updates)
 RUN apk add --no-cache dumb-init postgresql16-client bash gzip bc git
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+# Create non-root user for security (UID 1000 for compatibility with host systems)
+RUN addgroup -g 1000 -S nodejs && adduser -S nodejs -u 1000
 
 WORKDIR /app
 

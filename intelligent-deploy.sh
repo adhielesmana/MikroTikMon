@@ -291,15 +291,17 @@ mkdir -p attached_assets/logos
 mkdir -p logs
 mkdir -p backups
 
-# Set proper permissions on host
+# Set proper permissions and ownership on host (UID 1000:1000 matches container user)
+print_info "Setting ownership to 1000:1000 on host directories..."
+chown -R 1000:1000 attached_assets
+chown -R 1000:1000 logs
+chown -R 1000:1000 backups
+
 chmod -R 755 attached_assets
 chmod -R 755 logs
 chmod -R 755 backups
 
-print_success "Host directories created: attached_assets/logos, logs, backups"
-
-# After container starts, fix ownership inside container
-print_info "Note: Ownership will be fixed after container starts"
+print_success "Host directories created with 1000:1000 ownership"
 
 # ========================================
 # Deploy Docker App
@@ -321,11 +323,7 @@ sleep 5
 # Check if containers are running
 if $DOCKER_COMPOSE ps | grep -q "Up"; then
     print_success "Docker containers started successfully!"
-    
-    # Fix ownership of mounted directories inside container
-    print_info "Fixing directory ownership inside container..."
-    $DOCKER_COMPOSE exec -T app chown -R nodejs:nodejs /app/attached_assets /app/logs /app/backups 2>/dev/null || true
-    print_success "Directory ownership fixed"
+    print_info "Directory ownership: Host UID 1000 = Container nodejs user (UID 1000)"
 else
     print_error "Docker containers failed to start!"
     print_info "Check logs with: docker-compose logs"

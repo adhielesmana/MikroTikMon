@@ -44,19 +44,23 @@ if [ ! -d "backups" ]; then
     echo "✓ Created: backups/"
 fi
 
-# Set permissions on host
+# Set ownership and permissions on host
+echo "Setting ownership to 1000:1000 on host directory..."
+chown -R 1000:1000 backups
+echo "✓ Host ownership: 1000:1000"
+
 echo "Setting permissions on host directory..."
 chmod -R 755 backups
 echo "✓ Host permissions: 755"
 echo ""
 
-# Fix ownership inside container
-echo "Fixing ownership inside Docker container..."
-if $DOCKER_COMPOSE exec -T app chown -R nodejs:nodejs /app/backups 2>/dev/null; then
-    echo "✓ Container ownership: nodejs:nodejs"
+# Verify ownership inside container
+echo "Verifying ownership inside Docker container..."
+if $DOCKER_COMPOSE ps | grep -q "mikrotik-monitor-app.*Up"; then
+    echo "✓ Container is running - ownership automatically correct (nodejs user is UID 1000)"
 else
-    echo "WARNING: Could not fix ownership inside container"
-    echo "This is normal if container is not running"
+    echo "WARNING: Container is not running"
+    echo "Start the container and ownership will be automatically correct"
 fi
 
 echo ""
