@@ -966,140 +966,10 @@ export function stopRealtimePolling(routerId: string, client: WebSocket) {
   }
 }
 
-// Poll interface graph data every 5 minutes (historical snapshots with delta calculations)
-async function pollInterfaceGraphData() {
-  try {
-    // Get all enabled monitored ports with their routers
-    const monitoredPorts = await storage.getAllEnabledPorts();
-    
-    if (monitoredPorts.length === 0) {
-      return;
-    }
-    
-    // Group ports by router to minimize connections
-    const portsByRouter = new Map<string, typeof monitoredPorts>();
-    for (const port of monitoredPorts) {
-      const existing = portsByRouter.get(port.router.id) || [];
-      existing.push(port);
-      portsByRouter.set(port.router.id, existing);
-    }
-
-    console.log(`[InterfaceGraph] Polling ${portsByRouter.size} routers with ${monitoredPorts.length} monitored ports`);
-
-    const now = new Date();
-    const samples: any[] = [];
-
-    // Poll each router's monitored ports
-    await Promise.all(
-      Array.from(portsByRouter.entries()).map(async ([routerId, ports]) => {
-        try {
-          const router = ports[0].router;
-          
-          // Get router credentials
-          const credentials = await storage.getRouterCredentials(router.id);
-          if (!credentials) {
-            console.log(`[InterfaceGraph] No credentials for ${router.name}`);
-            return;
-          }
-
-          // Connect to MikroTik
-          const client = new MikrotikClient({
-            host: router.ipAddress,
-            port: router.port,
-            user: credentials.username,
-            password: credentials.password,
-            cloudDdnsHostname: router.cloudDdnsHostname || undefined,
-            restEnabled: router.restEnabled || false,
-            restPort: router.restPort || 443,
-            snmpEnabled: router.snmpEnabled || false,
-            snmpCommunity: router.snmpCommunity || "public",
-            snmpVersion: router.snmpVersion || "2c",
-            snmpPort: router.snmpPort || 161,
-            interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
-          });
-
-          // Use cached connection method for efficiency
-          const storedMethod = router.lastSuccessfulConnectionMethod as 'native' | 'rest' | 'snmp' | null;
-          
-          if (!storedMethod) {
-            console.log(`[InterfaceGraph] No cached connection method for ${router.name}`);
-            return;
-          }
-
-          // Fetch ALL interface stats (one API call gets everything)
-          const stats = await client.getInterfaceStatsWithMethod(storedMethod);
-          
-          // Process only the monitored ports
-          for (const port of ports) {
-            const interfaceData = stats.find(s => s.name === port.portName);
-            
-            if (!interfaceData) {
-              continue;
-            }
-
-            // Get the latest sample from database to calculate delta
-            const previousSample = await storage.getLatestInterfaceGraphSample(router.id, port.portName);
-
-            let rxBytesPerSecond = 0;
-            let txBytesPerSecond = 0;
-
-            if (previousSample) {
-              // Calculate time delta in seconds
-              const timeDeltaMs = now.getTime() - new Date(previousSample.timestamp).getTime();
-              const timeDeltaSec = timeDeltaMs / 1000;
-
-              if (timeDeltaSec > 0) {
-                // Get current absolute byte counters from MikroTik
-                // The interfaceData already contains calculated rates, but we need raw counters
-                // We'll use the rates * timeDelta to approximate the delta
-                // This is not perfect but works for 5-minute intervals
-                
-                // For a more accurate approach, we should fetch raw rx-byte and tx-byte
-                // But since we're using the existing client which calculates rates,
-                // we can use: bytes_delta = rate * timeDelta
-                const rxBytesDelta = interfaceData.rxBytesPerSecond * timeDeltaSec;
-                const txBytesDelta = interfaceData.txBytesPerSecond * timeDeltaSec;
-
-                // Calculate average rate over the interval
-                rxBytesPerSecond = Math.round(rxBytesDelta / timeDeltaSec);
-                txBytesPerSecond = Math.round(txBytesDelta / timeDeltaSec);
-              }
-            } else {
-              // First sample - use current rates from MikroTik
-              rxBytesPerSecond = Math.round(interfaceData.rxBytesPerSecond);
-              txBytesPerSecond = Math.round(interfaceData.txBytesPerSecond);
-            }
-
-            samples.push({
-              routerId: router.id,
-              portName: port.portName,
-              timestamp: now,
-              rxBytesPerSecond,
-              txBytesPerSecond,
-              totalBytesPerSecond: rxBytesPerSecond + txBytesPerSecond,
-            });
-          }
-        } catch (error: any) {
-          console.error(`[InterfaceGraph] Error polling router ${routerId}:`, error.message);
-        }
-      })
-    );
-
-    // Bulk insert all samples
-    if (samples.length > 0) {
-      await storage.insertInterfaceGraphSamples(samples);
-      console.log(`[InterfaceGraph] Stored ${samples.length} interface graph samples`);
-    }
-  } catch (error: any) {
-    console.error("[InterfaceGraph] Error in interface graph polling:", error);
-  }
-}
-
 // Execution guards to prevent concurrent runs
 let isPollingTraffic = false;
 let isCheckingAlerts = false;
 let isPersistingData = false;
-let isPollingInterfaceGraph = false;
 
 export function startScheduler() {
   console.log("[Scheduler] Starting traffic monitoring scheduler...");
@@ -1155,23 +1025,6 @@ export function startScheduler() {
       });
   });
 
-  // Poll interface graph data every 5 minutes (historical snapshots)
-  cron.schedule("*/5 * * * *", () => {
-    if (isPollingInterfaceGraph) {
-      console.log("[Scheduler] Skipping interface graph poll - previous execution still running");
-      return;
-    }
-    
-    isPollingInterfaceGraph = true;
-    pollInterfaceGraphData()
-      .catch(error => {
-        console.error("[Scheduler] Unhandled error in interface graph polling:", error);
-      })
-      .finally(() => {
-        isPollingInterfaceGraph = false;
-      });
-  });
-
   // Clean up stale violation counters every 5 minutes
   cron.schedule("*/5 * * * *", () => {
     cleanupStaleViolationCounters();
@@ -1192,10 +1045,7 @@ export function startScheduler() {
     checkAlerts().catch(error => {
       console.error("[Scheduler] Error in initial alert check:", error);
     });
-    pollInterfaceGraphData().catch(error => {
-      console.error("[Scheduler] Error in initial interface graph poll:", error);
-    });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  console.log("[Scheduler] Scheduler started successfully (60s traffic polling + alert checking with 5-check confirmation = 5min total alert confirmation time, on-demand real-time traffic when router details page is open, 5min database persistence, 5min interface graph snapshots, 5min counter cleanup, daily data cleanup)");
+  console.log("[Scheduler] Scheduler started successfully (60s traffic polling + alert checking with 5-check confirmation = 5min total alert confirmation time, on-demand real-time traffic when router details page is open, 5min database persistence, 5min counter cleanup, daily data cleanup)");
 }
