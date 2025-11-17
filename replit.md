@@ -26,12 +26,14 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 **Core Tables:** `users`, `router_groups`, `routers`, `monitored_ports`, `traffic_data` (TimescaleDB hypertable), `alerts`, `notifications`, `sessions`.
 **In-Memory Storage:** Nested Map structure for real-time traffic data.
 **TimescaleDB Features:** Hypertables, automatic compression (90%+ storage savings after 7 days), 2-year data retention, continuous aggregates (hourly/daily summaries).
+**Data Persistence:** Named Docker volume `postgres_data` ensures database survives container recreations.
 
 ### Deployment Architecture
 - **Production Setup**: Nginx (host system) + Docker application (on port 5000) using docker-compose.
-- **Deployment Script**: `intelligent-deploy.sh` for smart, idempotent deployments (skips Nginx/SSL re-configuration on subsequent runs, auto-creates necessary directories with correct ownership). Features intelligent UID detection (queries running container, parses Dockerfile, or falls back to 1000) to ensure correct permissions on any system.
+- **Deployment Script**: `intelligent-deploy.sh` for smart, idempotent deployments with **safe database preservation** (only recreates app container, database container reuses existing volume). Features intelligent UID detection (queries running container, parses Dockerfile, or falls back to 1000) to ensure correct permissions on any system. Auto-verifies data persistence after each deployment.
 - **SSL Certificates**: Let's Encrypt via certbot.
 - **Auto-Updates**: GitHub polling every 5 minutes for automatic deployment on code changes.
+- **Database Safety**: Deployment script explicitly preserves database container and verifies data counts (users, routers) post-deployment.
 
 ### System Design Choices
 - **UI/UX:** Mobile-first responsive design, dark mode, collapsible sidebar, touch-friendly interactions, dynamic logo management, auto-created and permissioned asset directories.

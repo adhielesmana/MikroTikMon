@@ -368,8 +368,24 @@ print_step "Deploying Docker application..."
 $DOCKER_COMPOSE pull || true
 $DOCKER_COMPOSE build --no-cache
 
-# Start/restart containers
-$DOCKER_COMPOSE up -d --force-recreate
+# SAFE DEPLOYMENT STRATEGY:
+# Only recreate the app container, preserve database container and ALL volumes
+print_info "Stopping application container (preserving database)..."
+$DOCKER_COMPOSE stop app || true
+
+print_info "Removing old application container (database untouched)..."
+$DOCKER_COMPOSE rm -f app || true
+
+print_info "Starting services (database will reuse existing volume)..."
+# Start database first (will reuse existing postgres_data volume)
+$DOCKER_COMPOSE up -d mikrotik-monitor-db
+
+# Wait for database to be ready
+print_info "Waiting for database to be ready..."
+sleep 5
+
+# Then start app with new build
+$DOCKER_COMPOSE up -d app
 
 # Wait for app to be ready
 print_info "Waiting for application to start..."
@@ -379,6 +395,7 @@ sleep 5
 if $DOCKER_COMPOSE ps | grep -q "Up"; then
     print_success "Docker containers started successfully!"
     print_info "Directory ownership: Host UID 1000 = Container nodejs user (UID 1000)"
+    print_success "Database data preserved in postgres_data volume"
 else
     print_error "Docker containers failed to start!"
     print_info "Check logs with: docker-compose logs"
@@ -386,13 +403,31 @@ else
 fi
 
 # ========================================
+# Verify Database Data Persistence
+# ========================================
+
+print_step "Verifying database data..."
+
+# Source environment variables
+source .env
+
+# Check if database has existing data (strip all whitespace including newlines)
+USER_COUNT=$(docker exec mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" -tA -c "SELECT COUNT(*) FROM users;" 2>/dev/null | tr -d '[:space:]' || echo "0")
+ROUTER_COUNT=$(docker exec mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" -tA -c "SELECT COUNT(*) FROM routers;" 2>/dev/null | tr -d '[:space:]' || echo "0")
+
+if [ "$USER_COUNT" != "0" ] || [ "$ROUTER_COUNT" != "0" ]; then
+    print_success "Existing database data preserved!"
+    print_info "  Users: $USER_COUNT"
+    print_info "  Routers: $ROUTER_COUNT"
+else
+    print_warning "Database appears empty (might be a fresh deployment)"
+fi
+
+# ========================================
 # Run Database Migrations
 # ========================================
 
 print_step "Running database migrations..."
-
-# Source environment variables
-source .env
 
 # Wait for database to be fully ready
 sleep 3
