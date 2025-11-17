@@ -250,22 +250,65 @@ async function pollRouterTraffic() {
               interfaceDisplayMode: (router.interfaceDisplayMode as "static" | "none" | "all") || 'static',
             });
 
-            // Use the last successful connection method (cached)
-            // We do NOT re-test fallbacks during background operations to reduce API calls
-            // Re-testing only happens when viewing/editing routers
+            // Try ALL enabled connection methods until one succeeds
+            // Priority: cached method first, then try all other enabled methods
             let stats: any[] = [];
+            let usedMethod: 'native' | 'rest' | 'snmp' | null = null;
             const storedMethod = router.lastSuccessfulConnectionMethod as 'native' | 'rest' | 'snmp' | null;
             
-            if (storedMethod) {
-              // Use the cached method directly - ONE API/SNMP call gets ALL interface data
-              console.log(`[Scheduler] Fetching all interfaces via '${storedMethod}' for ${router.name}`);
-              stats = await client.getInterfaceStatsWithMethod(storedMethod);
-              console.log(`[Scheduler] Retrieved ${stats.length} interfaces from ${router.name}`);
-            } else {
+            if (!storedMethod) {
               // No stored method - this means the router hasn't been tested yet
               // Skip this router - it will be tested when user views/edits it
               console.log(`[Scheduler] No stored method for ${router.name}, skipping (will be tested on view/edit)`);
               return;
+            }
+
+            // Build list of all enabled methods to try
+            const methodsToTry: ('native' | 'rest' | 'snmp')[] = [];
+            
+            // Try cached method first (highest priority)
+            methodsToTry.push(storedMethod);
+            
+            // Then add all other enabled methods
+            if (storedMethod !== 'native') {
+              methodsToTry.push('native'); // Always try native if not cached
+            }
+            if (router.restEnabled && storedMethod !== 'rest') {
+              methodsToTry.push('rest');
+            }
+            if (router.snmpEnabled && storedMethod !== 'snmp') {
+              methodsToTry.push('snmp');
+            }
+            
+            console.log(`[Scheduler] Will try methods in order for ${router.name}: ${methodsToTry.join(' → ')}`);
+            
+            // Try each method until one succeeds
+            let lastError: Error | null = null;
+            for (const method of methodsToTry) {
+              try {
+                console.log(`[Scheduler] Trying method '${method}' for ${router.name}...`);
+                stats = await client.getInterfaceStatsWithMethod(method);
+                console.log(`[Scheduler] ✓ Method '${method}' successful! Retrieved ${stats.length} interfaces from ${router.name}`);
+                usedMethod = method;
+                
+                // Update cached method if we used a different one
+                if (method !== storedMethod) {
+                  console.log(`[Scheduler] Updating cached method from '${storedMethod}' to '${method}' for ${router.name}`);
+                  await storage.updateLastSuccessfulConnectionMethod(router.id, method);
+                }
+                
+                break; // Success! Stop trying other methods
+              } catch (error: any) {
+                console.log(`[Scheduler] Method '${method}' failed for ${router.name}: ${error.message || 'Unknown error'}`);
+                lastError = error;
+                // Continue to next method
+              }
+            }
+            
+            // If we exhausted all methods without success, throw the last error
+            if (!usedMethod) {
+              console.error(`[Scheduler] All ${methodsToTry.length} connection method(s) failed for ${router.name}`);
+              throw lastError || new Error(`All connection methods failed for ${router.name}`);
             }
 
             // If we reach here, stats fetch succeeded = router is reachable
@@ -273,7 +316,7 @@ async function pollRouterTraffic() {
             await storage.updateRouterConnection(router.id, true);
 
             // Cloud DDNS hostname extraction: Store separately without replacing IP address
-            if (storedMethod === 'rest' && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
+            if (usedMethod === 'rest' && /^\d+\.\d+\.\d+\.\d+$/.test(router.ipAddress)) {
               const extractedHostname = client.getExtractedHostname();
               if (extractedHostname && extractedHostname !== router.ipAddress) {
                 console.log(`[Scheduler] Storing Cloud DDNS hostname ${extractedHostname} for router ${router.name}`);
