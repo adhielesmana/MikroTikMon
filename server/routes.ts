@@ -1736,8 +1736,8 @@ SET session_replication_role = 'origin';
 COMMIT;
 `;
         
-        // Write temporary SQL file
-        const tempSQLPath = path.join(backupsDir, `temp_restore_${Date.now()}.sql`);
+        // Write temporary SQL file (use /tmp since app may not have write access to backups dir)
+        const tempSQLPath = `/tmp/temp_restore_${Date.now()}.sql`;
         await fs.writeFile(tempSQLPath, dataOnlySQL, 'utf-8');
         
         try {
