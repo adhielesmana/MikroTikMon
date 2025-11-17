@@ -8,7 +8,7 @@ set -e
 
 # Configuration
 BACKUP_DIR="${BACKUP_DIR:-/app/backups}"
-RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
+RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-730}"  # Default: 2 years (730 days)
 DATE=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="mikrotik_monitor_backup_${DATE}.sql"
 COMPRESSED_FILE="${BACKUP_FILE}.gz"

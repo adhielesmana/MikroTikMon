@@ -364,28 +364,48 @@ print_info "Container nodejs user UID: $NODEJS_UID (auto-detected)"
 
 print_step "Deploying Docker application..."
 
-# Pull latest images and rebuild
-$DOCKER_COMPOSE pull || true
-$DOCKER_COMPOSE build --no-cache
+# CRITICAL: Build ONLY the app service, never rebuild database service
+# This prevents Docker from recreating the database container
+print_info "Building application image (database untouched)..."
+$DOCKER_COMPOSE build --no-cache app
 
-# SAFE DEPLOYMENT STRATEGY:
-# Only recreate the app container, preserve database container and ALL volumes
-print_info "Stopping application container (preserving database)..."
+# ULTRA-SAFE DEPLOYMENT STRATEGY:
+# 1. Ensure database is running (start if stopped, but NEVER recreate)
+# 2. Stop and remove ONLY the app container
+# 3. Start new app container
+
+# Check if database container exists
+DB_CONTAINER_EXISTS=$(docker ps -a --filter "name=mikrotik-monitor-db" --format "{{.Names}}" | grep -q "mikrotik-monitor-db" && echo "yes" || echo "no")
+
+if [ "$DB_CONTAINER_EXISTS" = "yes" ]; then
+    # Database container exists - check if it's running
+    DB_RUNNING=$(docker ps --filter "name=mikrotik-monitor-db" --format "{{.Names}}" | grep -q "mikrotik-monitor-db" && echo "yes" || echo "no")
+    
+    if [ "$DB_RUNNING" = "yes" ]; then
+        print_success "Database container already running (preserving data)"
+    else
+        print_info "Starting existing database container..."
+        docker start mikrotik-monitor-db
+        sleep 5
+        print_success "Database container started (data preserved)"
+    fi
+else
+    # First deployment - create database container
+    print_info "Creating database container (first deployment)..."
+    $DOCKER_COMPOSE up -d mikrotik-monitor-db
+    sleep 10
+    print_success "Database container created and initialized"
+fi
+
+# Now handle the app container - stop and recreate it
+print_info "Stopping application container..."
 $DOCKER_COMPOSE stop app || true
 
-print_info "Removing old application container (database untouched)..."
+print_info "Removing old application container..."
 $DOCKER_COMPOSE rm -f app || true
 
-print_info "Starting services (database will reuse existing volume)..."
-# Start database first (will reuse existing postgres_data volume)
-$DOCKER_COMPOSE up -d mikrotik-monitor-db
-
-# Wait for database to be ready
-print_info "Waiting for database to be ready..."
-sleep 5
-
-# Then start app with new build
-$DOCKER_COMPOSE up -d app
+print_info "Starting new application container..."
+$DOCKER_COMPOSE up -d --no-deps app
 
 # Wait for app to be ready
 print_info "Waiting for application to start..."

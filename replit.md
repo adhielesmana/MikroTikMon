@@ -44,7 +44,7 @@ A comprehensive, enterprise-grade network monitoring platform for MikroTik route
 - **Alerting:** Configurable thresholds per port, dual Email/In-App Popup notifications, smart de-duplication, auto-acknowledgment on issue resolution, manual acknowledgment tracking, independent port status monitoring, router connectivity alerts.
 - **Security:** Encrypted router credentials (AES), bcrypt password hashing, conditional session cookie security, user approval for new Google OAuth accounts, WebSocket authorization checks, persistent session cookies.
 - **Performance:** HTTP caching with ETags, React Query optimization, memoized data processing, throttled chart updates, background scheduler, aggressive static asset caching, dynamic gauge scaling.
-- **Key Features:** User management (roles, invitations), router management (secure credentials, bulk checks, groups, fallbacks), traffic monitoring (real-time, historical, graphs), robust alerting system, automated daily backups with intelligent data-only restore, admin-only logs page with live view, automatic deployment, responsive design.
+- **Key Features:** User management (roles, invitations), router management (secure credentials, bulk checks, groups, fallbacks), traffic monitoring (real-time, historical, graphs), robust alerting system, automated daily backups (2-year retention) with intelligent data-only restore, admin-only logs page with live view, automatic deployment, responsive design.
 
 ## External Dependencies
 -   **PostgreSQL Database:** Neon (serverless).
