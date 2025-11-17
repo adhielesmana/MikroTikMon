@@ -22,6 +22,7 @@ export default function Settings() {
   const [retentionDays, setRetentionDays] = useState("");
   const [alertSoundEnabled, setAlertSoundEnabled] = useState(true);
   const [selectedBackup, setSelectedBackup] = useState("");
+  const [dataOnlyRestore, setDataOnlyRestore] = useState(true); // Default to data-only (safer)
 
   // Load alert sound preference from localStorage
   useEffect(() => {
@@ -214,8 +215,8 @@ export default function Settings() {
   });
 
   const restoreBackupMutation = useMutation({
-    mutationFn: async (filename: string) => {
-      const res = await apiRequest("POST", "/api/backups/restore", { filename });
+    mutationFn: async ({ filename, dataOnly }: { filename: string; dataOnly: boolean }) => {
+      const res = await apiRequest("POST", "/api/backups/restore", { filename, dataOnly });
       return res.json();
     },
     onSuccess: () => {
@@ -245,11 +246,15 @@ export default function Settings() {
       return;
     }
 
-    if (!confirm("This will replace your current database. Are you sure?")) {
+    const confirmMessage = dataOnlyRestore
+      ? "This will restore data from the backup while preserving your current database schema. Continue?"
+      : "This will completely replace your database including schema. Continue?";
+
+    if (!confirm(confirmMessage)) {
       return;
     }
 
-    restoreBackupMutation.mutate(selectedBackup);
+    restoreBackupMutation.mutate({ filename: selectedBackup, dataOnly: dataOnlyRestore });
   };
 
   return (
@@ -459,6 +464,28 @@ export default function Settings() {
                     </SelectContent>
                   </Select>
 
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="data-only-restore"
+                          checked={dataOnlyRestore}
+                          onCheckedChange={setDataOnlyRestore}
+                          data-testid="switch-data-only-restore"
+                        />
+                        <Label htmlFor="data-only-restore" className="text-sm font-normal cursor-pointer">
+                          Data-Only Restore (Recommended)
+                        </Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {dataOnlyRestore 
+                          ? "✓ Restores data while keeping current database schema. Prevents schema conflicts with old backups." 
+                          : "⚠️ Full restore will replace everything including schema. May cause issues with old backups."}
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+
                   <Button
                     variant="destructive"
                     onClick={handleRestoreBackup}
@@ -469,7 +496,7 @@ export default function Settings() {
                     {restoreBackupMutation.isPending && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    Restore Selected Backup
+                    {dataOnlyRestore ? "Restore Data Only" : "Full Restore (Schema + Data)"}
                   </Button>
 
                   <p className="text-sm text-muted-foreground">
