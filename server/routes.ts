@@ -1629,7 +1629,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/backups/restore", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const { filename } = req.body;
+      const { filename, dataOnly = false } = req.body;
       
       if (!filename) {
         res.status(400).json({ message: "Filename is required" });
@@ -1653,32 +1653,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      console.log(`[Restore] Restoring database from: ${filename}`);
-      
       const { exec } = await import('child_process');
       const { promisify } = await import('util');
       const execAsync = promisify(exec);
       
-      // Create restore script
-      const isCompressed = filename.endsWith('.gz');
-      const decompressCmd = isCompressed ? `gunzip -c "${backupPath}"` : `cat "${backupPath}"`;
-      
-      const restoreScript = `
-        # Drop and recreate database
-        PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d postgres -c "DROP DATABASE IF EXISTS ${process.env.PGDATABASE};"
-        PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d postgres -c "CREATE DATABASE ${process.env.PGDATABASE};"
+      if (dataOnly) {
+        console.log(`[Restore] Data-only restore from: ${filename}`);
         
-        # Restore data
-        ${decompressCmd} | PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d "${process.env.PGDATABASE}"
-      `;
-      
-      await execAsync(restoreScript, { 
-        shell: '/bin/bash',
-        maxBuffer: 500 * 1024 * 1024 // 500MB buffer for large database restores
-      });
-      
-      console.log("[Restore] Database restored successfully");
-      res.json({ message: "Database restored successfully. Please refresh the page." });
+        // Read and parse SQL file to extract only data statements
+        const backupContent = await fs.readFile(backupPath, 'utf-8');
+        
+        // Filter SQL: Keep only COPY, INSERT, and setval statements
+        const dataStatements: string[] = [];
+        const lines = backupContent.split('\n');
+        let inCopyBlock = false;
+        let copyBuffer: string[] = [];
+        
+        for (const line of lines) {
+          // Detect COPY statements (data blocks)
+          if (line.startsWith('COPY ') && line.includes(' FROM stdin;')) {
+            inCopyBlock = true;
+            copyBuffer = [line];
+            continue;
+          }
+          
+          // Collect COPY data until we hit the terminator
+          if (inCopyBlock) {
+            copyBuffer.push(line);
+            if (line === '\\.') {
+              inCopyBlock = false;
+              dataStatements.push(copyBuffer.join('\n'));
+              copyBuffer = [];
+            }
+            continue;
+          }
+          
+          // Keep INSERT statements
+          if (line.trim().startsWith('INSERT INTO ')) {
+            dataStatements.push(line);
+            continue;
+          }
+          
+          // Keep sequence setval statements
+          if (line.includes('pg_catalog.setval(')) {
+            dataStatements.push(line);
+            continue;
+          }
+        }
+        
+        if (dataStatements.length === 0) {
+          res.status(400).json({ message: "No data statements found in backup file" });
+          return;
+        }
+        
+        console.log(`[Restore] Found ${dataStatements.length} data statements`);
+        
+        // Create safe restore script with transaction and FK handling
+        const dataOnlySQL = `
+BEGIN;
+
+-- Disable triggers and foreign key checks for fast import
+SET session_replication_role = 'replica';
+
+-- Truncate tables in FK-safe order (children first, parents last)
+TRUNCATE TABLE traffic_data CASCADE;
+TRUNCATE TABLE alerts CASCADE;
+TRUNCATE TABLE monitored_ports CASCADE;
+TRUNCATE TABLE notifications CASCADE;
+TRUNCATE TABLE user_routers CASCADE;
+TRUNCATE TABLE routers CASCADE;
+TRUNCATE TABLE router_groups CASCADE;
+TRUNCATE TABLE sessions CASCADE;
+TRUNCATE TABLE users CASCADE;
+TRUNCATE TABLE app_settings CASCADE;
+
+-- Insert data from backup
+${dataStatements.join('\n\n')}
+
+-- Re-enable triggers and foreign key checks
+SET session_replication_role = 'origin';
+
+COMMIT;
+`;
+        
+        // Write temporary SQL file
+        const tempSQLPath = path.join(backupsDir, `temp_restore_${Date.now()}.sql`);
+        await fs.writeFile(tempSQLPath, dataOnlySQL, 'utf-8');
+        
+        try {
+          // Execute data-only restore
+          await execAsync(
+            `PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d "${process.env.PGDATABASE}" --single-transaction --set ON_ERROR_STOP=1 -f "${tempSQLPath}"`,
+            {
+              shell: '/bin/bash',
+              maxBuffer: 500 * 1024 * 1024
+            }
+          );
+          
+          console.log("[Restore] Data-only restore completed successfully");
+          res.json({ message: "Data restored successfully. Current schema preserved. Please refresh the page." });
+        } finally {
+          // Clean up temp file
+          await fs.unlink(tempSQLPath).catch(() => {});
+        }
+      } else {
+        console.log(`[Restore] Full restore from: ${filename}`);
+        
+        // Full restore (original behavior)
+        const isCompressed = filename.endsWith('.gz');
+        const decompressCmd = isCompressed ? `gunzip -c "${backupPath}"` : `cat "${backupPath}"`;
+        
+        const restoreScript = `
+          # Drop and recreate database
+          PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d postgres -c "DROP DATABASE IF EXISTS ${process.env.PGDATABASE};"
+          PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d postgres -c "CREATE DATABASE ${process.env.PGDATABASE};"
+          
+          # Restore data
+          ${decompressCmd} | PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d "${process.env.PGDATABASE}"
+        `;
+        
+        await execAsync(restoreScript, { 
+          shell: '/bin/bash',
+          maxBuffer: 500 * 1024 * 1024
+        });
+        
+        console.log("[Restore] Full restore completed successfully");
+        res.json({ message: "Database restored successfully. Please refresh the page." });
+      }
     } catch (error: any) {
       console.error("[Restore] Error restoring backup:", error);
       res.status(500).json({ message: `Failed to restore backup: ${error.message}` });
