@@ -43,38 +43,71 @@ async function getAggregatedTraffic(
     interval = '10 minutes';
   }
   
-  const conditions = [
-    eq(trafficData.routerId, routerId),
-    gte(trafficData.timestamp, since)
+  // Build WHERE conditions manually for raw SQL
+  const whereConditions: string[] = [
+    `router_id = '${routerId}'`,
+    `timestamp >= '${since.toISOString()}'`
   ];
   
   if (portName) {
-    conditions.push(eq(trafficData.portName, portName));
+    whereConditions.push(`port_name = '${portName.replace(/'/g, "''")}'`);
   }
   
   if (until) {
-    conditions.push(lt(trafficData.timestamp, until));
+    whereConditions.push(`timestamp < '${until.toISOString()}'`);
   }
 
-  // Use time_bucket for aggregation (TimescaleDB feature)
-  const result = await db.execute(sql`
-    SELECT 
-      time_bucket(${interval}::interval, timestamp) AS bucket_time,
-      AVG(rx_bytes_per_second)::bigint AS avg_rx,
-      AVG(tx_bytes_per_second)::bigint AS avg_tx,
-      AVG(total_bytes_per_second)::bigint AS avg_total
-    FROM traffic_data
-    WHERE ${and(...conditions)}
-    GROUP BY bucket_time
-    ORDER BY bucket_time ASC
-  `);
+  const whereClause = whereConditions.join(' AND ');
 
-  return result.rows.map((row: any) => ({
-    timestamp: new Date(row.bucket_time).toISOString(),
-    rxBytesPerSecond: Number(row.avg_rx || 0),
-    txBytesPerSecond: Number(row.avg_tx || 0),
-    totalBytesPerSecond: Number(row.avg_total || 0),
-  }));
+  try {
+    // Try using time_bucket for aggregation (TimescaleDB feature)
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        time_bucket('${interval}'::interval, timestamp) AS bucket_time,
+        AVG(rx_bytes_per_second)::bigint AS avg_rx,
+        AVG(tx_bytes_per_second)::bigint AS avg_tx,
+        AVG(total_bytes_per_second)::bigint AS avg_total
+      FROM traffic_data
+      WHERE ${whereClause}
+      GROUP BY bucket_time
+      ORDER BY bucket_time ASC
+    `));
+
+    return result.rows.map((row: any) => ({
+      timestamp: new Date(row.bucket_time).toISOString(),
+      rxBytesPerSecond: Number(row.avg_rx || 0),
+      txBytesPerSecond: Number(row.avg_tx || 0),
+      totalBytesPerSecond: Number(row.avg_total || 0),
+    }));
+  } catch (error: any) {
+    // Fallback: Use standard PostgreSQL date_trunc if time_bucket not available
+    console.warn('[TrafficCache] time_bucket not available, using date_trunc fallback:', error.message);
+    
+    // Map intervals to date_trunc precision
+    let truncPrecision = 'minute';
+    if (interval === '6 hours') truncPrecision = 'hour';
+    else if (interval === '1 hour') truncPrecision = 'hour';
+    else if (interval === '10 minutes') truncPrecision = 'minute';
+    
+    const result = await db.execute(sql.raw(`
+      SELECT 
+        date_trunc('${truncPrecision}', timestamp) AS bucket_time,
+        AVG(rx_bytes_per_second)::bigint AS avg_rx,
+        AVG(tx_bytes_per_second)::bigint AS avg_tx,
+        AVG(total_bytes_per_second)::bigint AS avg_total
+      FROM traffic_data
+      WHERE ${whereClause}
+      GROUP BY bucket_time
+      ORDER BY bucket_time ASC
+    `));
+
+    return result.rows.map((row: any) => ({
+      timestamp: new Date(row.bucket_time).toISOString(),
+      rxBytesPerSecond: Number(row.avg_rx || 0),
+      txBytesPerSecond: Number(row.avg_tx || 0),
+      totalBytesPerSecond: Number(row.avg_total || 0),
+    }));
+  }
 }
 
 /**
