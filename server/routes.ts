@@ -1696,6 +1696,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return logsContent + afterWorkflow;
   }
 
+  // Helper function to run all database migrations
+  async function runMigrations(): Promise<void> {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    
+    const migrationsDir = path.join(process.cwd(), 'migrations');
+    
+    try {
+      // Check if migrations directory exists
+      await fs.access(migrationsDir);
+      
+      // Get all .sql files in migrations directory
+      const files = await fs.readdir(migrationsDir);
+      const sqlFiles = files.filter(f => f.endsWith('.sql')).sort();
+      
+      if (sqlFiles.length === 0) {
+        console.log('[Migrations] No migration files found');
+        return;
+      }
+      
+      console.log(`[Migrations] Running ${sqlFiles.length} migration(s)...`);
+      
+      // Run each migration
+      for (const file of sqlFiles) {
+        const filePath = path.join(migrationsDir, file);
+        console.log(`[Migrations] Running: ${file}`);
+        
+        try {
+          // Read migration content
+          const migrationSQL = await fs.readFile(filePath, 'utf-8');
+          
+          // Execute migration (suppress "already exists" warnings)
+          await execAsync(
+            `PGPASSWORD="${process.env.PGPASSWORD}" psql -U "${process.env.PGUSER}" -h "${process.env.PGHOST}" -p "${process.env.PGPORT}" -d "${process.env.PGDATABASE}" -f "${filePath}"`,
+            {
+              shell: '/bin/bash',
+              maxBuffer: 50 * 1024 * 1024
+            }
+          );
+          
+          console.log(`[Migrations] ✓ ${file} completed`);
+        } catch (error: any) {
+          // Ignore "already exists" errors
+          if (error.message && (error.message.includes('already exists') || error.message.includes('does not exist'))) {
+            console.log(`[Migrations] ✓ ${file} - no changes needed`);
+          } else {
+            console.error(`[Migrations] Error in ${file}:`, error.message);
+            throw error;
+          }
+        }
+      }
+      
+      console.log('[Migrations] All migrations completed successfully');
+    } catch (error) {
+      if ((error as any).code === 'ENOENT') {
+        console.log('[Migrations] No migrations directory found');
+      } else {
+        console.error('[Migrations] Error running migrations:', error);
+        throw error;
+      }
+    }
+  }
+
   // Backup/Restore API routes (admin only)
   app.get("/api/backups", isAuthenticated, isAdmin, async (req, res) => {
     try {
@@ -1908,12 +1972,17 @@ COMMIT;
           
           console.log("[Restore] Data-only restore completed successfully");
           
+          // CRITICAL: Run migrations to add any missing columns (e.g., acknowledged_by)
+          console.log("[Restore] Running database migrations to update schema...");
+          await runMigrations();
+          console.log("[Restore] Migrations completed");
+          
           // CRITICAL: Restart application to refresh database connections and scheduler
           console.log("[Restore] Triggering application restart to refresh connections and scheduler...");
           
           // Send success response before restart
           res.json({ 
-            message: "Core data restored successfully. Application restarting to refresh connections...",
+            message: "Core data restored successfully. Migrations applied. Application restarting to refresh connections...",
             details: {
               note: "The application will restart automatically. Please refresh the page in a few seconds."
             }
@@ -1950,12 +2019,17 @@ COMMIT;
         
         console.log("[Restore] Full restore completed successfully");
         
+        // CRITICAL: Run migrations to add any missing columns (e.g., acknowledged_by)
+        console.log("[Restore] Running database migrations to update schema...");
+        await runMigrations();
+        console.log("[Restore] Migrations completed");
+        
         // CRITICAL: Restart application to refresh database connections and scheduler
         console.log("[Restore] Triggering application restart to refresh connections and scheduler...");
         
         // Send success response before restart
         res.json({ 
-          message: "Database restored successfully. Application restarting...",
+          message: "Database restored successfully. Migrations applied. Application restarting...",
           details: {
             note: "The application will restart automatically. Please refresh the page in a few seconds."
           }

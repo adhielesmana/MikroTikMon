@@ -120,6 +120,25 @@ docker exec mikrotik-monitor-db rm /tmp/backup.sql
 rm "$TEMP_SQL"
 print_success "Cleanup complete"
 
+# Run migrations to add missing columns
+print_step "Running database migrations..."
+if [ -d "migrations" ] && [ "$(ls -A migrations/*.sql 2>/dev/null)" ]; then
+    MIGRATION_COUNT=$(ls -1 migrations/*.sql 2>/dev/null | wc -l)
+    print_info "Found $MIGRATION_COUNT migration file(s)"
+    
+    for migration_file in migrations/*.sql; do
+        if [ -f "$migration_file" ]; then
+            filename=$(basename "$migration_file")
+            print_info "  Running: $filename"
+            docker exec -i mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" < "$migration_file" 2>&1 | \
+                grep -v "already exists\|does not exist\|skipping" || true
+        fi
+    done
+    print_success "Migrations completed"
+else
+    print_info "No migrations to run"
+fi
+
 # Start application
 print_step "Starting application..."
 $DOCKER_COMPOSE start app
