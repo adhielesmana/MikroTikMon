@@ -335,6 +335,112 @@ async function pollRouterTraffic() {
               });
             }
 
+            // Fetch and cache IP addresses (only update if changed)
+            try {
+              const currentIps = await client.getAllIpAddresses();
+              const existingIps = await storage.getRouterIpAddresses(router.id);
+              
+              // Create a map of existing IPs for quick lookup
+              const existingIpMap = new Map(
+                existingIps.map(ip => [`${ip.address}-${ip.interfaceName}`, ip])
+              );
+              
+              // Track which IPs we've seen (to identify stale ones)
+              const seenIpKeys = new Set<string>();
+              
+              let ipChanges = 0;
+              for (const ip of currentIps) {
+                const key = `${ip.address}-${ip.interface}`;
+                seenIpKeys.add(key);
+                const existing = existingIpMap.get(key);
+                
+                // Only update if data changed or doesn't exist
+                if (!existing || 
+                    existing.network !== ip.network || 
+                    existing.disabled !== ip.disabled) {
+                  await storage.upsertRouterIpAddress(router.id, {
+                    address: ip.address,
+                    network: ip.network,
+                    interfaceName: ip.interface,
+                    disabled: ip.disabled,
+                  });
+                  ipChanges++;
+                }
+              }
+              
+              // Clean up stale IPs (removed from router)
+              const staleIps = existingIps.filter(ip => 
+                !seenIpKeys.has(`${ip.address}-${ip.interfaceName}`)
+              );
+              if (staleIps.length > 0) {
+                await storage.cleanupStaleRouterIpAddresses(router.id, 0);
+                console.log(`[Scheduler] Removed ${staleIps.length} stale IP(s) from ${router.name}`);
+              }
+              
+              if (ipChanges > 0) {
+                console.log(`[Scheduler] Updated ${ipChanges} IP address(es) for ${router.name}`);
+              }
+            } catch (error: any) {
+              console.warn(`[Scheduler] Failed to fetch IP addresses for ${router.name}: ${error.message}`);
+            }
+
+            // Fetch and cache routes (only update if changed)
+            try {
+              const currentRoutes = await client.getRoutes();
+              const existingRoutes = await storage.getRouterRoutes(router.id);
+              
+              // Create a map of existing routes for quick lookup
+              const existingRouteMap = new Map(
+                existingRoutes.map(route => [`${route.dstAddress}-${route.gateway}`, route])
+              );
+              
+              // Track which routes we've seen (to identify stale ones)
+              const seenRouteKeys = new Set<string>();
+              
+              let routeChanges = 0;
+              for (const route of currentRoutes) {
+                const key = `${route.dstAddress}-${route.gateway}`;
+                seenRouteKeys.add(key);
+                const existing = existingRouteMap.get(key);
+                
+                // Only update if data changed or doesn't exist
+                if (!existing || 
+                    existing.distance !== route.distance ||
+                    existing.scope !== (route.scope || null) ||
+                    existing.targetScope !== (route.targetScope || null) ||
+                    existing.disabled !== route.disabled ||
+                    existing.dynamic !== route.dynamic ||
+                    existing.active !== route.active) {
+                  await storage.upsertRouterRoute(router.id, {
+                    dstAddress: route.dstAddress,
+                    gateway: route.gateway,
+                    distance: route.distance,
+                    scope: route.scope,
+                    targetScope: route.targetScope,
+                    disabled: route.disabled,
+                    dynamic: route.dynamic,
+                    active: route.active,
+                  });
+                  routeChanges++;
+                }
+              }
+              
+              // Clean up stale routes (removed from router)
+              const staleRoutes = existingRoutes.filter(route => 
+                !seenRouteKeys.has(`${route.dstAddress}-${route.gateway}`)
+              );
+              if (staleRoutes.length > 0) {
+                await storage.cleanupStaleRouterRoutes(router.id, 0);
+                console.log(`[Scheduler] Removed ${staleRoutes.length} stale route(s) from ${router.name}`);
+              }
+              
+              if (routeChanges > 0) {
+                console.log(`[Scheduler] Updated ${routeChanges} route(s) for ${router.name}`);
+              }
+            } catch (error: any) {
+              console.warn(`[Scheduler] Failed to fetch routes for ${router.name}: ${error.message}`);
+            }
+
             // Get monitored ports for this router
             const monitoredPortsForRouter = portsByRouter.get(router.id) || [];
             console.log(`[Scheduler] Processing ${monitoredPortsForRouter.length} monitored port(s) from single API response for ${router.name}`);
