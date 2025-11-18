@@ -1057,16 +1057,16 @@ async function pollSingleRouterRealtime(routerId: string) {
       // Increment poll count
       pollingState.pollCount++;
       
-      // Check if we've reached the 100-poll limit
-      if (pollingState.pollCount >= 100 && !pollingState.isPaused) {
-        console.log(`[RealtimePoll] Reached 100-poll limit for router ${routerId}, pausing polling`);
+      // Check if we've reached the 50-poll limit
+      if (pollingState.pollCount >= 50 && !pollingState.isPaused) {
+        console.log(`[RealtimePoll] Reached 50-poll limit for router ${routerId}, pausing polling`);
         pollingState.isPaused = true;
         
         // Notify clients that polling has paused
         const pauseMessage = JSON.stringify({
           type: "realtime_polling_paused",
           routerId,
-          message: "Real-time polling paused after 100 updates to reduce server load"
+          message: "Real-time polling paused after 50 updates to reduce server load"
         });
         
         pollingState.clients.forEach((client: WebSocket) => {
@@ -1080,12 +1080,12 @@ async function pollSingleRouterRealtime(routerId: string) {
         return;
       }
       
-      // Get last 100 points PER INTERFACE (not total) to ensure all interfaces are represented
-      const trafficData = getRealtimeTrafficPerInterface(routerId, 100);
+      // Get last 50 points PER INTERFACE (not total) to ensure all interfaces are represented
+      const trafficData = getRealtimeTrafficPerInterface(routerId, 50);
       const message = JSON.stringify({
         type: "realtime_traffic",
         routerId,
-        data: trafficData, // Already limited to 100 points per interface
+        data: trafficData, // Already limited to 50 points per interface
         pollCount: pollingState.pollCount, // Send current poll count to frontend
       });
       
@@ -1112,7 +1112,7 @@ export function startRealtimePolling(routerId: string, client: WebSocket) {
       pollSingleRouterRealtime(routerId).catch(error => {
         console.error(`[RealtimePoll] Error in real-time poll for ${routerId}:`, error);
       });
-    }, 1000); // 1-second interval for true real-time
+    }, 5000); // 5-second interval for real-time monitoring
     
     pollingState = {
       interval,
@@ -1173,7 +1173,7 @@ export function restartRealtimePolling(routerId: string) {
     pollSingleRouterRealtime(routerId).catch(error => {
       console.error(`[RealtimePoll] Error in real-time poll for ${routerId}:`, error);
     });
-  }, 1000);
+  }, 5000);
   
   pollingState.interval = interval;
   
