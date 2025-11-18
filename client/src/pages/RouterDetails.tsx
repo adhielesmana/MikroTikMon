@@ -136,14 +136,14 @@ const SpeedometerGauge = memo(({
               strokeWidth="3"
             />
             
-            {/* Background arc (gray) */}
+            {/* Background arc (colored but lighter) */}
             <path
               d={backgroundArc}
               fill="none"
-              stroke="hsl(var(--muted))"
+              stroke={displayColor}
               strokeWidth="30"
               strokeLinecap="round"
-              opacity="0.3"
+              opacity="0.2"
             />
             
             {/* Colored arc (showing current value) */}
