@@ -94,8 +94,8 @@ const SpeedometerGauge = memo(({
     const x2 = centerX + tickOuterRadius * Math.cos(tickAngleRad);
     const y2 = centerY + tickOuterRadius * Math.sin(tickAngleRad);
     
-    // Label position
-    const labelRadius = radius + 22;
+    // Label position inside the circle
+    const labelRadius = radius - 20;
     const labelX = centerX + labelRadius * Math.cos(tickAngleRad);
     const labelY = centerY + labelRadius * Math.sin(tickAngleRad);
     
