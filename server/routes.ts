@@ -1451,15 +1451,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         disabled: ip.disabled,
       }));
       
-      // Generate ETag for HTTP caching
-      const etag = generateETag(result);
-      res.setHeader('Cache-Control', 'private, max-age=30'); // Cache for 30 seconds (faster than before)
-      res.setHeader('ETag', etag);
-      
-      // Return 304 if client has cached version
-      if (req.headers['if-none-match'] === etag) {
-        return res.status(304).end();
-      }
+      // Prevent Nginx from caching this response (fixes production issue)
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       
       res.json(result);
     } catch (error) {
@@ -1499,15 +1494,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         active: route.active,
       }));
       
-      // Generate ETag for HTTP caching
-      const etag = generateETag(result);
-      res.setHeader('Cache-Control', 'private, max-age=30'); // Cache for 30 seconds (faster than before)
-      res.setHeader('ETag', etag);
-      
-      // Return 304 if client has cached version
-      if (req.headers['if-none-match'] === etag) {
-        return res.status(304).end();
-      }
+      // Prevent Nginx from caching this response (fixes production issue)
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
       
       res.json(result);
     } catch (error) {

@@ -124,7 +124,7 @@ export default function RouterDetails() {
   const allInterfaces = interfacesData?.interfaces || [];
 
   // Fetch IP addresses for router
-  const { data: ipAddresses, isLoading: loadingIpAddresses, error: ipError } = useQuery<Array<{
+  const { data: ipAddresses, isLoading: loadingIpAddresses } = useQuery<Array<{
     address: string;
     network: string;
     interface: string;
@@ -132,13 +132,10 @@ export default function RouterDetails() {
   }>>({
     queryKey: [`/api/routers/${id}/ip-addresses`],
     enabled: !!id,
-    staleTime: 0, // Never use stale data
-    gcTime: 0, // Don't cache at all
-    refetchOnMount: 'always', // Force refetch every time
   });
 
   // Fetch routing table for router
-  const { data: routes, isLoading: loadingRoutes, error: routesError } = useQuery<Array<{
+  const { data: routes, isLoading: loadingRoutes } = useQuery<Array<{
     dstAddress: string;
     gateway: string;
     distance: string;
@@ -150,31 +147,7 @@ export default function RouterDetails() {
   }>>({
     queryKey: [`/api/routers/${id}/routes`],
     enabled: !!id,
-    staleTime: 0, // Never use stale data
-    gcTime: 0, // Don't cache at all
-    refetchOnMount: 'always', // Force refetch every time
   });
-
-  // Debug logging
-  useEffect(() => {
-    console.log('[RouterDetails] IP Query Status:', { 
-      id, 
-      loading: loadingIpAddresses, 
-      data: ipAddresses, 
-      error: ipError,
-      enabled: !!id 
-    });
-  }, [id, loadingIpAddresses, ipAddresses, ipError]);
-
-  useEffect(() => {
-    console.log('[RouterDetails] Routes Query Status:', { 
-      id, 
-      loading: loadingRoutes, 
-      data: routes, 
-      error: routesError,
-      enabled: !!id 
-    });
-  }, [id, loadingRoutes, routes, routesError]);
 
   // Pagination for IP addresses
   const ipPagination = usePagination({
