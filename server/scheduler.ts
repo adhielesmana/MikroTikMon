@@ -51,7 +51,12 @@ const MAX_ENTRIES_PER_INTERFACE = 7200; // 2 hours at 1 second intervals per int
 
 // On-demand real-time traffic polling state
 // Tracks which routers are currently being monitored in real-time (when details page is open)
-const activeRealtimePolling = new Map<string, { interval: NodeJS.Timeout; clients: Set<WebSocket> }>();
+const activeRealtimePolling = new Map<string, { 
+  interval: NodeJS.Timeout; 
+  clients: Set<WebSocket>;
+  pollCount: number;
+  isPaused: boolean;
+}>();
 
 // Track consecutive threshold violations per port for 5-check confirmation
 // Map<portId, { count: number, lastCheck: Date }>
@@ -1049,12 +1054,39 @@ async function pollSingleRouterRealtime(routerId: string) {
     // Broadcast real-time data to connected clients via WebSocket
     const pollingState = activeRealtimePolling.get(routerId);
     if (pollingState && pollingState.clients.size > 0) {
+      // Increment poll count
+      pollingState.pollCount++;
+      
+      // Check if we've reached the 100-poll limit
+      if (pollingState.pollCount >= 100 && !pollingState.isPaused) {
+        console.log(`[RealtimePoll] Reached 100-poll limit for router ${routerId}, pausing polling`);
+        pollingState.isPaused = true;
+        
+        // Notify clients that polling has paused
+        const pauseMessage = JSON.stringify({
+          type: "realtime_polling_paused",
+          routerId,
+          message: "Real-time polling paused after 100 updates to reduce server load"
+        });
+        
+        pollingState.clients.forEach((client: WebSocket) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(pauseMessage);
+          }
+        });
+        
+        // Stop the interval but keep the polling state for potential restart
+        clearInterval(pollingState.interval);
+        return;
+      }
+      
       // Get last 100 points PER INTERFACE (not total) to ensure all interfaces are represented
       const trafficData = getRealtimeTrafficPerInterface(routerId, 100);
       const message = JSON.stringify({
         type: "realtime_traffic",
         routerId,
         data: trafficData, // Already limited to 100 points per interface
+        pollCount: pollingState.pollCount, // Send current poll count to frontend
       });
       
       pollingState.clients.forEach((client: WebSocket) => {
@@ -1085,6 +1117,8 @@ export function startRealtimePolling(routerId: string, client: WebSocket) {
     pollingState = {
       interval,
       clients: new Set([client]),
+      pollCount: 0,
+      isPaused: false,
     };
     activeRealtimePolling.set(routerId, pollingState);
     
@@ -1117,6 +1151,51 @@ export function stopRealtimePolling(routerId: string, client: WebSocket) {
     activeRealtimePolling.delete(routerId);
     console.log(`[RealtimePoll] Stopped real-time polling for router ${routerId} (no clients)`);
   }
+}
+
+// Restart real-time polling for a specific router (after it was paused)
+export function restartRealtimePolling(routerId: string) {
+  console.log(`[RealtimePoll] Restarting real-time polling for router ${routerId}`);
+  
+  const pollingState = activeRealtimePolling.get(routerId);
+  
+  if (!pollingState) {
+    console.log(`[RealtimePoll] No polling state found for router ${routerId}, cannot restart`);
+    return;
+  }
+  
+  // Reset poll count and unpause
+  pollingState.pollCount = 0;
+  pollingState.isPaused = false;
+  
+  // Start new interval
+  const interval = setInterval(() => {
+    pollSingleRouterRealtime(routerId).catch(error => {
+      console.error(`[RealtimePoll] Error in real-time poll for ${routerId}:`, error);
+    });
+  }, 1000);
+  
+  pollingState.interval = interval;
+  
+  // Immediately poll once
+  pollSingleRouterRealtime(routerId).catch(error => {
+    console.error(`[RealtimePoll] Error in initial poll after restart for ${routerId}:`, error);
+  });
+  
+  // Notify clients that polling has restarted
+  const restartMessage = JSON.stringify({
+    type: "realtime_polling_restarted",
+    routerId,
+    message: "Real-time polling restarted"
+  });
+  
+  pollingState.clients.forEach((client: WebSocket) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(restartMessage);
+    }
+  });
+  
+  console.log(`[RealtimePoll] Restarted polling for router ${routerId} with ${pollingState.clients.size} client(s)`);
 }
 
 // Execution guards to prevent concurrent runs

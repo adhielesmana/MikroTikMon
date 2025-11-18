@@ -8,7 +8,7 @@ import { sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated, isAdmin, isSuperadmin, isEnabled } from "./replitAuth";
 import { MikrotikClient } from "./mikrotik";
 import { emailService } from "./emailService";
-import { startScheduler, setWebSocketServer, startRealtimePolling, stopRealtimePolling } from "./scheduler";
+import { startScheduler, setWebSocketServer, startRealtimePolling, stopRealtimePolling, restartRealtimePolling } from "./scheduler";
 import { insertRouterSchema, type Router } from "@shared/schema";
 import { z } from "zod";
 import fs from "fs/promises";
@@ -2471,6 +2471,44 @@ COMMIT;
               activeRouterId = null;
             }
             ws.send(JSON.stringify({ type: "realtime_polling_stopped", routerId: data.routerId }));
+          } catch (error) {
+            console.error(`[WebSocket] Error checking router access:`, error);
+            ws.send(JSON.stringify({ type: "error", message: "Failed to verify router access" }));
+          }
+        }
+        
+        // Handle restart real-time traffic polling
+        if (data.type === "restart_realtime_polling" && data.routerId) {
+          console.log(`[WebSocket] Restarting real-time polling for router ${data.routerId}`);
+          
+          // Check router ownership or superadmin status (same as start)
+          try {
+            const router = await storage.getRouter(data.routerId);
+            if (!router) {
+              console.log(`[WebSocket] Router ${data.routerId} not found`);
+              ws.send(JSON.stringify({ type: "error", message: "Router not found" }));
+              return;
+            }
+            
+            // Check if user has access (owner, assigned user, or superadmin)
+            if (!userId) {
+              console.log(`[WebSocket] User not authenticated`);
+              ws.send(JSON.stringify({ type: "error", message: "Not authenticated" }));
+              return;
+            }
+            
+            const hasAccess = await storage.canUserAccessRouter(data.routerId, userId);
+            console.log(`[WebSocket] Access check for restart polling - userId: ${userId}, routerId: ${data.routerId}, hasAccess: ${hasAccess}`);
+            
+            if (!hasAccess) {
+              console.log(`[WebSocket] FORBIDDEN - User ${userId} cannot access router ${data.routerId}`);
+              ws.send(JSON.stringify({ type: "error", message: "Forbidden: You don't have access to this router" }));
+              return;
+            }
+            
+            restartRealtimePolling(data.routerId);
+            activeRouterId = data.routerId;
+            // Note: The restartRealtimePolling function will send the "realtime_polling_restarted" message
           } catch (error) {
             console.error(`[WebSocket] Error checking router access:`, error);
             ws.send(JSON.stringify({ type: "error", message: "Failed to verify router access" }));
