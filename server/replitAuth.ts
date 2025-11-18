@@ -418,7 +418,14 @@ export async function setupAuth(app: Express) {
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   // Check if user is authenticated via any provider
-  if (!req.isAuthenticated()) {
+  const isAuth = req.isAuthenticated();
+  const hasSession = !!(req.session && req.session.passport);
+  const cookies = req.headers.cookie;
+  
+  console.log(`[Auth Debug] ${req.method} ${req.path} - isAuth: ${isAuth}, hasSession: ${hasSession}, hasCookies: ${!!cookies}`);
+  
+  if (!isAuth) {
+    console.log(`[Auth Debug] Rejecting ${req.path} - no authentication`);
     return res.status(401).json({ message: "Unauthorized" });
   }
 
