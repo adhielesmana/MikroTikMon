@@ -11,6 +11,56 @@ export async function runMigrations() {
   console.log("[Migrations] Checking database schema...");
 
   try {
+    // Create router_ip_addresses table if it doesn't exist
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS router_ip_addresses (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        router_id VARCHAR NOT NULL REFERENCES routers(id) ON DELETE CASCADE,
+        address VARCHAR(255) NOT NULL,
+        network VARCHAR(255) NOT NULL,
+        interface_name VARCHAR(255) NOT NULL,
+        disabled BOOLEAN NOT NULL DEFAULT false,
+        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(router_id, address, interface_name)
+      );
+    `);
+    console.log("[Migrations] ✓ Ensured router_ip_addresses table exists");
+
+    // Create index for router_ip_addresses if it doesn't exist
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_router_ip_addresses_router 
+      ON router_ip_addresses(router_id);
+    `);
+
+    // Create router_routes table if it doesn't exist
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS router_routes (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+        router_id VARCHAR NOT NULL REFERENCES routers(id) ON DELETE CASCADE,
+        dst_address VARCHAR(255) NOT NULL,
+        gateway VARCHAR(255) NOT NULL,
+        distance VARCHAR(10) NOT NULL DEFAULT '1',
+        scope VARCHAR(10),
+        target_scope VARCHAR(10),
+        disabled BOOLEAN NOT NULL DEFAULT false,
+        dynamic BOOLEAN NOT NULL DEFAULT false,
+        active BOOLEAN NOT NULL DEFAULT true,
+        last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(router_id, dst_address, gateway)
+      );
+    `);
+    console.log("[Migrations] ✓ Ensured router_routes table exists");
+
+    // Create index for router_routes if it doesn't exist
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_router_routes_router 
+      ON router_routes(router_id);
+    `);
+
     // Check if acknowledged_by column exists in alerts table
     const acknowledgedByCheck = await db.execute(sql`
       SELECT EXISTS (
