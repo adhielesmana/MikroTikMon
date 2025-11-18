@@ -55,6 +55,26 @@ export default function Routers() {
   const [selectedGroup, setSelectedGroup] = useState<string>("all");
   const { toast } = useToast();
 
+  // Prefetch router data on hover for instant navigation
+  const prefetchRouterData = (routerId: string) => {
+    // Prefetch all router-related data in parallel
+    queryClient.prefetchQuery({
+      queryKey: ["/api/routers", routerId],
+    });
+    queryClient.prefetchQuery({
+      queryKey: ["/api/routers", routerId, "ports"],
+    });
+    queryClient.prefetchQuery({
+      queryKey: ["/api/routers", routerId, "interfaces"],
+    });
+    queryClient.prefetchQuery({
+      queryKey: [`/api/routers/${routerId}/ip-addresses`],
+    });
+    queryClient.prefetchQuery({
+      queryKey: [`/api/routers/${routerId}/routes`],
+    });
+  };
+
   const { data: currentUser } = useQuery<User>({
     queryKey: ["/api/user"],
   });
@@ -249,7 +269,11 @@ export default function Routers() {
                 </TableHeader>
                 <TableBody>
                   {pagination.paginateItems(filteredRouters).map((router) => (
-                    <TableRow key={router.id} data-testid={`router-row-${router.id}`}>
+                    <TableRow 
+                      key={router.id} 
+                      data-testid={`router-row-${router.id}`}
+                      onMouseEnter={() => prefetchRouterData(router.id)}
+                    >
                       <TableCell className="font-medium" data-testid={`text-router-name-${router.id}`}>
                         <Link href={`/routers/${router.id}`}>
                           <span className="hover:underline cursor-pointer text-primary">
