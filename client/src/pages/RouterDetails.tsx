@@ -178,10 +178,10 @@ const SpeedometerGauge = memo(({
               </g>
             ))}
             
-            {/* Center value display - positioned well below the circle */}
+            {/* Center value display - positioned below the circle */}
             <text
               x={centerX}
-              y={centerY + 70}
+              y={centerY + 60}
               textAnchor="middle"
               dominantBaseline="middle"
               className="text-3xl font-extrabold"
@@ -192,7 +192,7 @@ const SpeedometerGauge = memo(({
             </text>
             <text
               x={centerX}
-              y={centerY + 90}
+              y={centerY + 80}
               textAnchor="middle"
               dominantBaseline="middle"
               className="text-xs fill-muted-foreground font-bold"
