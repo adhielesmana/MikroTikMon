@@ -346,10 +346,10 @@ export default function RouterDetails() {
         } else if (message.type === "realtime_polling_paused" && message.routerId === id) {
           // Set paused state - this takes precedence
           setIsPollingPaused(true);
-          setPollCount(100); // Ensure counter shows 100
+          setPollCount(50); // Ensure counter shows 50
           toast({
             title: "Real-time polling paused",
-            description: "Polling paused after 100 updates to reduce server load. Click 'Resume Monitoring' to continue.",
+            description: "Polling paused after 50 updates to reduce server load. Click 'Resume Monitoring' to continue.",
             variant: "default",
           });
         } else if (message.type === "realtime_polling_restarted" && message.routerId === id) {
@@ -357,7 +357,7 @@ export default function RouterDetails() {
           setPollCount(0);
           toast({
             title: "Real-time polling restarted",
-            description: "Monitoring resumed for another 100 updates",
+            description: "Monitoring resumed for another 50 updates",
             variant: "default",
           });
         } else if (message.type === "error") {
