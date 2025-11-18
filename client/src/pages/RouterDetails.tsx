@@ -131,7 +131,7 @@ const SpeedometerGauge = memo(({
               d={backgroundArc}
               fill="none"
               stroke="hsl(var(--muted))"
-              strokeWidth="10"
+              strokeWidth="30"
               strokeLinecap="round"
               opacity="0.3"
             />
@@ -141,7 +141,7 @@ const SpeedometerGauge = memo(({
               d={filledArc}
               fill="none"
               stroke={displayColor}
-              strokeWidth="10"
+              strokeWidth="30"
               strokeLinecap="round"
               style={{ transition: 'all 0.3s ease' }}
             />
@@ -168,10 +168,10 @@ const SpeedometerGauge = memo(({
               </g>
             ))}
             
-            {/* Center value display */}
+            {/* Center value display - positioned below center */}
             <text
               x={centerX}
-              y={centerY - 5}
+              y={centerY + 35}
               textAnchor="middle"
               dominantBaseline="middle"
               className="text-3xl font-bold"
@@ -182,7 +182,7 @@ const SpeedometerGauge = memo(({
             </text>
             <text
               x={centerX}
-              y={centerY + 15}
+              y={centerY + 55}
               textAnchor="middle"
               dominantBaseline="middle"
               className="text-xs fill-muted-foreground"
