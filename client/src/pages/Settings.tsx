@@ -499,10 +499,24 @@ export default function Settings() {
                     {dataOnlyRestore ? "Restore Data Only" : "Full Restore (Schema + Data)"}
                   </Button>
 
-                  <p className="text-sm text-muted-foreground">
-                    Found {backupsData.backups.length} backup{backupsData.backups.length !== 1 ? 's' : ''}.
-                    Oldest backups are automatically deleted after 30 days.
-                  </p>
+                  <div className="space-y-2">
+                    {backupsData.backups.length > 0 && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">Last backup:</span>
+                        <span className="text-muted-foreground">
+                          {new Date(backupsData.backups[0].created).toLocaleString()}
+                        </span>
+                        <Badge variant="secondary" className="ml-2">
+                          {(backupsData.backups[0].size / 1024 / 1024).toFixed(2)} MB
+                        </Badge>
+                      </div>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      Found {backupsData.backups.length} backup{backupsData.backups.length !== 1 ? 's' : ''}.
+                      Automated backups run weekly (Sunday 3 AM). Oldest backups are automatically deleted after 2 years (730 days).
+                    </p>
+                  </div>
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground py-4 text-center border rounded-md">
