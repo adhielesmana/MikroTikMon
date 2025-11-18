@@ -4,6 +4,8 @@ import {
   routers,
   routerGroups,
   routerInterfaces,
+  routerIpAddresses,
+  routerRoutes,
   monitoredPorts,
   trafficData,
   alerts,
@@ -18,6 +20,10 @@ import {
   type InsertRouterGroup,
   type RouterInterface,
   type InsertRouterInterface,
+  type RouterIpAddress,
+  type InsertRouterIpAddress,
+  type RouterRoute,
+  type InsertRouterRoute,
   type MonitoredPort,
   type InsertMonitoredPort,
   type TrafficData,
@@ -448,6 +454,112 @@ export class DatabaseStorage implements IStorage {
     
     // Filter out already monitored interfaces
     return allInterfaces.filter(iface => !monitoredNames.has(iface.interfaceName));
+  }
+
+  // Router IP Addresses operations (caching all IP addresses from routers)
+  async upsertRouterIpAddress(routerId: string, ipData: {
+    address: string;
+    network: string;
+    interfaceName: string;
+    disabled: boolean;
+  }): Promise<void> {
+    await db.insert(routerIpAddresses)
+      .values({
+        routerId,
+        address: ipData.address,
+        network: ipData.network,
+        interfaceName: ipData.interfaceName,
+        disabled: ipData.disabled,
+        lastSeen: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [routerIpAddresses.routerId, routerIpAddresses.address, routerIpAddresses.interfaceName],
+        set: {
+          network: ipData.network,
+          disabled: ipData.disabled,
+          lastSeen: new Date(),
+          updatedAt: new Date(),
+        }
+      });
+  }
+
+  async getRouterIpAddresses(routerId: string): Promise<RouterIpAddress[]> {
+    return await db
+      .select()
+      .from(routerIpAddresses)
+      .where(eq(routerIpAddresses.routerId, routerId))
+      .orderBy(routerIpAddresses.address);
+  }
+
+  async cleanupStaleRouterIpAddresses(routerId: string, maxAgeMinutes: number = 5): Promise<void> {
+    const cutoffTime = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+    await db
+      .delete(routerIpAddresses)
+      .where(
+        and(
+          eq(routerIpAddresses.routerId, routerId),
+          sql`${routerIpAddresses.lastSeen} < ${cutoffTime}`
+        )
+      );
+  }
+
+  // Router Routes operations (caching routing table from routers)
+  async upsertRouterRoute(routerId: string, routeData: {
+    dstAddress: string;
+    gateway: string;
+    distance: string;
+    scope?: string | null;
+    targetScope?: string | null;
+    disabled: boolean;
+    dynamic: boolean;
+    active: boolean;
+  }): Promise<void> {
+    await db.insert(routerRoutes)
+      .values({
+        routerId,
+        dstAddress: routeData.dstAddress,
+        gateway: routeData.gateway,
+        distance: routeData.distance,
+        scope: routeData.scope || null,
+        targetScope: routeData.targetScope || null,
+        disabled: routeData.disabled,
+        dynamic: routeData.dynamic,
+        active: routeData.active,
+        lastSeen: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [routerRoutes.routerId, routerRoutes.dstAddress, routerRoutes.gateway],
+        set: {
+          distance: routeData.distance,
+          scope: routeData.scope || null,
+          targetScope: routeData.targetScope || null,
+          disabled: routeData.disabled,
+          dynamic: routeData.dynamic,
+          active: routeData.active,
+          lastSeen: new Date(),
+          updatedAt: new Date(),
+        }
+      });
+  }
+
+  async getRouterRoutes(routerId: string): Promise<RouterRoute[]> {
+    return await db
+      .select()
+      .from(routerRoutes)
+      .where(eq(routerRoutes.routerId, routerId))
+      .orderBy(routerRoutes.dstAddress);
+  }
+
+  async cleanupStaleRouterRoutes(routerId: string, maxAgeMinutes: number = 5): Promise<void> {
+    const cutoffTime = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+    await db
+      .delete(routerRoutes)
+      .where(
+        and(
+          eq(routerRoutes.routerId, routerId),
+          sql`${routerRoutes.lastSeen} < ${cutoffTime}`
+        )
+      );
   }
 
   // Monitored Ports operations
