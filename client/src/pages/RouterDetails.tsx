@@ -10,7 +10,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePaginationFooter } from "@/components/TablePaginationFooter";
 import { formatBytesPerSecond, formatRelativeTime } from "@/lib/utils";
-import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from "recharts";
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
 import { AddPortDialog } from "@/components/AddPortDialog";
 import { AddRouterDialog } from "@/components/AddRouterDialog";
@@ -36,12 +35,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// Memoized gauge component to prevent unnecessary re-renders
-const SpeedGauge = memo(({ 
+// Speedometer-style gauge with needle
+const SpeedometerGauge = memo(({ 
   title, 
   speed, 
   color, 
-  gaugeData, 
   maxSpeed,
   testId,
   isPaused 
@@ -49,14 +47,50 @@ const SpeedGauge = memo(({
   title: string;
   speed: number;
   color: string;
-  gaugeData: Array<{ name: string; value: number; fill: string }>;
   maxSpeed: number;
   testId: string;
   isPaused?: boolean;
 }) => {
-  // Use gray color when paused
   const displayColor = isPaused ? '#6b7280' : color;
   const textColor = isPaused ? 'text-gray-500' : (color === '#10b981' ? 'text-green-600' : 'text-blue-600');
+  
+  // Calculate needle angle (180° = 0 Mbps, 0° = max Mbps)
+  const percentage = Math.min(speed / maxSpeed, 1);
+  const angle = 180 - (percentage * 180); // 180° to 0°
+  
+  // SVG dimensions
+  const size = 200;
+  const centerX = size / 2;
+  const centerY = size / 2;
+  const radius = size / 2 - 20;
+  const needleLength = radius - 10;
+  
+  // Calculate needle endpoint
+  const needleAngleRad = (angle * Math.PI) / 180;
+  const needleX = centerX + needleLength * Math.cos(needleAngleRad - Math.PI / 2);
+  const needleY = centerY + needleLength * Math.sin(needleAngleRad - Math.PI / 2);
+  
+  // Generate tick marks (11 ticks: 0%, 10%, 20%, ..., 100%)
+  const ticks = Array.from({ length: 11 }, (_, i) => {
+    const tickAngle = 180 - (i * 18); // 180° to 0°, every 18°
+    const tickAngleRad = (tickAngle * Math.PI) / 180;
+    const tickValue = (maxSpeed * i) / 10;
+    const isMajor = i % 2 === 0; // Major ticks at 0%, 20%, 40%, etc.
+    const tickRadius = radius + (isMajor ? 10 : 5);
+    const tickStartRadius = radius - 5;
+    
+    const x1 = centerX + tickStartRadius * Math.cos(tickAngleRad - Math.PI / 2);
+    const y1 = centerY + tickStartRadius * Math.sin(tickAngleRad - Math.PI / 2);
+    const x2 = centerX + tickRadius * Math.cos(tickAngleRad - Math.PI / 2);
+    const y2 = centerY + tickRadius * Math.sin(tickAngleRad - Math.PI / 2);
+    
+    // Label position (only for major ticks)
+    const labelRadius = radius + 25;
+    const labelX = centerX + labelRadius * Math.cos(tickAngleRad - Math.PI / 2);
+    const labelY = centerY + labelRadius * Math.sin(tickAngleRad - Math.PI / 2);
+    
+    return { x1, y1, x2, y2, labelX, labelY, tickValue, isMajor };
+  });
   
   return (
     <Card className={isPaused ? 'opacity-60' : ''}>
@@ -64,36 +98,86 @@ const SpeedGauge = memo(({
         <CardTitle className="text-center text-lg">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={200}>
-          <RadialBarChart
-            cx="50%"
-            cy="50%"
-            innerRadius="60%"
-            outerRadius="100%"
-            data={gaugeData.map(d => ({ ...d, fill: displayColor }))}
-            startAngle={180}
-            endAngle={0}
-          >
-            <PolarAngleAxis
-              type="number"
-              domain={[0, maxSpeed]}
-              angleAxisId={0}
-              tick={false}
+        <svg width="100%" height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
+          {/* Gauge arc background */}
+          <path
+            d={`M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}`}
+            fill="none"
+            stroke="hsl(var(--muted))"
+            strokeWidth="12"
+            strokeLinecap="round"
+          />
+          
+          {/* Colored arc (showing current value) */}
+          <path
+            d={`M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}`}
+            fill="none"
+            stroke={displayColor}
+            strokeWidth="12"
+            strokeLinecap="round"
+            strokeDasharray={`${percentage * Math.PI * radius} ${Math.PI * radius}`}
+            style={{ transition: 'stroke-dasharray 0.3s ease' }}
+          />
+          
+          {/* Tick marks */}
+          {ticks.map((tick, i) => (
+            <g key={i}>
+              <line
+                x1={tick.x1}
+                y1={tick.y1}
+                x2={tick.x2}
+                y2={tick.y2}
+                stroke="hsl(var(--foreground))"
+                strokeWidth={tick.isMajor ? 2 : 1}
+                opacity={tick.isMajor ? 0.6 : 0.3}
+              />
+              {tick.isMajor && (
+                <text
+                  x={tick.labelX}
+                  y={tick.labelY}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="text-[10px] fill-muted-foreground font-medium"
+                >
+                  {tick.tickValue.toFixed(0)}
+                </text>
+              )}
+            </g>
+          ))}
+          
+          {/* Needle */}
+          <g style={{ transition: 'transform 0.3s ease', transformOrigin: `${centerX}px ${centerY}px` }}>
+            <line
+              x1={centerX}
+              y1={centerY}
+              x2={needleX}
+              y2={needleY}
+              stroke={displayColor}
+              strokeWidth="3"
+              strokeLinecap="round"
             />
-            <RadialBar
-              background
-              dataKey="value"
-              cornerRadius={10}
+            {/* Needle center dot */}
+            <circle
+              cx={centerX}
+              cy={centerY}
+              r="6"
               fill={displayColor}
             />
-          </RadialBarChart>
-        </ResponsiveContainer>
-        <div className="text-center mt-4">
+            <circle
+              cx={centerX}
+              cy={centerY}
+              r="3"
+              fill="hsl(var(--background))"
+            />
+          </g>
+        </svg>
+        
+        <div className="text-center mt-2">
           <div className={`text-4xl font-bold ${textColor}`} data-testid={testId}>
             {speed.toFixed(2)}
           </div>
           <div className="text-sm text-muted-foreground">
-            Mbps <span className="text-xs opacity-70">(0-{maxSpeed})</span>
+            Mbps
           </div>
         </div>
       </CardContent>
@@ -531,23 +615,6 @@ export default function RouterDetails() {
     }
   }, [currentSpeed.rx, currentSpeed.tx]);
 
-  // Memoize gauge data using animated values for visual effect
-  const rxGaugeData = useMemo(() => [
-    {
-      name: "RX",
-      value: Math.min(animatedSpeed.rx, maxSpeed),
-      fill: "#3b82f6",
-    },
-  ], [animatedSpeed.rx, maxSpeed]);
-
-  const txGaugeData = useMemo(() => [
-    {
-      name: "TX",
-      value: Math.min(animatedSpeed.tx, maxSpeed),
-      fill: "#10b981",
-    },
-  ], [animatedSpeed.tx, maxSpeed]);
-
   if (loadingRouter) {
     return (
       <div className="space-y-6">
@@ -713,25 +780,23 @@ export default function RouterDetails() {
             )}
           </div>
 
-          {/* Speedtest Meters */}
+          {/* Speedometer Meters */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* TX Meter */}
-            <SpeedGauge
+            <SpeedometerGauge
               title="Upload (TX)"
               speed={animatedSpeed.tx}
               color="#10b981"
-              gaugeData={txGaugeData}
               maxSpeed={maxSpeed}
               testId="text-tx-speed"
               isPaused={isPollingPaused}
             />
 
             {/* RX Meter */}
-            <SpeedGauge
+            <SpeedometerGauge
               title="Download (RX)"
               speed={animatedSpeed.rx}
               color="#3b82f6"
-              gaugeData={rxGaugeData}
               maxSpeed={maxSpeed}
               testId="text-rx-speed"
               isPaused={isPollingPaused}
