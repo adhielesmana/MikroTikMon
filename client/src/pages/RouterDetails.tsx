@@ -156,21 +156,6 @@ const SpeedometerGauge = memo(({
               style={{ transition: 'all 0.3s ease' }}
             />
             
-            {/* Tick labels (dots removed, labels only) */}
-            {ticks.map((tick, i) => (
-              <g key={i}>
-                <text
-                  x={tick.labelX}
-                  y={tick.labelY}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="text-[9px] fill-muted-foreground font-bold"
-                >
-                  {tick.displayValue}
-                </text>
-              </g>
-            ))}
-            
             {/* Center value display - positioned below the circle */}
             <text
               x={centerX}
