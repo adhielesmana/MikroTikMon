@@ -182,9 +182,10 @@ const SpeedometerGauge = memo(({
             <g style={{ transition: 'all 0.3s ease' }}>
               <polygon
                 points={`${base1X},${base1Y} ${needleX},${needleY} ${base2X},${base2Y}`}
-                fill="hsl(var(--background))"
-                stroke="hsl(var(--foreground))"
-                strokeWidth="1"
+                fill={displayColor}
+                fillOpacity="0.2"
+                stroke={displayColor}
+                strokeWidth="2"
                 style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }}
               />
             </g>
