@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Activity, Server, Pencil, Trash2, Network, MapPin, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowLeft, Activity, Server, Pencil, Trash2, Network, MapPin, Search, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
 import type { Router, MonitoredPort, TrafficData } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -43,7 +43,8 @@ const SpeedGauge = memo(({
   color, 
   gaugeData, 
   maxSpeed,
-  testId 
+  testId,
+  isPaused 
 }: { 
   title: string;
   speed: number;
@@ -51,47 +52,54 @@ const SpeedGauge = memo(({
   gaugeData: Array<{ name: string; value: number; fill: string }>;
   maxSpeed: number;
   testId: string;
-}) => (
-  <Card>
-    <CardHeader>
-      <CardTitle className="text-center text-lg">{title}</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <ResponsiveContainer width="100%" height={200}>
-        <RadialBarChart
-          cx="50%"
-          cy="50%"
-          innerRadius="60%"
-          outerRadius="100%"
-          data={gaugeData}
-          startAngle={180}
-          endAngle={0}
-        >
-          <PolarAngleAxis
-            type="number"
-            domain={[0, maxSpeed]}
-            angleAxisId={0}
-            tick={false}
-          />
-          <RadialBar
-            background
-            dataKey="value"
-            cornerRadius={10}
-            fill={color}
-          />
-        </RadialBarChart>
-      </ResponsiveContainer>
-      <div className="text-center mt-4">
-        <div className={`text-4xl font-bold ${color === '#10b981' ? 'text-green-600' : 'text-blue-600'}`} data-testid={testId}>
-          {speed.toFixed(2)}
+  isPaused?: boolean;
+}) => {
+  // Use gray color when paused
+  const displayColor = isPaused ? '#6b7280' : color;
+  const textColor = isPaused ? 'text-gray-500' : (color === '#10b981' ? 'text-green-600' : 'text-blue-600');
+  
+  return (
+    <Card className={isPaused ? 'opacity-60' : ''}>
+      <CardHeader>
+        <CardTitle className="text-center text-lg">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={200}>
+          <RadialBarChart
+            cx="50%"
+            cy="50%"
+            innerRadius="60%"
+            outerRadius="100%"
+            data={gaugeData.map(d => ({ ...d, fill: displayColor }))}
+            startAngle={180}
+            endAngle={0}
+          >
+            <PolarAngleAxis
+              type="number"
+              domain={[0, maxSpeed]}
+              angleAxisId={0}
+              tick={false}
+            />
+            <RadialBar
+              background
+              dataKey="value"
+              cornerRadius={10}
+              fill={displayColor}
+            />
+          </RadialBarChart>
+        </ResponsiveContainer>
+        <div className="text-center mt-4">
+          <div className={`text-4xl font-bold ${textColor}`} data-testid={testId}>
+            {speed.toFixed(2)}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Mbps <span className="text-xs opacity-70">(0-{maxSpeed})</span>
+          </div>
         </div>
-        <div className="text-sm text-muted-foreground">
-          Mbps <span className="text-xs opacity-70">(0-{maxSpeed})</span>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-));
+      </CardContent>
+    </Card>
+  );
+});
 
 export default function RouterDetails() {
   const { id } = useParams<{ id: string }>();
@@ -102,6 +110,8 @@ export default function RouterDetails() {
   
   // WebSocket-based real-time traffic data
   const [realtimeTrafficData, setRealtimeTrafficData] = useState<TrafficData[]>([]);
+  const [isPollingPaused, setIsPollingPaused] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
 
   // Search and sort states for IP addresses
@@ -300,6 +310,15 @@ export default function RouterDetails() {
     }
   }, [allInterfaces, ports, selectedInterface]);
 
+  // Function to restart real-time polling
+  const handleRefreshPolling = () => {
+    if (!id) return;
+    const ws = wsRef.current || (window as any).__appWebSocket;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "restart_realtime_polling", routerId: id }));
+    }
+  };
+
   // WebSocket connection for real-time data
   useEffect(() => {
     if (!id) return;
@@ -313,8 +332,28 @@ export default function RouterDetails() {
         
         if (message.type === "realtime_traffic" && message.routerId === id && isSubscribed) {
           setRealtimeTrafficData(message.data);
+          if (message.pollCount !== undefined) {
+            setPollCount(message.pollCount);
+          }
         } else if (message.type === "realtime_polling_started" && message.routerId === id) {
           pollingStarted = true;
+          setIsPollingPaused(false);
+          setPollCount(0);
+        } else if (message.type === "realtime_polling_paused" && message.routerId === id) {
+          setIsPollingPaused(true);
+          toast({
+            title: "Real-time polling paused",
+            description: "Polling paused after 100 updates to reduce server load. Click refresh to continue.",
+            variant: "default",
+          });
+        } else if (message.type === "realtime_polling_restarted" && message.routerId === id) {
+          setIsPollingPaused(false);
+          setPollCount(0);
+          toast({
+            title: "Real-time polling restarted",
+            description: "Monitoring resumed for another 100 updates",
+            variant: "default",
+          });
         } else if (message.type === "error") {
           console.error("[RouterDetails] WebSocket error:", message.message);
           toast({
@@ -595,7 +634,7 @@ export default function RouterDetails() {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Interface Selector */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <label className="text-sm font-medium">Select Interface:</label>
             <Select value={selectedInterface} onValueChange={setSelectedInterface}>
               <SelectTrigger className="w-64" data-testid="select-interface">
@@ -620,9 +659,22 @@ export default function RouterDetails() {
                 ))}
               </SelectContent>
             </Select>
-            <Badge variant="default" className="animate-pulse" data-testid="badge-live">
-              LIVE
-            </Badge>
+            {!isPollingPaused ? (
+              <Badge variant="default" className="animate-pulse" data-testid="badge-live">
+                LIVE ({pollCount}/100)
+              </Badge>
+            ) : (
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleRefreshPolling}
+                data-testid="button-refresh-polling"
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Resume Monitoring
+              </Button>
+            )}
           </div>
 
           {/* Speedtest Meters */}
@@ -635,6 +687,7 @@ export default function RouterDetails() {
               gaugeData={txGaugeData}
               maxSpeed={maxSpeed}
               testId="text-tx-speed"
+              isPaused={isPollingPaused}
             />
 
             {/* RX Meter */}
@@ -645,6 +698,7 @@ export default function RouterDetails() {
               gaugeData={rxGaugeData}
               maxSpeed={maxSpeed}
               testId="text-rx-speed"
+              isPaused={isPollingPaused}
             />
           </div>
 
