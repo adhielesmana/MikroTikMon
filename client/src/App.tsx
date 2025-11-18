@@ -14,7 +14,6 @@ import Routers from "@/pages/Routers";
 import RouterDetails from "@/pages/RouterDetails";
 import MonitoredPorts from "@/pages/MonitoredPorts";
 import PortDetails from "@/pages/PortDetails";
-import GraphHistory from "@/pages/GraphHistory";
 import Alerts from "@/pages/Alerts";
 import Settings from "@/pages/Settings";
 import Logs from "@/pages/Logs";
@@ -149,13 +148,6 @@ function Router() {
             {() => (
               <AuthenticatedLayout>
                 <PortDetails />
-              </AuthenticatedLayout>
-            )}
-          </Route>
-          <Route path="/graph-history">
-            {() => (
-              <AuthenticatedLayout>
-                <GraphHistory />
               </AuthenticatedLayout>
             )}
           </Route>
