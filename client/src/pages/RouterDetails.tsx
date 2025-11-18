@@ -105,6 +105,7 @@ export default function RouterDetails() {
   const { id } = useParams<{ id: string }>();
   const [selectedInterface, setSelectedInterface] = useState<string>("");
   const [currentSpeed, setCurrentSpeed] = useState({ rx: 0, tx: 0 });
+  const [animatedSpeed, setAnimatedSpeed] = useState({ rx: 0, tx: 0 });
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { toast } = useToast();
   
@@ -113,6 +114,7 @@ export default function RouterDetails() {
   const [isPollingPaused, setIsPollingPaused] = useState(false);
   const [pollCount, setPollCount] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
+  const animationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Search and sort states for IP addresses
   const [ipSearchQuery, setIpSearchQuery] = useState("");
@@ -438,30 +440,60 @@ export default function RouterDetails() {
     return sorted[0];
   }, [realtimeTrafficData, selectedInterface]);
 
-  // Throttle chart updates to every 2 seconds to reduce re-renders
-  const lastUpdateRef = useRef<number>(0);
-  
+  // Animation effect: gradually decrease gauge values from real data to 0 over 5 seconds
   useEffect(() => {
     if (!latestInterfaceData) {
       setCurrentSpeed({ rx: 0, tx: 0 });
+      setAnimatedSpeed({ rx: 0, tx: 0 });
       return;
     }
-
-    const now = Date.now();
-    const timeSinceLastUpdate = now - lastUpdateRef.current;
-    
-    // Throttle updates to every 2 seconds (2000ms)
-    if (timeSinceLastUpdate < 2000) {
-      return;
-    }
-
-    lastUpdateRef.current = now;
 
     // Convert bytes per second to Megabits per second (Mbps)
     const rxMbps = (latestInterfaceData.rxBytesPerSecond * 8) / 1000000;
     const txMbps = (latestInterfaceData.txBytesPerSecond * 8) / 1000000;
 
+    // Store the real values
     setCurrentSpeed({ rx: rxMbps, tx: txMbps });
+    
+    // Set animated values to real values (start of animation)
+    setAnimatedSpeed({ rx: rxMbps, tx: txMbps });
+    
+    // Clear any existing animation interval
+    if (animationIntervalRef.current) {
+      clearInterval(animationIntervalRef.current);
+    }
+    
+    // Animate the gauges: gradually decrease to 0 over 5 seconds
+    const animationDuration = 5000; // 5 seconds
+    const animationSteps = 50; // 50 steps
+    const stepInterval = animationDuration / animationSteps; // ~100ms per step
+    
+    let step = 0;
+    animationIntervalRef.current = setInterval(() => {
+      step++;
+      const progress = step / animationSteps; // 0 to 1
+      const remainingFactor = 1 - progress; // 1 to 0
+      
+      setAnimatedSpeed({
+        rx: rxMbps * remainingFactor,
+        tx: txMbps * remainingFactor,
+      });
+      
+      if (step >= animationSteps) {
+        if (animationIntervalRef.current) {
+          clearInterval(animationIntervalRef.current);
+          animationIntervalRef.current = null;
+        }
+      }
+    }, stepInterval);
+    
+    // Cleanup on unmount or when new data arrives
+    return () => {
+      if (animationIntervalRef.current) {
+        clearInterval(animationIntervalRef.current);
+        animationIntervalRef.current = null;
+      }
+    };
   }, [latestInterfaceData]);
 
   const deletePortMutation = useMutation({
@@ -484,7 +516,7 @@ export default function RouterDetails() {
     },
   });
 
-  // Dynamic gauge scale based on current traffic
+  // Dynamic gauge scale based on current traffic (use real currentSpeed, not animated)
   // < 100 Mbps → 0-100 scale
   // 100-1000 Mbps → 0-1000 scale
   // > 1000 Mbps → 0-10000 scale
@@ -499,22 +531,22 @@ export default function RouterDetails() {
     }
   }, [currentSpeed.rx, currentSpeed.tx]);
 
-  // Memoize gauge data to prevent unnecessary re-renders of chart components
+  // Memoize gauge data using animated values for visual effect
   const rxGaugeData = useMemo(() => [
     {
       name: "RX",
-      value: Math.min(currentSpeed.rx, maxSpeed),
+      value: Math.min(animatedSpeed.rx, maxSpeed),
       fill: "#3b82f6",
     },
-  ], [currentSpeed.rx, maxSpeed]);
+  ], [animatedSpeed.rx, maxSpeed]);
 
   const txGaugeData = useMemo(() => [
     {
       name: "TX",
-      value: Math.min(currentSpeed.tx, maxSpeed),
+      value: Math.min(animatedSpeed.tx, maxSpeed),
       fill: "#10b981",
     },
-  ], [currentSpeed.tx, maxSpeed]);
+  ], [animatedSpeed.tx, maxSpeed]);
 
   if (loadingRouter) {
     return (
@@ -633,7 +665,7 @@ export default function RouterDetails() {
         <CardHeader>
           <CardTitle>Real-Time Traffic Monitor</CardTitle>
           <CardDescription>
-            Live traffic monitoring - updates every second
+            Live traffic monitoring - updates every 5 seconds
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -665,7 +697,7 @@ export default function RouterDetails() {
             </Select>
             {!isPollingPaused ? (
               <Badge variant="default" className="animate-pulse" data-testid="badge-live">
-                LIVE ({pollCount}/100)
+                LIVE ({pollCount}/50)
               </Badge>
             ) : (
               <Button 
@@ -686,7 +718,7 @@ export default function RouterDetails() {
             {/* TX Meter */}
             <SpeedGauge
               title="Upload (TX)"
-              speed={currentSpeed.tx}
+              speed={animatedSpeed.tx}
               color="#10b981"
               gaugeData={txGaugeData}
               maxSpeed={maxSpeed}
@@ -697,7 +729,7 @@ export default function RouterDetails() {
             {/* RX Meter */}
             <SpeedGauge
               title="Download (RX)"
-              speed={currentSpeed.rx}
+              speed={animatedSpeed.rx}
               color="#3b82f6"
               gaugeData={rxGaugeData}
               maxSpeed={maxSpeed}
@@ -707,7 +739,7 @@ export default function RouterDetails() {
           </div>
 
           <p className="text-xs text-muted-foreground text-center">
-            Gauge scale: 0 - {maxSpeed} Mbps • Visual updates every 2 seconds
+            Gauge scale: 0 - {maxSpeed} Mbps • Animated decay over 5 seconds
           </p>
         </CardContent>
       </Card>
