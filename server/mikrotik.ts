@@ -950,4 +950,64 @@ export class MikrotikClient {
       return [];
     }
   }
+
+  async getIpAddresses(interfaceName: string): Promise<Array<{ address: string; network: string; interface: string }>> {
+    let api: RouterOSAPI | null = null;
+
+    try {
+      // Try Native API first
+      api = new RouterOSAPI({
+        host: this.connection.host,
+        user: this.connection.user,
+        password: this.connection.password,
+        port: this.connection.port,
+        timeout: 10,
+      });
+
+      await api.connect();
+      const addresses = await api.write("/ip/address/print");
+      await api.close();
+
+      if (Array.isArray(addresses)) {
+        return addresses
+          .filter((addr: any) => addr.interface === interfaceName)
+          .map((addr: any) => ({
+            address: addr.address || "",
+            network: addr.network || "",
+            interface: addr.interface || "",
+          }));
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error("Failed to get IP addresses via native API:", error);
+      if (api) {
+        try {
+          await api.close();
+        } catch (e) {
+          // Ignore close errors
+        }
+      }
+
+      // Try REST API if enabled
+      if (this.connection.restEnabled) {
+        try {
+          const addresses = await this.restRequestWithFallback('/rest/ip/address');
+          if (Array.isArray(addresses)) {
+            return addresses
+              .filter((addr: any) => addr.interface === interfaceName)
+              .map((addr: any) => ({
+                address: addr.address || "",
+                network: addr.network || "",
+                interface: addr.interface || "",
+              }));
+          }
+        } catch (restError) {
+          console.error("REST API failed for IP addresses:", restError);
+        }
+      }
+
+      return [];
+    }
+  }
 }

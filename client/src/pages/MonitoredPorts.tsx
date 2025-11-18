@@ -30,6 +30,7 @@ import { TablePaginationFooter } from "@/components/TablePaginationFooter";
 import { Loader2, Trash2, Save, X, Network, RefreshCw } from "lucide-react";
 import type { MonitoredPort, Router } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "wouter";
 
 type MonitoredPortWithRouter = MonitoredPort & { router: Router; ownerUsername?: string };
 
@@ -248,7 +249,11 @@ export default function MonitoredPorts() {
                     return (
                       <TableRow key={port.id} data-testid={`row-port-${port.id}`}>
                         <TableCell className="font-medium" data-testid={`text-port-name-${port.id}`}>
-                          {port.portName}
+                          <Link href={`/ports/${port.id}`}>
+                            <span className="text-primary hover:underline cursor-pointer">
+                              {port.portName}
+                            </span>
+                          </Link>
                         </TableCell>
                         <TableCell className="text-muted-foreground" data-testid={`text-port-comment-${port.id}`}>
                           <div className="flex flex-col gap-0.5">

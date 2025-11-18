@@ -110,6 +110,7 @@ export interface IStorage {
   getAlerts(userId: string): Promise<(Alert & { routerName: string })[]>;
   getAllAlerts(): Promise<Alert[]>;
   getAlertsByRouter(routerId: string): Promise<Alert[]>;
+  getAlertsForPort(portId: string): Promise<Alert[]>;
   getLatestAlertForPort(portId: string): Promise<Alert | undefined>;
   getLatestUnacknowledgedAlertForPort(portId: string): Promise<Alert | undefined>;
   getLatestUnacknowledgedRouterAlert(routerId: string): Promise<Alert | undefined>;
@@ -778,6 +779,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(alerts)
       .where(eq(alerts.routerId, routerId))
+      .orderBy(desc(alerts.createdAt));
+  }
+
+  async getAlertsForPort(portId: string): Promise<Alert[]> {
+    return db
+      .select()
+      .from(alerts)
+      .where(eq(alerts.portId, portId))
       .orderBy(desc(alerts.createdAt));
   }
 

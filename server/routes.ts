@@ -1066,6 +1066,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single monitored port with router info
+  app.get("/api/ports/:id", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const port = await storage.getMonitoredPort(req.params.id);
+      
+      if (!port) {
+        return res.status(404).json({ message: "Port not found" });
+      }
+      
+      const router = await storage.getRouter(port.routerId);
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      const userId = getUserId(req);
+      
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(port.routerId, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      res.json({ ...port, router });
+    } catch (error) {
+      console.error("Error fetching port:", error);
+      res.status(500).json({ message: "Failed to fetch port" });
+    }
+  });
+
+  // Get IP addresses for a monitored port
+  app.get("/api/ports/:id/ip-addresses", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const port = await storage.getMonitoredPort(req.params.id);
+      
+      if (!port) {
+        return res.status(404).json({ message: "Port not found" });
+      }
+      
+      const router = await storage.getRouter(port.routerId);
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      const userId = getUserId(req);
+      
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(port.routerId, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Fetch IP addresses from MikroTik router
+      try {
+        const { decryptPassword } = await import("./storage.js");
+        const decryptedPassword = decryptPassword(router.encryptedPassword);
+        
+        const client = new MikrotikClient({
+          host: router.cloudDdnsHostname || router.ipAddress,
+          user: router.username,
+          password: decryptedPassword,
+          port: router.port,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || 'public',
+          snmpPort: router.snmpPort || 161,
+          snmpVersion: (router.snmpVersion as '1' | '2c') || '2c',
+          interfaceDisplayMode: (router.interfaceDisplayMode as 'none' | 'static' | 'all') || 'static',
+        });
+        
+        const ipAddresses = await client.getIpAddresses(port.portName);
+        res.json(ipAddresses);
+      } catch (error: any) {
+        console.error("Error fetching IP addresses:", error);
+        // Return empty array if we can't fetch IPs
+        res.json([]);
+      }
+    } catch (error) {
+      console.error("Error fetching IP addresses:", error);
+      res.status(500).json({ message: "Failed to fetch IP addresses" });
+    }
+  });
+
+  // Get alerts for a monitored port
+  app.get("/api/ports/:id/alerts", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const port = await storage.getMonitoredPort(req.params.id);
+      
+      if (!port) {
+        return res.status(404).json({ message: "Port not found" });
+      }
+      
+      const router = await storage.getRouter(port.routerId);
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      const userId = getUserId(req);
+      
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(port.routerId, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Get all alerts for this port
+      const alerts = await storage.getAlertsForPort(port.id);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching port alerts:", error);
+      res.status(500).json({ message: "Failed to fetch port alerts" });
+    }
+  });
+
   // Traffic Data routes
   // Real-time traffic data (from in-memory store) - for current/recent viewing
   app.get("/api/routers/:id/traffic/realtime", isAuthenticated, isEnabled, async (req: any, res) => {
@@ -1166,12 +1280,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           case "30d":
             since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
             break;
+          case "365d":
+          case "1y":
+            since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+            break;
           default:
             since = new Date(Date.now() - 60 * 60 * 1000);
         }
       }
       
-      const trafficData = await storage.getRecentTraffic(req.params.id, since, until);
+      let trafficData = await storage.getRecentTraffic(req.params.id, since, until);
+      
+      // Filter by port name if provided
+      if (req.query.portName) {
+        trafficData = trafficData.filter(d => d.portName === req.query.portName);
+      }
+      
       res.json(trafficData);
     } catch (error) {
       console.error("Error fetching traffic data:", error);

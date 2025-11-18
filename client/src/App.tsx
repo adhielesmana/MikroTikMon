@@ -13,6 +13,7 @@ import Dashboard from "@/pages/Dashboard";
 import Routers from "@/pages/Routers";
 import RouterDetails from "@/pages/RouterDetails";
 import MonitoredPorts from "@/pages/MonitoredPorts";
+import PortDetails from "@/pages/PortDetails";
 import GraphHistory from "@/pages/GraphHistory";
 import Alerts from "@/pages/Alerts";
 import Settings from "@/pages/Settings";
@@ -141,6 +142,13 @@ function Router() {
             {() => (
               <AuthenticatedLayout>
                 <MonitoredPorts />
+              </AuthenticatedLayout>
+            )}
+          </Route>
+          <Route path="/ports/:portId">
+            {() => (
+              <AuthenticatedLayout>
+                <PortDetails />
               </AuthenticatedLayout>
             )}
           </Route>
