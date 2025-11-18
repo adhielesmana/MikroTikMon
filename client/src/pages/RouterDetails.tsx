@@ -35,7 +35,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// Speedometer-style gauge with needle
+// Circular speedometer-style gauge with needle (like the reference image)
 const SpeedometerGauge = memo(({ 
   title, 
   speed, 
@@ -52,133 +52,175 @@ const SpeedometerGauge = memo(({
   isPaused?: boolean;
 }) => {
   const displayColor = isPaused ? '#6b7280' : color;
-  const textColor = isPaused ? 'text-gray-500' : (color === '#10b981' ? 'text-green-600' : 'text-blue-600');
   
-  // Calculate needle angle (180° = 0 Mbps, 0° = max Mbps)
+  // Calculate needle angle (270° = 0, goes clockwise)
   const percentage = Math.min(speed / maxSpeed, 1);
-  const angle = 180 - (percentage * 180); // 180° to 0°
+  const startAngle = 135; // Start at bottom-left
+  const angle = startAngle + (percentage * 270); // 270° range (3/4 circle)
   
   // SVG dimensions
-  const size = 200;
+  const size = 220;
   const centerX = size / 2;
   const centerY = size / 2;
-  const radius = size / 2 - 20;
-  const needleLength = radius - 10;
+  const radius = 75;
+  const needleLength = radius - 5;
   
   // Calculate needle endpoint
   const needleAngleRad = (angle * Math.PI) / 180;
-  const needleX = centerX + needleLength * Math.cos(needleAngleRad - Math.PI / 2);
-  const needleY = centerY + needleLength * Math.sin(needleAngleRad - Math.PI / 2);
+  const needleX = centerX + needleLength * Math.cos(needleAngleRad);
+  const needleY = centerY + needleLength * Math.sin(needleAngleRad);
   
-  // Generate tick marks (11 ticks: 0%, 10%, 20%, ..., 100%)
-  const ticks = Array.from({ length: 11 }, (_, i) => {
-    const tickAngle = 180 - (i * 18); // 180° to 0°, every 18°
+  // Tick positions: 0, 1, 5, 10, 20, 30, 50, 75, 100
+  const tickValues = [0, 1, 5, 10, 20, 30, 50, 75, 100];
+  const ticks = tickValues.map(value => {
+    const tickPercentage = value / 100;
+    const tickAngle = startAngle + (tickPercentage * 270);
     const tickAngleRad = (tickAngle * Math.PI) / 180;
-    const tickValue = (maxSpeed * i) / 10;
-    const isMajor = i % 2 === 0; // Major ticks at 0%, 20%, 40%, etc.
-    const tickRadius = radius + (isMajor ? 10 : 5);
-    const tickStartRadius = radius - 5;
+    const actualValue = (maxSpeed * value) / 100;
     
-    const x1 = centerX + tickStartRadius * Math.cos(tickAngleRad - Math.PI / 2);
-    const y1 = centerY + tickStartRadius * Math.sin(tickAngleRad - Math.PI / 2);
-    const x2 = centerX + tickRadius * Math.cos(tickAngleRad - Math.PI / 2);
-    const y2 = centerY + tickRadius * Math.sin(tickAngleRad - Math.PI / 2);
+    // Tick mark positions
+    const tickOuterRadius = radius + 8;
+    const tickInnerRadius = radius - 2;
+    const x1 = centerX + tickInnerRadius * Math.cos(tickAngleRad);
+    const y1 = centerY + tickInnerRadius * Math.sin(tickAngleRad);
+    const x2 = centerX + tickOuterRadius * Math.cos(tickAngleRad);
+    const y2 = centerY + tickOuterRadius * Math.sin(tickAngleRad);
     
-    // Label position (only for major ticks)
-    const labelRadius = radius + 25;
-    const labelX = centerX + labelRadius * Math.cos(tickAngleRad - Math.PI / 2);
-    const labelY = centerY + labelRadius * Math.sin(tickAngleRad - Math.PI / 2);
+    // Label position
+    const labelRadius = radius + 22;
+    const labelX = centerX + labelRadius * Math.cos(tickAngleRad);
+    const labelY = centerY + labelRadius * Math.sin(tickAngleRad);
     
-    return { x1, y1, x2, y2, labelX, labelY, tickValue, isMajor };
+    return { x1, y1, x2, y2, labelX, labelY, actualValue, displayValue: value };
   });
+  
+  // Create SVG path for the colored arc
+  const createArc = (startAngle: number, endAngle: number, radius: number) => {
+    const start = (startAngle * Math.PI) / 180;
+    const end = (endAngle * Math.PI) / 180;
+    const x1 = centerX + radius * Math.cos(start);
+    const y1 = centerY + radius * Math.sin(start);
+    const x2 = centerX + radius * Math.cos(end);
+    const y2 = centerY + radius * Math.sin(end);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+    return `M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`;
+  };
+  
+  const backgroundArc = createArc(startAngle, startAngle + 270, radius);
+  const filledArc = createArc(startAngle, angle, radius);
   
   return (
     <Card className={isPaused ? 'opacity-60' : ''}>
-      <CardHeader>
-        <CardTitle className="text-center text-lg">{title}</CardTitle>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-center text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <svg width="100%" height={size} viewBox={`0 0 ${size} ${size}`} className="overflow-visible">
-          {/* Gauge arc background */}
-          <path
-            d={`M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}`}
-            fill="none"
-            stroke="hsl(var(--muted))"
-            strokeWidth="12"
-            strokeLinecap="round"
-          />
-          
-          {/* Colored arc (showing current value) */}
-          <path
-            d={`M ${centerX - radius} ${centerY} A ${radius} ${radius} 0 0 1 ${centerX + radius} ${centerY}`}
-            fill="none"
-            stroke={displayColor}
-            strokeWidth="12"
-            strokeLinecap="round"
-            strokeDasharray={`${percentage * Math.PI * radius} ${Math.PI * radius}`}
-            style={{ transition: 'stroke-dasharray 0.3s ease' }}
-          />
-          
-          {/* Tick marks */}
-          {ticks.map((tick, i) => (
-            <g key={i}>
-              <line
-                x1={tick.x1}
-                y1={tick.y1}
-                x2={tick.x2}
-                y2={tick.y2}
-                stroke="hsl(var(--foreground))"
-                strokeWidth={tick.isMajor ? 2 : 1}
-                opacity={tick.isMajor ? 0.6 : 0.3}
-              />
-              {tick.isMajor && (
+      <CardContent className="flex items-center justify-center">
+        <div className="relative">
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            {/* Dark background circle */}
+            <circle
+              cx={centerX}
+              cy={centerY}
+              r={radius + 15}
+              fill="hsl(var(--muted) / 0.2)"
+              className="dark:fill-black/40"
+            />
+            
+            {/* Background arc (gray) */}
+            <path
+              d={backgroundArc}
+              fill="none"
+              stroke="hsl(var(--muted))"
+              strokeWidth="10"
+              strokeLinecap="round"
+              opacity="0.3"
+            />
+            
+            {/* Colored arc (showing current value) */}
+            <path
+              d={filledArc}
+              fill="none"
+              stroke={displayColor}
+              strokeWidth="10"
+              strokeLinecap="round"
+              style={{ transition: 'all 0.3s ease' }}
+            />
+            
+            {/* Tick marks and labels */}
+            {ticks.map((tick, i) => (
+              <g key={i}>
+                <circle
+                  cx={tick.x2}
+                  cy={tick.y2}
+                  r="2"
+                  fill="hsl(var(--foreground))"
+                  opacity="0.5"
+                />
                 <text
                   x={tick.labelX}
                   y={tick.labelY}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  className="text-[10px] fill-muted-foreground font-medium"
+                  className="text-[9px] fill-muted-foreground font-medium"
                 >
-                  {tick.tickValue.toFixed(0)}
+                  {tick.displayValue}
                 </text>
-              )}
-            </g>
-          ))}
-          
-          {/* Needle */}
-          <g style={{ transition: 'transform 0.3s ease', transformOrigin: `${centerX}px ${centerY}px` }}>
+              </g>
+            ))}
+            
+            {/* Center value display */}
+            <text
+              x={centerX}
+              y={centerY - 5}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="text-3xl font-bold"
+              fill={displayColor}
+              data-testid={testId}
+            >
+              {Math.round(speed)}
+            </text>
+            <text
+              x={centerX}
+              y={centerY + 15}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="text-xs fill-muted-foreground"
+            >
+              Mbps
+            </text>
+            
+            {/* Needle */}
             <line
               x1={centerX}
               y1={centerY}
               x2={needleX}
               y2={needleY}
-              stroke={displayColor}
+              stroke="hsl(var(--background))"
               strokeWidth="3"
               strokeLinecap="round"
+              style={{ 
+                transition: 'all 0.3s ease',
+                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))'
+              }}
             />
-            {/* Needle center dot */}
+            
+            {/* Center hub */}
             <circle
               cx={centerX}
               cy={centerY}
-              r="6"
-              fill={displayColor}
+              r="8"
+              fill="hsl(var(--background))"
+              stroke={displayColor}
+              strokeWidth="2"
             />
             <circle
               cx={centerX}
               cy={centerY}
               r="3"
-              fill="hsl(var(--background))"
+              fill={displayColor}
             />
-          </g>
-        </svg>
-        
-        <div className="text-center mt-2">
-          <div className={`text-4xl font-bold ${textColor}`} data-testid={testId}>
-            {speed.toFixed(2)}
-          </div>
-          <div className="text-sm text-muted-foreground">
-            Mbps
-          </div>
+          </svg>
         </div>
       </CardContent>
     </Card>
