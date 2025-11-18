@@ -104,6 +104,48 @@ export const userRouters = pgTable("user_routers", {
   index("idx_user_routers_router").on(table.routerId),
 ]);
 
+// Router IP Addresses table - Caches all IP addresses from each router
+export const routerIpAddresses = pgTable("router_ip_addresses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
+  address: varchar("address", { length: 255 }).notNull(), // IP address with CIDR notation (e.g., 192.168.1.1/24)
+  network: varchar("network", { length: 255 }).notNull(), // Network address (e.g., 192.168.1.0/24)
+  interfaceName: varchar("interface_name", { length: 255 }).notNull(), // Interface this IP is assigned to
+  disabled: boolean("disabled").notNull().default(false),
+  lastSeen: timestamp("last_seen").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique().on(table.routerId, table.address, table.interfaceName),
+  index("idx_router_ip_addresses_router").on(table.routerId),
+]);
+
+export type RouterIpAddress = typeof routerIpAddresses.$inferSelect;
+export type InsertRouterIpAddress = typeof routerIpAddresses.$inferInsert;
+
+// Router Routes table - Caches routing table from each router
+export const routerRoutes = pgTable("router_routes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  routerId: varchar("router_id").notNull().references(() => routers.id, { onDelete: "cascade" }),
+  dstAddress: varchar("dst_address", { length: 255 }).notNull(), // Destination network (e.g., 0.0.0.0/0, 192.168.1.0/24)
+  gateway: varchar("gateway", { length: 255 }).notNull(), // Gateway IP or interface name
+  distance: varchar("distance", { length: 10 }).notNull().default("1"), // Administrative distance
+  scope: varchar("scope", { length: 10 }), // Route scope
+  targetScope: varchar("target_scope", { length: 10 }), // Target scope
+  disabled: boolean("disabled").notNull().default(false),
+  dynamic: boolean("dynamic").notNull().default(false), // Dynamic route (learned via routing protocol)
+  active: boolean("active").notNull().default(true), // Route is active in routing table
+  lastSeen: timestamp("last_seen").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique().on(table.routerId, table.dstAddress, table.gateway),
+  index("idx_router_routes_router").on(table.routerId),
+]);
+
+export type RouterRoute = typeof routerRoutes.$inferSelect;
+export type InsertRouterRoute = typeof routerRoutes.$inferInsert;
+
 // Relations - Defined after all tables
 export const routerGroupsRelations = relations(routerGroups, ({ one, many }) => ({
   user: one(users, {
