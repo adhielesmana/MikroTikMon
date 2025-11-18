@@ -71,7 +71,7 @@ const SpeedometerGauge = memo(({
   const needleY = centerY + needleLength * Math.sin(needleAngleRad);
   
   // Calculate perpendicular points for wider base at center
-  const baseWidth = 6; // Width of needle base
+  const baseWidth = 18; // Width of needle base (tripled)
   const perpAngle = needleAngleRad + Math.PI / 2;
   const base1X = centerX + baseWidth * Math.cos(perpAngle);
   const base1Y = centerY + baseWidth * Math.sin(perpAngle);
@@ -209,19 +209,27 @@ const SpeedometerGauge = memo(({
               />
             </g>
             
-            {/* Center hub */}
+            {/* Center hub (tripled size with enhanced styling) */}
             <circle
               cx={centerX}
               cy={centerY}
-              r="8"
+              r="24"
               fill="hsl(var(--background))"
               stroke={displayColor}
-              strokeWidth="2"
+              strokeWidth="3"
+              style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))' }}
             />
             <circle
               cx={centerX}
               cy={centerY}
-              r="3"
+              r="12"
+              fill={displayColor}
+              opacity="0.2"
+            />
+            <circle
+              cx={centerX}
+              cy={centerY}
+              r="6"
               fill={displayColor}
             />
           </svg>
