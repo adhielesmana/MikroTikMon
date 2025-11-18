@@ -3,7 +3,8 @@ import { useParams, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Activity, Server, Pencil, Trash2, Network, MapPin } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Activity, Server, Pencil, Trash2, Network, MapPin, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import type { Router, MonitoredPort, TrafficData } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -103,6 +104,16 @@ export default function RouterDetails() {
   const [realtimeTrafficData, setRealtimeTrafficData] = useState<TrafficData[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
+  // Search and sort states for IP addresses
+  const [ipSearchQuery, setIpSearchQuery] = useState("");
+  const [ipSortField, setIpSortField] = useState<"address" | "interface" | null>(null);
+  const [ipSortDirection, setIpSortDirection] = useState<"asc" | "desc">("asc");
+
+  // Search and sort states for routes
+  const [routeSearchQuery, setRouteSearchQuery] = useState("");
+  const [routeSortField, setRouteSortField] = useState<"destination" | "gateway" | null>(null);
+  const [routeSortDirection, setRouteSortDirection] = useState<"asc" | "desc">("asc");
+
   const { data: router, isLoading: loadingRouter } = useQuery<Router>({
     queryKey: ["/api/routers", id],
     enabled: !!id,
@@ -149,29 +160,127 @@ export default function RouterDetails() {
     enabled: !!id,
   });
 
+  // Filter and sort IP addresses
+  const filteredAndSortedIpAddresses = useMemo(() => {
+    if (!ipAddresses) return [];
+    
+    let filtered = ipAddresses;
+    
+    // Apply search filter
+    if (ipSearchQuery) {
+      const query = ipSearchQuery.toLowerCase();
+      filtered = filtered.filter(ip => 
+        ip.address.toLowerCase().includes(query) || 
+        ip.interface.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply sorting
+    if (ipSortField) {
+      filtered = [...filtered].sort((a, b) => {
+        let aVal: string, bVal: string;
+        
+        if (ipSortField === "address") {
+          aVal = a.address;
+          bVal = b.address;
+        } else {
+          aVal = a.interface;
+          bVal = b.interface;
+        }
+        
+        const comparison = aVal.localeCompare(bVal);
+        return ipSortDirection === "asc" ? comparison : -comparison;
+      });
+    }
+    
+    return filtered;
+  }, [ipAddresses, ipSearchQuery, ipSortField, ipSortDirection]);
+
+  // Filter and sort routes
+  const filteredAndSortedRoutes = useMemo(() => {
+    if (!routes) return [];
+    
+    let filtered = routes;
+    
+    // Apply search filter (destination only)
+    if (routeSearchQuery) {
+      const query = routeSearchQuery.toLowerCase();
+      filtered = filtered.filter(route => 
+        route.dstAddress.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply sorting
+    if (routeSortField) {
+      filtered = [...filtered].sort((a, b) => {
+        let aVal: string, bVal: string;
+        
+        if (routeSortField === "destination") {
+          aVal = a.dstAddress;
+          bVal = b.dstAddress;
+        } else {
+          aVal = a.gateway;
+          bVal = b.gateway;
+        }
+        
+        const comparison = aVal.localeCompare(bVal);
+        return routeSortDirection === "asc" ? comparison : -comparison;
+      });
+    }
+    
+    return filtered;
+  }, [routes, routeSearchQuery, routeSortField, routeSortDirection]);
+
   // Pagination for IP addresses
   const ipPagination = usePagination({
-    totalItems: ipAddresses?.length || 0,
+    totalItems: filteredAndSortedIpAddresses.length,
     initialPageSize: 5,
     storageKey: 'router-ip-addresses',
   });
 
   // Pagination for routes
   const routesPagination = usePagination({
-    totalItems: routes?.length || 0,
+    totalItems: filteredAndSortedRoutes.length,
     initialPageSize: 5,
     storageKey: 'router-routes',
   });
 
   const paginatedIpAddresses = useMemo(() => {
-    if (!ipAddresses) return [];
-    return ipPagination.paginateItems(ipAddresses);
-  }, [ipAddresses, ipPagination.currentPage, ipPagination.pageSize]);
+    return ipPagination.paginateItems(filteredAndSortedIpAddresses);
+  }, [filteredAndSortedIpAddresses, ipPagination.currentPage, ipPagination.pageSize]);
 
   const paginatedRoutes = useMemo(() => {
-    if (!routes) return [];
-    return routesPagination.paginateItems(routes);
-  }, [routes, routesPagination.currentPage, routesPagination.pageSize]);
+    return routesPagination.paginateItems(filteredAndSortedRoutes);
+  }, [filteredAndSortedRoutes, routesPagination.currentPage, routesPagination.pageSize]);
+
+  // Reset pagination when search/sort changes
+  useEffect(() => {
+    ipPagination.setCurrentPage(1);
+  }, [ipSearchQuery, ipSortField, ipSortDirection]);
+
+  useEffect(() => {
+    routesPagination.setCurrentPage(1);
+  }, [routeSearchQuery, routeSortField, routeSortDirection]);
+
+  // Sort handlers for IP addresses
+  const handleIpSort = (field: "address" | "interface") => {
+    if (ipSortField === field) {
+      setIpSortDirection(ipSortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setIpSortField(field);
+      setIpSortDirection("asc");
+    }
+  };
+
+  // Sort handlers for routes
+  const handleRouteSort = (field: "destination" | "gateway") => {
+    if (routeSortField === field) {
+      setRouteSortDirection(routeSortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setRouteSortField(field);
+      setRouteSortDirection("asc");
+    }
+  };
 
   // Auto-select first monitored port or first interface
   useEffect(() => {
@@ -548,13 +657,27 @@ export default function RouterDetails() {
       {/* IP Addresses Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Network className="h-5 w-5" />
-            IP Addresses
-          </CardTitle>
-          <CardDescription>
-            All IP addresses configured on this router
-          </CardDescription>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Network className="h-5 w-5" />
+                IP Addresses
+              </CardTitle>
+              <CardDescription>
+                All IP addresses configured on this router
+              </CardDescription>
+            </div>
+            <div className="relative w-64">
+              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by address or interface..."
+                value={ipSearchQuery}
+                onChange={(e) => setIpSearchQuery(e.target.value)}
+                className="pl-8"
+                data-testid="input-ip-search"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loadingIpAddresses ? (
@@ -567,30 +690,64 @@ export default function RouterDetails() {
             <div className="text-center py-8 text-muted-foreground">
               No IP addresses found on this router.
             </div>
+          ) : filteredAndSortedIpAddresses.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No IP addresses match your search.
+            </div>
           ) : (
             <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Address</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleIpSort("address")}
+                        className="h-8 gap-1"
+                        data-testid="button-sort-ip-address"
+                      >
+                        Address
+                        {ipSortField === "address" ? (
+                          ipSortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                        )}
+                      </Button>
+                    </TableHead>
                     <TableHead>Network</TableHead>
-                    <TableHead>Interface</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleIpSort("interface")}
+                        className="h-8 gap-1"
+                        data-testid="button-sort-ip-interface"
+                      >
+                        Interface
+                        {ipSortField === "interface" ? (
+                          ipSortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                        )}
+                      </Button>
+                    </TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedIpAddresses.map((ip, index) => (
                     <TableRow key={`${ip.interface}-${ip.address}-${index}`} data-testid={`row-ip-${index}`}>
-                      <TableCell className="font-mono" data-testid={`text-ip-address-${index}`}>
+                      <TableCell className="font-mono whitespace-nowrap" data-testid={`text-ip-address-${index}`}>
                         {ip.address}
                       </TableCell>
-                      <TableCell className="font-mono" data-testid={`text-ip-network-${index}`}>
+                      <TableCell className="font-mono whitespace-nowrap" data-testid={`text-ip-network-${index}`}>
                         {ip.network}
                       </TableCell>
-                      <TableCell data-testid={`text-ip-interface-${index}`}>
+                      <TableCell className="whitespace-nowrap" data-testid={`text-ip-interface-${index}`}>
                         {ip.interface}
                       </TableCell>
-                      <TableCell data-testid={`text-ip-status-${index}`}>
+                      <TableCell className="whitespace-nowrap" data-testid={`text-ip-status-${index}`}>
                         <Badge variant={ip.disabled ? "secondary" : "default"}>
                           {ip.disabled ? "Disabled" : "Enabled"}
                         </Badge>
@@ -606,7 +763,7 @@ export default function RouterDetails() {
                 onPageChange={ipPagination.setCurrentPage}
                 onPageSizeChange={ipPagination.setPageSize}
                 itemRange={ipPagination.itemRange}
-                totalItems={ipAddresses.length}
+                totalItems={filteredAndSortedIpAddresses.length}
               />
             </>
           )}
@@ -616,13 +773,27 @@ export default function RouterDetails() {
       {/* Routing Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Routing Table
-          </CardTitle>
-          <CardDescription>
-            All routes configured on this router
-          </CardDescription>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Routing Table
+              </CardTitle>
+              <CardDescription>
+                All routes configured on this router
+              </CardDescription>
+            </div>
+            <div className="relative w-64">
+              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by destination..."
+                value={routeSearchQuery}
+                onChange={(e) => setRouteSearchQuery(e.target.value)}
+                className="pl-8"
+                data-testid="input-route-search"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loadingRoutes ? (
@@ -635,13 +806,47 @@ export default function RouterDetails() {
             <div className="text-center py-8 text-muted-foreground">
               No routes found on this router.
             </div>
+          ) : filteredAndSortedRoutes.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No routes match your search.
+            </div>
           ) : (
             <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Destination</TableHead>
-                    <TableHead>Gateway</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRouteSort("destination")}
+                        className="h-8 gap-1"
+                        data-testid="button-sort-route-destination"
+                      >
+                        Destination
+                        {routeSortField === "destination" ? (
+                          routeSortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                        )}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRouteSort("gateway")}
+                        className="h-8 gap-1"
+                        data-testid="button-sort-route-gateway"
+                      >
+                        Gateway
+                        {routeSortField === "gateway" ? (
+                          routeSortDirection === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-50" />
+                        )}
+                      </Button>
+                    </TableHead>
                     <TableHead>Distance</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -649,17 +854,17 @@ export default function RouterDetails() {
                 <TableBody>
                   {paginatedRoutes.map((route, index) => (
                     <TableRow key={`${route.dstAddress}-${route.gateway}-${index}`} data-testid={`row-route-${index}`}>
-                      <TableCell className="font-mono" data-testid={`text-route-dst-${index}`}>
+                      <TableCell className="font-mono whitespace-nowrap" data-testid={`text-route-dst-${index}`}>
                         {route.dstAddress}
                       </TableCell>
-                      <TableCell className="font-mono" data-testid={`text-route-gateway-${index}`}>
+                      <TableCell className="font-mono whitespace-nowrap" data-testid={`text-route-gateway-${index}`}>
                         {route.gateway}
                       </TableCell>
-                      <TableCell data-testid={`text-route-distance-${index}`}>
+                      <TableCell className="whitespace-nowrap" data-testid={`text-route-distance-${index}`}>
                         {route.distance}
                       </TableCell>
-                      <TableCell data-testid={`text-route-status-${index}`}>
-                        <div className="flex gap-1">
+                      <TableCell className="whitespace-nowrap" data-testid={`text-route-status-${index}`}>
+                        <div className="flex gap-1 flex-wrap">
                           {route.active && <Badge variant="default">Active</Badge>}
                           {route.dynamic && <Badge variant="secondary">Dynamic</Badge>}
                           {route.disabled && <Badge variant="outline">Disabled</Badge>}
@@ -676,7 +881,7 @@ export default function RouterDetails() {
                 onPageChange={routesPagination.setCurrentPage}
                 onPageSizeChange={routesPagination.setPageSize}
                 itemRange={routesPagination.itemRange}
-                totalItems={routes.length}
+                totalItems={filteredAndSortedRoutes.length}
               />
             </>
           )}
