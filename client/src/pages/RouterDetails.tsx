@@ -330,7 +330,9 @@ export default function RouterDetails() {
       try {
         const message = JSON.parse(event.data);
         
+        // Handle different message types
         if (message.type === "realtime_traffic" && message.routerId === id && isSubscribed) {
+          // Update traffic data and poll count (only if not paused)
           setRealtimeTrafficData(message.data);
           if (message.pollCount !== undefined) {
             setPollCount(message.pollCount);
@@ -340,10 +342,12 @@ export default function RouterDetails() {
           setIsPollingPaused(false);
           setPollCount(0);
         } else if (message.type === "realtime_polling_paused" && message.routerId === id) {
+          // Set paused state - this takes precedence
           setIsPollingPaused(true);
+          setPollCount(100); // Ensure counter shows 100
           toast({
             title: "Real-time polling paused",
-            description: "Polling paused after 100 updates to reduce server load. Click refresh to continue.",
+            description: "Polling paused after 100 updates to reduce server load. Click 'Resume Monitoring' to continue.",
             variant: "default",
           });
         } else if (message.type === "realtime_polling_restarted" && message.routerId === id) {
