@@ -71,7 +71,7 @@ const SpeedometerGauge = memo(({
   const needleY = centerY + needleLength * Math.sin(needleAngleRad);
   
   // Calculate perpendicular points for wider base at center
-  const baseWidth = 6; // Width of needle base
+  const baseWidth = 18; // Width of needle base (tripled from 6 to 18)
   const perpAngle = needleAngleRad + Math.PI / 2;
   const base1X = centerX + baseWidth * Math.cos(perpAngle);
   const base1Y = centerY + baseWidth * Math.sin(perpAngle);
