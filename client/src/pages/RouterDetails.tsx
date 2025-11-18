@@ -94,8 +94,8 @@ const SpeedometerGauge = memo(({
     const x2 = centerX + tickOuterRadius * Math.cos(tickAngleRad);
     const y2 = centerY + tickOuterRadius * Math.sin(tickAngleRad);
     
-    // Label position inside the circle
-    const labelRadius = radius - 20;
+    // Label position right on the tick mark
+    const labelRadius = radius + 8; // Same as tickOuterRadius
     const labelX = centerX + labelRadius * Math.cos(tickAngleRad);
     const labelY = centerY + labelRadius * Math.sin(tickAngleRad);
     
@@ -156,16 +156,9 @@ const SpeedometerGauge = memo(({
               style={{ transition: 'all 0.3s ease' }}
             />
             
-            {/* Tick marks and labels */}
+            {/* Tick labels (dots removed, labels only) */}
             {ticks.map((tick, i) => (
               <g key={i}>
-                <circle
-                  cx={tick.x2}
-                  cy={tick.y2}
-                  r="2"
-                  fill="hsl(var(--foreground))"
-                  opacity="0.5"
-                />
                 <text
                   x={tick.labelX}
                   y={tick.labelY}
