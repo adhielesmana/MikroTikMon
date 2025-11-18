@@ -5,9 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablePaginationFooter } from "@/components/TablePaginationFooter";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { ArrowLeft, Network, Server, Activity, Bell, Globe, Calendar, AlertTriangle } from "lucide-react";
-import { format, subDays, subMonths, subYears } from "date-fns";
+import { ArrowLeft, Network, Server, Activity, Bell, Globe, Calendar, AlertTriangle, History } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { usePagination } from "@/hooks/usePagination";
 import type { MonitoredPort, Router, Alert } from "@shared/schema";
 
 type MonitoredPortWithRouter = MonitoredPort & { router: Router };
@@ -104,6 +107,12 @@ export default function PortDetails() {
   // Get active alerts count
   const activeAlertsCount = alerts?.filter(a => !a.acknowledgedAt).length || 0;
   const totalAlertsCount = alerts?.length || 0;
+
+  // Pagination for alerts table
+  const { paginatedItems: paginatedAlerts, ...alertsPagination } = usePagination(
+    alerts || [],
+    5
+  );
 
   if (loadingPort) {
     return (
@@ -414,6 +423,79 @@ export default function PortDetails() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Alert History Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Alert History
+          </CardTitle>
+          <CardDescription>
+            Historical alerts for this interface ({totalAlertsCount} total)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!alerts || alerts.length === 0 ? (
+            <div className="text-center py-8">
+              <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-sm text-muted-foreground">No alerts for this interface</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Message</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Acknowledged</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedAlerts.map((alert) => (
+                      <TableRow key={alert.id} data-testid={`row-alert-${alert.id}`}>
+                        <TableCell className="whitespace-nowrap">
+                          <Badge variant={alert.type === "traffic" ? "default" : "destructive"}>
+                            {alert.type === "traffic" ? "Traffic" : "Connectivity"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-md">
+                          <p className="text-sm">{alert.message}</p>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true })}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {alert.acknowledgedAt ? (
+                            <Badge variant="secondary">Resolved</Badge>
+                          ) : (
+                            <Badge variant="destructive">Active</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                          {alert.acknowledgedAt
+                            ? formatDistanceToNow(new Date(alert.acknowledgedAt), { addSuffix: true })
+                            : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <TablePaginationFooter
+                currentPage={alertsPagination.currentPage}
+                totalPages={alertsPagination.totalPages}
+                onPageChange={alertsPagination.goToPage}
+                itemsPerPage={5}
+                totalItems={alerts.length}
+              />
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
