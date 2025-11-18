@@ -132,7 +132,8 @@ export default function RouterDetails() {
   }>>({
     queryKey: [`/api/routers/${id}/ip-addresses`],
     enabled: !!id,
-    staleTime: 60000, // 1 minute
+    staleTime: 30000, // 30 seconds
+    refetchOnMount: true, // Always refetch on mount to get latest data
   });
 
   // Fetch routing table for router
@@ -148,7 +149,8 @@ export default function RouterDetails() {
   }>>({
     queryKey: [`/api/routers/${id}/routes`],
     enabled: !!id,
-    staleTime: 60000, // 1 minute
+    staleTime: 30000, // 30 seconds
+    refetchOnMount: true, // Always refetch on mount to get latest data
   });
 
   // Pagination for IP addresses
