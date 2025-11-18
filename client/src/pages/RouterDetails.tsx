@@ -125,13 +125,16 @@ const SpeedometerGauge = memo(({
       <CardContent className="flex items-center justify-center">
         <div className="relative">
           <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-            {/* Dark background circle */}
+            {/* Dark background circle with colored border */}
             <circle
               cx={centerX}
               cy={centerY}
               r={radius + 15}
               fill="hsl(var(--muted) / 0.2)"
               className="dark:fill-black/40"
+              stroke={displayColor}
+              strokeWidth="2"
+              opacity="0.6"
             />
             
             {/* Background arc (gray) */}
