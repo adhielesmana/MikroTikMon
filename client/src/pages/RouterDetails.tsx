@@ -3,9 +3,11 @@ import { useParams, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Activity, Server, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Activity, Server, Pencil, Trash2, Network, MapPin } from "lucide-react";
 import type { Router, MonitoredPort, TrafficData } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TablePaginationFooter } from "@/components/TablePaginationFooter";
 import { formatBytesPerSecond, formatRelativeTime } from "@/lib/utils";
 import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from "recharts";
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from "react";
@@ -13,6 +15,7 @@ import { AddPortDialog } from "@/components/AddPortDialog";
 import { AddRouterDialog } from "@/components/AddRouterDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePagination } from "@/hooks/usePagination";
 import {
   Select,
   SelectContent,
@@ -119,6 +122,58 @@ export default function RouterDetails() {
   });
   
   const allInterfaces = interfacesData?.interfaces || [];
+
+  // Fetch IP addresses for router
+  const { data: ipAddresses, isLoading: loadingIpAddresses } = useQuery<Array<{
+    address: string;
+    network: string;
+    interface: string;
+    disabled: boolean;
+  }>>({
+    queryKey: [`/api/routers/${id}/ip-addresses`],
+    enabled: !!id,
+    staleTime: 60000, // 1 minute
+  });
+
+  // Fetch routing table for router
+  const { data: routes, isLoading: loadingRoutes } = useQuery<Array<{
+    dstAddress: string;
+    gateway: string;
+    distance: string;
+    scope: string;
+    targetScope: string;
+    disabled: boolean;
+    dynamic: boolean;
+    active: boolean;
+  }>>({
+    queryKey: [`/api/routers/${id}/routes`],
+    enabled: !!id,
+    staleTime: 60000, // 1 minute
+  });
+
+  // Pagination for IP addresses
+  const ipPagination = usePagination({
+    totalItems: ipAddresses?.length || 0,
+    initialPageSize: 5,
+    storageKey: 'router-ip-addresses',
+  });
+
+  // Pagination for routes
+  const routesPagination = usePagination({
+    totalItems: routes?.length || 0,
+    initialPageSize: 5,
+    storageKey: 'router-routes',
+  });
+
+  const paginatedIpAddresses = useMemo(() => {
+    if (!ipAddresses) return [];
+    return ipPagination.paginateItems(ipAddresses);
+  }, [ipAddresses, ipPagination.currentPage, ipPagination.pageSize]);
+
+  const paginatedRoutes = useMemo(() => {
+    if (!routes) return [];
+    return routesPagination.paginateItems(routes);
+  }, [routes, routesPagination.currentPage, routesPagination.pageSize]);
 
   // Auto-select first monitored port or first interface
   useEffect(() => {
@@ -489,6 +544,144 @@ export default function RouterDetails() {
           <p className="text-xs text-muted-foreground text-center">
             Gauge scale: 0 - {maxSpeed} Mbps • Visual updates every 2 seconds
           </p>
+        </CardContent>
+      </Card>
+
+      {/* IP Addresses Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Network className="h-5 w-5" />
+            IP Addresses
+          </CardTitle>
+          <CardDescription>
+            All IP addresses configured on this router
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingIpAddresses ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : !ipAddresses || ipAddresses.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No IP addresses found on this router.
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Network</TableHead>
+                    <TableHead>Interface</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedIpAddresses.map((ip, index) => (
+                    <TableRow key={`${ip.interface}-${ip.address}-${index}`} data-testid={`row-ip-${index}`}>
+                      <TableCell className="font-mono" data-testid={`text-ip-address-${index}`}>
+                        {ip.address}
+                      </TableCell>
+                      <TableCell className="font-mono" data-testid={`text-ip-network-${index}`}>
+                        {ip.network}
+                      </TableCell>
+                      <TableCell data-testid={`text-ip-interface-${index}`}>
+                        {ip.interface}
+                      </TableCell>
+                      <TableCell data-testid={`text-ip-status-${index}`}>
+                        <Badge variant={ip.disabled ? "secondary" : "default"}>
+                          {ip.disabled ? "Disabled" : "Enabled"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePaginationFooter
+                currentPage={ipPagination.currentPage}
+                totalPages={ipPagination.totalPages}
+                pageSize={ipPagination.pageSize}
+                onPageChange={ipPagination.setCurrentPage}
+                onPageSizeChange={ipPagination.setPageSize}
+                itemRange={ipPagination.itemRange}
+                totalItems={ipAddresses.length}
+              />
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Routing Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Routing Table
+          </CardTitle>
+          <CardDescription>
+            All routes configured on this router
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingRoutes ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : !routes || routes.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No routes found on this router.
+            </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Destination</TableHead>
+                    <TableHead>Gateway</TableHead>
+                    <TableHead>Distance</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedRoutes.map((route, index) => (
+                    <TableRow key={`${route.dstAddress}-${route.gateway}-${index}`} data-testid={`row-route-${index}`}>
+                      <TableCell className="font-mono" data-testid={`text-route-dst-${index}`}>
+                        {route.dstAddress}
+                      </TableCell>
+                      <TableCell className="font-mono" data-testid={`text-route-gateway-${index}`}>
+                        {route.gateway}
+                      </TableCell>
+                      <TableCell data-testid={`text-route-distance-${index}`}>
+                        {route.distance}
+                      </TableCell>
+                      <TableCell data-testid={`text-route-status-${index}`}>
+                        <div className="flex gap-1">
+                          {route.active && <Badge variant="default">Active</Badge>}
+                          {route.dynamic && <Badge variant="secondary">Dynamic</Badge>}
+                          {route.disabled && <Badge variant="outline">Disabled</Badge>}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePaginationFooter
+                currentPage={routesPagination.currentPage}
+                totalPages={routesPagination.totalPages}
+                pageSize={routesPagination.pageSize}
+                onPageChange={routesPagination.setCurrentPage}
+                onPageSizeChange={routesPagination.setPageSize}
+                itemRange={routesPagination.itemRange}
+                totalItems={routes.length}
+              />
+            </>
+          )}
         </CardContent>
       </Card>
 

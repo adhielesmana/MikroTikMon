@@ -1010,4 +1010,137 @@ export class MikrotikClient {
       return [];
     }
   }
+
+  async getAllIpAddresses(): Promise<Array<{ address: string; network: string; interface: string; disabled: boolean }>> {
+    let api: RouterOSAPI | null = null;
+
+    try {
+      // Try Native API first
+      api = new RouterOSAPI({
+        host: this.connection.host,
+        user: this.connection.user,
+        password: this.connection.password,
+        port: this.connection.port,
+        timeout: 10,
+      });
+
+      await api.connect();
+      const addresses = await api.write("/ip/address/print");
+      await api.close();
+
+      if (Array.isArray(addresses)) {
+        return addresses.map((addr: any) => ({
+          address: addr.address || "",
+          network: addr.network || "",
+          interface: addr.interface || "",
+          disabled: addr.disabled === 'true' || addr.disabled === true || false,
+        }));
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error("Failed to get all IP addresses via native API:", error);
+      if (api) {
+        try {
+          await api.close();
+        } catch (e) {
+          // Ignore close errors
+        }
+      }
+
+      // Try REST API if enabled
+      if (this.connection.restEnabled) {
+        try {
+          const addresses = await this.restRequestWithFallback('/rest/ip/address');
+          if (Array.isArray(addresses)) {
+            return addresses.map((addr: any) => ({
+              address: addr.address || "",
+              network: addr.network || "",
+              interface: addr.interface || "",
+              disabled: addr.disabled === 'true' || addr.disabled === true || false,
+            }));
+          }
+        } catch (restError) {
+          console.error("REST API failed for all IP addresses:", restError);
+        }
+      }
+
+      return [];
+    }
+  }
+
+  async getRoutes(): Promise<Array<{ 
+    dstAddress: string; 
+    gateway: string; 
+    distance: string; 
+    scope: string;
+    targetScope: string;
+    disabled: boolean;
+    dynamic: boolean;
+    active: boolean;
+  }>> {
+    let api: RouterOSAPI | null = null;
+
+    try {
+      // Try Native API first
+      api = new RouterOSAPI({
+        host: this.connection.host,
+        user: this.connection.user,
+        password: this.connection.password,
+        port: this.connection.port,
+        timeout: 10,
+      });
+
+      await api.connect();
+      const routes = await api.write("/ip/route/print");
+      await api.close();
+
+      if (Array.isArray(routes)) {
+        return routes.map((route: any) => ({
+          dstAddress: route['dst-address'] || route.dstAddress || "0.0.0.0/0",
+          gateway: route.gateway || "",
+          distance: route.distance || "1",
+          scope: route.scope || "30",
+          targetScope: route['target-scope'] || route.targetScope || "10",
+          disabled: route.disabled === 'true' || route.disabled === true || false,
+          dynamic: route.dynamic === 'true' || route.dynamic === true || false,
+          active: route.active === 'true' || route.active === true || false,
+        }));
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error("Failed to get routes via native API:", error);
+      if (api) {
+        try {
+          await api.close();
+        } catch (e) {
+          // Ignore close errors
+        }
+      }
+
+      // Try REST API if enabled
+      if (this.connection.restEnabled) {
+        try {
+          const routes = await this.restRequestWithFallback('/rest/ip/route');
+          if (Array.isArray(routes)) {
+            return routes.map((route: any) => ({
+              dstAddress: route['dst-address'] || route.dstAddress || "0.0.0.0/0",
+              gateway: route.gateway || "",
+              distance: route.distance || "1",
+              scope: route.scope || "30",
+              targetScope: route['target-scope'] || route.targetScope || "10",
+              disabled: route.disabled === 'true' || route.disabled === true || false,
+              dynamic: route.dynamic === 'true' || route.dynamic === true || false,
+              active: route.active === 'true' || route.active === true || false,
+            }));
+          }
+        } catch (restError) {
+          console.error("REST API failed for routes:", restError);
+        }
+      }
+
+      return [];
+    }
+  }
 }

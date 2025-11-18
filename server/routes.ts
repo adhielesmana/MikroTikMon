@@ -1424,6 +1424,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all IP addresses for a router
+  app.get("/api/routers/:id/ip-addresses", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const router = await storage.getRouter(req.params.id);
+      
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Fetch IP addresses from MikroTik router
+      try {
+        const { decryptPassword } = await import("./storage.js");
+        const decryptedPassword = decryptPassword(router.encryptedPassword);
+        
+        const client = new MikrotikClient({
+          host: router.cloudDdnsHostname || router.ipAddress,
+          user: router.username,
+          password: decryptedPassword,
+          port: router.port,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || 'public',
+          snmpPort: router.snmpPort || 161,
+          snmpVersion: (router.snmpVersion as '1' | '2c') || '2c',
+          interfaceDisplayMode: (router.interfaceDisplayMode as 'none' | 'static' | 'all') || 'static',
+        });
+        
+        const ipAddresses = await client.getAllIpAddresses();
+        
+        // Generate ETag for HTTP caching
+        const etag = generateETag(ipAddresses);
+        res.setHeader('Cache-Control', 'private, max-age=60'); // Cache for 1 minute
+        res.setHeader('ETag', etag);
+        
+        // Return 304 if client has cached version
+        if (req.headers['if-none-match'] === etag) {
+          return res.status(304).end();
+        }
+        
+        res.json(ipAddresses);
+      } catch (error: any) {
+        console.error("Error fetching IP addresses:", error);
+        // Return empty array if we can't fetch IPs
+        res.json([]);
+      }
+    } catch (error) {
+      console.error("Error fetching IP addresses:", error);
+      res.status(500).json({ message: "Failed to fetch IP addresses" });
+    }
+  });
+
+  // Get routing table for a router
+  app.get("/api/routers/:id/routes", isAuthenticated, isEnabled, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const router = await storage.getRouter(req.params.id);
+      
+      if (!router) {
+        return res.status(404).json({ message: "Router not found" });
+      }
+      
+      // Check if user has access (owner, assigned user, or superadmin)
+      const hasAccess = await storage.canUserAccessRouter(req.params.id, userId);
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Fetch routes from MikroTik router
+      try {
+        const { decryptPassword } = await import("./storage.js");
+        const decryptedPassword = decryptPassword(router.encryptedPassword);
+        
+        const client = new MikrotikClient({
+          host: router.cloudDdnsHostname || router.ipAddress,
+          user: router.username,
+          password: decryptedPassword,
+          port: router.port,
+          restEnabled: router.restEnabled || false,
+          restPort: router.restPort || 443,
+          snmpEnabled: router.snmpEnabled || false,
+          snmpCommunity: router.snmpCommunity || 'public',
+          snmpPort: router.snmpPort || 161,
+          snmpVersion: (router.snmpVersion as '1' | '2c') || '2c',
+          interfaceDisplayMode: (router.interfaceDisplayMode as 'none' | 'static' | 'all') || 'static',
+        });
+        
+        const routes = await client.getRoutes();
+        
+        // Generate ETag for HTTP caching
+        const etag = generateETag(routes);
+        res.setHeader('Cache-Control', 'private, max-age=60'); // Cache for 1 minute
+        res.setHeader('ETag', etag);
+        
+        // Return 304 if client has cached version
+        if (req.headers['if-none-match'] === etag) {
+          return res.status(304).end();
+        }
+        
+        res.json(routes);
+      } catch (error: any) {
+        console.error("Error fetching routes:", error);
+        // Return empty array if we can't fetch routes
+        res.json([]);
+      }
+    } catch (error) {
+      console.error("Error fetching routes:", error);
+      res.status(500).json({ message: "Failed to fetch routes" });
+    }
+  });
+
   // Alert routes
   app.get("/api/alerts", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
