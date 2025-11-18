@@ -207,16 +207,16 @@ CREATE TABLE IF NOT EXISTS alerts (
   id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
   router_id VARCHAR NOT NULL REFERENCES routers(id) ON DELETE CASCADE,
   port_id VARCHAR REFERENCES monitored_ports(id) ON DELETE CASCADE,
-  port_name VARCHAR(255) NOT NULL,
+  port_name VARCHAR(255),
+  port_comment VARCHAR(255),
   user_id VARCHAR NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   severity VARCHAR(20) NOT NULL DEFAULT 'warning',
   message TEXT NOT NULL,
-  alert_type VARCHAR(50) NOT NULL DEFAULT 'traffic',
   current_traffic_bps REAL,
   threshold_bps REAL,
   acknowledged BOOLEAN NOT NULL DEFAULT false,
   acknowledged_at TIMESTAMP,
-  acknowledged_by VARCHAR REFERENCES users(id) ON DELETE SET NULL,
+  acknowledged_by VARCHAR(255),
   created_at TIMESTAMP DEFAULT NOW()
 );
 

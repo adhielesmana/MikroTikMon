@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startAutoUpdate } from "./autoUpdate";
+import { runMigrations } from "./migrations";
 import path from "path";
 import { mkdir } from "fs/promises";
 
@@ -96,6 +97,14 @@ app.use((req, res, next) => {
 (async () => {
   // Ensure all required directories exist before starting the server
   await ensureDirectoriesExist();
+
+  // Run database migrations to ensure schema is up-to-date
+  try {
+    await runMigrations();
+  } catch (error) {
+    console.error("[Startup] Failed to run database migrations:", error);
+    console.error("[Startup] Server will continue but may have database issues");
+  }
 
   const server = await registerRoutes(app);
 
