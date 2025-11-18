@@ -559,7 +559,9 @@ export default function RouterDetails() {
     return sorted[0];
   }, [realtimeTrafficData, selectedInterface]);
 
-  // Animation effect: gradually decrease gauge values from real data to 0 over 5 seconds
+  // Animation effect: decrease gauge by 10% every second for visual effect
+  // When traffic is non-zero, immediately show actual value
+  // When traffic is zero, continue decreasing from current animated value
   useEffect(() => {
     if (!latestInterfaceData) {
       setCurrentSpeed({ rx: 0, tx: 0 });
@@ -574,37 +576,36 @@ export default function RouterDetails() {
     // Store the real values
     setCurrentSpeed({ rx: rxMbps, tx: txMbps });
     
-    // Set animated values to real values (start of animation)
-    setAnimatedSpeed({ rx: rxMbps, tx: txMbps });
+    // If traffic is non-zero, immediately set animated value to actual value
+    // If traffic is zero, keep the current animated value (will continue decreasing)
+    if (rxMbps > 0 || txMbps > 0) {
+      setAnimatedSpeed({ rx: rxMbps, tx: txMbps });
+    }
     
     // Clear any existing animation interval
     if (animationIntervalRef.current) {
       clearInterval(animationIntervalRef.current);
     }
     
-    // Animate the gauges: gradually decrease to 0 over 5 seconds
-    const animationDuration = 5000; // 5 seconds
-    const animationSteps = 50; // 50 steps
-    const stepInterval = animationDuration / animationSteps; // ~100ms per step
-    
-    let step = 0;
+    // Decrease by 10% every 1 second
+    // This creates the visual "decay" effect between polls (every 5 seconds)
     animationIntervalRef.current = setInterval(() => {
-      step++;
-      const progress = step / animationSteps; // 0 to 1
-      const remainingFactor = 1 - progress; // 1 to 0
-      
-      setAnimatedSpeed({
-        rx: rxMbps * remainingFactor,
-        tx: txMbps * remainingFactor,
-      });
-      
-      if (step >= animationSteps) {
-        if (animationIntervalRef.current) {
-          clearInterval(animationIntervalRef.current);
-          animationIntervalRef.current = null;
+      setAnimatedSpeed(prev => {
+        const newRx = Math.max(0, prev.rx * 0.9); // Decrease by 10%, never go below 0
+        const newTx = Math.max(0, prev.tx * 0.9); // Decrease by 10%, never go below 0
+        
+        // Stop animation if both values are effectively zero
+        if (newRx < 0.01 && newTx < 0.01) {
+          if (animationIntervalRef.current) {
+            clearInterval(animationIntervalRef.current);
+            animationIntervalRef.current = null;
+          }
+          return { rx: 0, tx: 0 };
         }
-      }
-    }, stepInterval);
+        
+        return { rx: newRx, tx: newTx };
+      });
+    }, 1000); // 1 second interval
     
     // Cleanup on unmount or when new data arrives
     return () => {
@@ -839,7 +840,7 @@ export default function RouterDetails() {
           </div>
 
           <p className="text-xs text-muted-foreground text-center">
-            Gauge scale: 0 - {maxSpeed} Mbps • Animated decay over 5 seconds
+            Gauge scale: 0 - {maxSpeed} Mbps • Decreases 10% per second between polls
           </p>
         </CardContent>
       </Card>
