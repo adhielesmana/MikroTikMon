@@ -70,6 +70,14 @@ const SpeedometerGauge = memo(({
   const needleX = centerX + needleLength * Math.cos(needleAngleRad);
   const needleY = centerY + needleLength * Math.sin(needleAngleRad);
   
+  // Calculate perpendicular points for wider base at center
+  const baseWidth = 6; // Width of needle base
+  const perpAngle = needleAngleRad + Math.PI / 2;
+  const base1X = centerX + baseWidth * Math.cos(perpAngle);
+  const base1Y = centerY + baseWidth * Math.sin(perpAngle);
+  const base2X = centerX - baseWidth * Math.cos(perpAngle);
+  const base2Y = centerY - baseWidth * Math.sin(perpAngle);
+  
   // Tick positions: 0, 1, 5, 10, 20, 30, 50, 75, 100
   const tickValues = [0, 1, 5, 10, 20, 30, 50, 75, 100];
   const ticks = tickValues.map(value => {
@@ -190,10 +198,10 @@ const SpeedometerGauge = memo(({
               Mbps
             </text>
             
-            {/* Knife-style needle (sharp triangular shape) */}
+            {/* Knife-style needle (wide base at center, sharp tip at edge) */}
             <g style={{ transition: 'all 0.3s ease' }}>
               <polygon
-                points={`${centerX},${centerY} ${needleX - 3},${needleY} ${needleX + 3},${needleY}`}
+                points={`${base1X},${base1Y} ${needleX},${needleY} ${base2X},${base2Y}`}
                 fill="hsl(var(--background))"
                 stroke="hsl(var(--foreground))"
                 strokeWidth="1"
