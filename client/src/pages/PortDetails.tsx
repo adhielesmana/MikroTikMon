@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TablePaginationFooter } from "@/components/TablePaginationFooter";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { ArrowLeft, Network, Server, Activity, Bell, Globe, Calendar, AlertTriangle, History } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { usePagination } from "@/hooks/usePagination";
@@ -99,20 +99,205 @@ export default function PortDetails() {
       .sort((a, b) => a.timestamp - b.timestamp);
   };
 
-  const chart1dData = useMemo(() => createChartData(traffic1d, "1d"), [traffic1d]);
-  const chart7dData = useMemo(() => createChartData(traffic7d, "7d"), [traffic7d]);
-  const chart30dData = useMemo(() => createChartData(traffic30d, "30d"), [traffic30d]);
-  const chart365dData = useMemo(() => createChartData(traffic365d, "365d"), [traffic365d]);
+  // Fill missing data points with zeros for complete timeline
+  const fillMissingDataPoints = (data: any[], range: string) => {
+    const now = new Date();
+    const filled: any[] = [];
+    const safeData = data || [];
+    
+    if (range === "1d") {
+      // Create hourly data points for last 24 hours
+      for (let i = 23; i >= 0; i--) {
+        const hourDate = new Date(now);
+        hourDate.setHours(hourDate.getHours() - i, 0, 0, 0);
+        const hourKey = format(hourDate, "HH:mm");
+        
+        // Find data for this hour
+        const hourData = safeData.filter(d => {
+          const dataDate = new Date(d.timestamp);
+          return dataDate.getFullYear() === hourDate.getFullYear() &&
+                 dataDate.getMonth() === hourDate.getMonth() &&
+                 dataDate.getDate() === hourDate.getDate() &&
+                 dataDate.getHours() === hourDate.getHours();
+        });
+        
+        if (hourData.length > 0) {
+          const avgRx = hourData.reduce((sum, d) => sum + d.rx, 0) / hourData.length;
+          const avgTx = hourData.reduce((sum, d) => sum + d.tx, 0) / hourData.length;
+          const avgTotal = hourData.reduce((sum, d) => sum + d.total, 0) / hourData.length;
+          
+          filled.push({
+            time: hourKey,
+            timestamp: hourDate.getTime(),
+            rx: avgRx,
+            tx: avgTx,
+            total: avgTotal,
+          });
+        } else {
+          filled.push({
+            time: hourKey,
+            timestamp: hourDate.getTime(),
+            rx: 0,
+            tx: 0,
+            total: 0,
+          });
+        }
+      }
+    } else if (range === "7d") {
+      // Create data points every 6 hours for last 7 days (28 data points)
+      const intervalHours = 6;
+      const totalIntervals = 28; // 7 days * 24 hours / 6 hours = 28 intervals
+      
+      // Start from 168 hours ago (7 days * 24 hours)
+      for (let i = 0; i < totalIntervals; i++) {
+        const intervalDate = new Date(now);
+        intervalDate.setHours(intervalDate.getHours() - (168 - (i * intervalHours)), 0, 0, 0);
+        const intervalKey = format(intervalDate, "MMM dd HH:mm");
+        
+        // Find data for this interval (within the 6-hour window)
+        const startTime = intervalDate.getTime();
+        const endTime = startTime + (intervalHours * 60 * 60 * 1000);
+        
+        const intervalData = safeData.filter(d => {
+          const dataTime = d.timestamp;
+          return dataTime >= startTime && dataTime < endTime;
+        });
+        
+        if (intervalData.length > 0) {
+          const avgRx = intervalData.reduce((sum, d) => sum + d.rx, 0) / intervalData.length;
+          const avgTx = intervalData.reduce((sum, d) => sum + d.tx, 0) / intervalData.length;
+          const avgTotal = intervalData.reduce((sum, d) => sum + d.total, 0) / intervalData.length;
+          
+          filled.push({
+            time: intervalKey,
+            timestamp: intervalDate.getTime(),
+            rx: avgRx,
+            tx: avgTx,
+            total: avgTotal,
+          });
+        } else {
+          filled.push({
+            time: intervalKey,
+            timestamp: intervalDate.getTime(),
+            rx: 0,
+            tx: 0,
+            total: 0,
+          });
+        }
+      }
+    } else if (range === "365d") {
+      // Create 13 monthly data points from same month last year to this month this year
+      // e.g., if now is Nov 2024, show Nov 2023 through Nov 2024
+      for (let i = 1; i <= 13; i++) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - 13 + i, 1);
+        const monthKey = format(monthDate, "MMM yyyy");
+        
+        // Find data for this month
+        const monthData = safeData.filter(d => {
+          const dataDate = new Date(d.timestamp);
+          return dataDate.getFullYear() === monthDate.getFullYear() &&
+                 dataDate.getMonth() === monthDate.getMonth();
+        });
+        
+        if (monthData.length > 0) {
+          // Average the values for this month
+          const avgRx = monthData.reduce((sum, d) => sum + d.rx, 0) / monthData.length;
+          const avgTx = monthData.reduce((sum, d) => sum + d.tx, 0) / monthData.length;
+          const avgTotal = monthData.reduce((sum, d) => sum + d.total, 0) / monthData.length;
+          
+          filled.push({
+            time: monthKey,
+            timestamp: monthDate.getTime(),
+            rx: avgRx,
+            tx: avgTx,
+            total: avgTotal,
+          });
+        } else {
+          // No data for this month, fill with zeros
+          filled.push({
+            time: monthKey,
+            timestamp: monthDate.getTime(),
+            rx: 0,
+            tx: 0,
+            total: 0,
+          });
+        }
+      }
+    } else if (range === "30d") {
+      // Create daily data points for last 30 days
+      for (let i = 29; i >= 0; i--) {
+        const dayDate = new Date(now);
+        dayDate.setDate(dayDate.getDate() - i);
+        dayDate.setHours(0, 0, 0, 0);
+        const dayKey = format(dayDate, "MMM dd");
+        
+        // Find data for this day
+        const dayData = safeData.filter(d => {
+          const dataDate = new Date(d.timestamp);
+          return dataDate.getFullYear() === dayDate.getFullYear() &&
+                 dataDate.getMonth() === dayDate.getMonth() &&
+                 dataDate.getDate() === dayDate.getDate();
+        });
+        
+        if (dayData.length > 0) {
+          const avgRx = dayData.reduce((sum, d) => sum + d.rx, 0) / dayData.length;
+          const avgTx = dayData.reduce((sum, d) => sum + d.tx, 0) / dayData.length;
+          const avgTotal = dayData.reduce((sum, d) => sum + d.total, 0) / dayData.length;
+          
+          filled.push({
+            time: dayKey,
+            timestamp: dayDate.getTime(),
+            rx: avgRx,
+            tx: avgTx,
+            total: avgTotal,
+          });
+        } else {
+          filled.push({
+            time: dayKey,
+            timestamp: dayDate.getTime(),
+            rx: 0,
+            tx: 0,
+            total: 0,
+          });
+        }
+      }
+    }
+    
+    return filled;
+  };
+
+  const chart1dData = useMemo(() => {
+    const rawData = createChartData(traffic1d, "1d");
+    return fillMissingDataPoints(rawData, "1d");
+  }, [traffic1d]);
+  
+  const chart7dData = useMemo(() => {
+    const rawData = createChartData(traffic7d, "7d");
+    return fillMissingDataPoints(rawData, "7d");
+  }, [traffic7d]);
+  
+  const chart30dData = useMemo(() => {
+    const rawData = createChartData(traffic30d, "30d");
+    return fillMissingDataPoints(rawData, "30d");
+  }, [traffic30d]);
+  
+  const chart365dData = useMemo(() => {
+    const rawData = createChartData(traffic365d, "365d");
+    return fillMissingDataPoints(rawData, "365d");
+  }, [traffic365d]);
 
   // Get active alerts count
   const activeAlertsCount = alerts?.filter(a => !a.acknowledgedAt).length || 0;
   const totalAlertsCount = alerts?.length || 0;
 
   // Pagination for alerts table
-  const { paginatedItems: paginatedAlerts, ...alertsPagination } = usePagination(
-    alerts || [],
-    5
-  );
+  const alertsPagination = usePagination<Alert>({
+    totalItems: alerts?.length || 0,
+    initialPageSize: 5,
+    storageKey: "port-alerts",
+  });
+
+  const paginatedAlerts = alertsPagination.paginateItems(alerts || []);
 
   if (loadingPort) {
     return (
@@ -309,15 +494,15 @@ export default function PortDetails() {
               <Skeleton className="h-64 w-full" />
             ) : chart1dData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chart1dData}>
+                <AreaChart data={chart1dData}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="time" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} label={{ value: "Mbps", angle: -90, position: "insideLeft" }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="rx" stroke="#10b981" name="Download" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="tx" stroke="#3b82f6" name="Upload" strokeWidth={2} dot={false} />
-                </LineChart>
+                  <Area type="monotone" dataKey="rx" stroke="#10b981" fill="#10b98120" name="Download" strokeWidth={2} />
+                  <Area type="monotone" dataKey="tx" stroke="#3b82f6" fill="#3b82f620" name="Upload" strokeWidth={2} />
+                </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-64 flex items-center justify-center text-muted-foreground">
@@ -341,15 +526,15 @@ export default function PortDetails() {
               <Skeleton className="h-64 w-full" />
             ) : chart7dData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chart7dData}>
+                <AreaChart data={chart7dData}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="time" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} label={{ value: "Mbps", angle: -90, position: "insideLeft" }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="rx" stroke="#10b981" name="Download" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="tx" stroke="#3b82f6" name="Upload" strokeWidth={2} dot={false} />
-                </LineChart>
+                  <Area type="monotone" dataKey="rx" stroke="#10b981" fill="#10b98120" name="Download" strokeWidth={2} />
+                  <Area type="monotone" dataKey="tx" stroke="#3b82f6" fill="#3b82f620" name="Upload" strokeWidth={2} />
+                </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-64 flex items-center justify-center text-muted-foreground">
@@ -373,15 +558,15 @@ export default function PortDetails() {
               <Skeleton className="h-64 w-full" />
             ) : chart30dData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chart30dData}>
+                <AreaChart data={chart30dData}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="time" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} label={{ value: "Mbps", angle: -90, position: "insideLeft" }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="rx" stroke="#10b981" name="Download" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="tx" stroke="#3b82f6" name="Upload" strokeWidth={2} dot={false} />
-                </LineChart>
+                  <Area type="monotone" dataKey="rx" stroke="#10b981" fill="#10b98120" name="Download" strokeWidth={2} />
+                  <Area type="monotone" dataKey="tx" stroke="#3b82f6" fill="#3b82f620" name="Upload" strokeWidth={2} />
+                </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-64 flex items-center justify-center text-muted-foreground">
@@ -405,15 +590,15 @@ export default function PortDetails() {
               <Skeleton className="h-64 w-full" />
             ) : chart365dData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={chart365dData}>
+                <AreaChart data={chart365dData}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="time" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} label={{ value: "Mbps", angle: -90, position: "insideLeft" }} />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="rx" stroke="#10b981" name="Download" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="tx" stroke="#3b82f6" name="Upload" strokeWidth={2} dot={false} />
-                </LineChart>
+                  <Area type="monotone" dataKey="rx" stroke="#10b981" fill="#10b98120" name="Download" strokeWidth={2} />
+                  <Area type="monotone" dataKey="tx" stroke="#3b82f6" fill="#3b82f620" name="Upload" strokeWidth={2} />
+                </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-64 flex items-center justify-center text-muted-foreground">
@@ -455,18 +640,18 @@ export default function PortDetails() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedAlerts.map((alert) => (
+                    {paginatedAlerts.map((alert: Alert) => (
                       <TableRow key={alert.id} data-testid={`row-alert-${alert.id}`}>
                         <TableCell className="whitespace-nowrap">
-                          <Badge variant={alert.type === "traffic" ? "default" : "destructive"}>
-                            {alert.type === "traffic" ? "Traffic" : "Connectivity"}
+                          <Badge variant={alert.currentTrafficBps !== null ? "default" : "destructive"}>
+                            {alert.currentTrafficBps !== null ? "Traffic" : "Connectivity"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="max-w-md">
-                          <p className="text-sm">{alert.message}</p>
+                        <TableCell className="max-w-md whitespace-nowrap">
+                          <p className="text-sm truncate">{alert.message}</p>
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                          {formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true })}
+                          {alert.createdAt ? formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true }) : "-"}
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
                           {alert.acknowledgedAt ? (
@@ -488,9 +673,11 @@ export default function PortDetails() {
               <TablePaginationFooter
                 currentPage={alertsPagination.currentPage}
                 totalPages={alertsPagination.totalPages}
-                onPageChange={alertsPagination.goToPage}
-                itemsPerPage={5}
+                onPageChange={alertsPagination.setCurrentPage}
                 totalItems={alerts.length}
+                pageSize={alertsPagination.pageSize}
+                itemRange={alertsPagination.itemRange}
+                onPageSizeChange={alertsPagination.setPageSize}
               />
             </>
           )}
