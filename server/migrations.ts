@@ -132,6 +132,30 @@ export async function runMigrations() {
       console.log("[Migrations] ✓ Made port_name nullable");
     }
 
+    // Add performance indexes for traffic_data table if they don't exist
+    console.log("[Migrations] Checking performance indexes...");
+    
+    // Index for traffic queries by router and time range
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_traffic_router_timestamp 
+      ON traffic_data(router_id, timestamp DESC);
+    `);
+    
+    // Index for traffic queries by router, port, and time range
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_traffic_router_port_timestamp 
+      ON traffic_data(router_id, port_name, timestamp DESC);
+    `);
+    
+    // Index for port-specific queries
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_traffic_port_timestamp 
+      ON traffic_data(port_id, timestamp DESC) 
+      WHERE port_id IS NOT NULL;
+    `);
+    
+    console.log("[Migrations] ✓ Performance indexes verified");
+
     console.log("[Migrations] ✓ Database schema is up-to-date");
   } catch (error) {
     console.error("[Migrations] Error running migrations:", error);

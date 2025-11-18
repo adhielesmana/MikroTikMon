@@ -56,25 +56,33 @@ export default function PortDetails() {
     enabled: !!portId && !!portData,
   });
 
-  // Fetch traffic data for different time ranges
+  // Fetch traffic data for different time ranges with aggressive caching
   const { data: traffic1d, isLoading: loading1d } = useQuery({
     queryKey: [`/api/routers/${portData?.routerId}/traffic?portName=${encodeURIComponent(portData?.portName || '')}&timeRange=1d`],
     enabled: !!portData?.routerId && !!portData?.portName,
+    staleTime: 2 * 60 * 1000,  // 2 minutes - data is considered fresh
+    gcTime: 10 * 60 * 1000,    // 10 minutes - keep in cache
   });
 
   const { data: traffic7d, isLoading: loading7d } = useQuery({
     queryKey: [`/api/routers/${portData?.routerId}/traffic?portName=${encodeURIComponent(portData?.portName || '')}&timeRange=7d`],
     enabled: !!portData?.routerId && !!portData?.portName,
+    staleTime: 2 * 60 * 1000,  // 2 minutes
+    gcTime: 10 * 60 * 1000,    // 10 minutes
   });
 
   const { data: traffic30d, isLoading: loading30d } = useQuery({
     queryKey: [`/api/routers/${portData?.routerId}/traffic?portName=${encodeURIComponent(portData?.portName || '')}&timeRange=30d`],
     enabled: !!portData?.routerId && !!portData?.portName,
+    staleTime: 5 * 60 * 1000,  // 5 minutes - longer time range = longer cache
+    gcTime: 15 * 60 * 1000,    // 15 minutes
   });
 
   const { data: traffic365d, isLoading: loading365d } = useQuery({
     queryKey: [`/api/routers/${portData?.routerId}/traffic?portName=${encodeURIComponent(portData?.portName || '')}&timeRange=365d`],
     enabled: !!portData?.routerId && !!portData?.portName,
+    staleTime: 10 * 60 * 1000, // 10 minutes - yearly data changes slowly
+    gcTime: 30 * 60 * 1000,    // 30 minutes
   });
 
   // Transform traffic data for charts

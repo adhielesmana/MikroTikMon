@@ -1227,7 +1227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Historical traffic data (from database) - for long-term analysis
+  // Historical traffic data (from database) - OPTIMIZED with caching and aggregation
   app.get("/api/routers/:id/traffic", isAuthenticated, isEnabled, async (req: any, res) => {
     try {
       const userId = getUserId(req);
@@ -1289,11 +1289,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      let trafficData = await storage.getRecentTraffic(req.params.id, since, until);
+      // Use cached, aggregated traffic data for better performance
+      const { getCachedTrafficData } = await import("./trafficCache");
+      const portName = req.query.portName ? String(req.query.portName) : undefined;
+      const trafficData = await getCachedTrafficData(req.params.id, portName, since, until);
       
-      // Filter by port name if provided
-      if (req.query.portName) {
-        trafficData = trafficData.filter(d => d.portName === req.query.portName);
+      // Generate ETag for HTTP caching
+      const etag = generateETag({ data: trafficData, since, until, portName });
+      res.setHeader('Cache-Control', 'private, max-age=120'); // Cache for 2 minutes
+      res.setHeader('ETag', etag);
+      
+      // Return 304 if client has cached version
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
       }
       
       res.json(trafficData);
