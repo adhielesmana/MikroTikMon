@@ -1084,9 +1084,9 @@ export function startScheduler() {
     });
   });
 
-  // Automated database backup daily at 3 AM (production only)
+  // Automated database backup weekly (Sunday at 3 AM, production only)
   if (process.env.NODE_ENV === "production") {
-    cron.schedule("0 3 * * *", () => {
+    cron.schedule("0 3 * * 0", () => {
       createDatabaseBackup().catch(error => {
         console.error("[Scheduler] Unhandled error in database backup:", error);
       });
@@ -1103,7 +1103,7 @@ export function startScheduler() {
     });
   }, 5000); // Wait 5 seconds for app to fully initialize
 
-  const backupStatus = process.env.NODE_ENV === "production" ? "daily database backup at 3 AM" : "database backup disabled (dev mode)";
+  const backupStatus = process.env.NODE_ENV === "production" ? "weekly database backup (Sunday 3 AM)" : "database backup disabled (dev mode)";
   console.log(`[Scheduler] Scheduler started successfully (60s traffic polling + alert checking with 5-check confirmation = 5min total alert confirmation time, on-demand real-time traffic when router details page is open, 5min database persistence, 5min counter cleanup, daily data cleanup at 2 AM, ${backupStatus})`);
 }
 
