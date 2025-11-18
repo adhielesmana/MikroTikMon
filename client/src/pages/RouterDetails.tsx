@@ -161,7 +161,7 @@ const SpeedometerGauge = memo(({
                   y={tick.labelY}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  className="text-[9px] fill-muted-foreground font-medium"
+                  className="text-[9px] fill-muted-foreground font-bold"
                 >
                   {tick.displayValue}
                 </text>
@@ -174,7 +174,7 @@ const SpeedometerGauge = memo(({
               y={centerY + 35}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-3xl font-bold"
+              className="text-3xl font-extrabold"
               fill={displayColor}
               data-testid={testId}
             >
@@ -185,25 +185,21 @@ const SpeedometerGauge = memo(({
               y={centerY + 55}
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-xs fill-muted-foreground"
+              className="text-xs fill-muted-foreground font-bold"
             >
               Mbps
             </text>
             
-            {/* Needle */}
-            <line
-              x1={centerX}
-              y1={centerY}
-              x2={needleX}
-              y2={needleY}
-              stroke="hsl(var(--background))"
-              strokeWidth="3"
-              strokeLinecap="round"
-              style={{ 
-                transition: 'all 0.3s ease',
-                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))'
-              }}
-            />
+            {/* Knife-style needle (sharp triangular shape) */}
+            <g style={{ transition: 'all 0.3s ease' }}>
+              <polygon
+                points={`${centerX},${centerY} ${needleX - 3},${needleY} ${needleX + 3},${needleY}`}
+                fill="hsl(var(--background))"
+                stroke="hsl(var(--foreground))"
+                strokeWidth="1"
+                style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' }}
+              />
+            </g>
             
             {/* Center hub */}
             <circle
