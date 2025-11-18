@@ -234,6 +234,7 @@ export default function MonitoredPorts() {
                     <TableHead>Port Name</TableHead>
                     <TableHead>Interface Comment</TableHead>
                     <TableHead>MAC Address</TableHead>
+                    <TableHead>Last Updated</TableHead>
                     <TableHead>Router Name</TableHead>
                     <TableHead>Owner</TableHead>
                     <TableHead>Threshold (Mbps)</TableHead>
@@ -248,33 +249,29 @@ export default function MonitoredPorts() {
 
                     return (
                       <TableRow key={port.id} data-testid={`row-port-${port.id}`}>
-                        <TableCell className="font-medium" data-testid={`text-port-name-${port.id}`}>
+                        <TableCell className="font-medium whitespace-nowrap" data-testid={`text-port-name-${port.id}`}>
                           <Link href={`/ports/${port.id}`}>
                             <span className="text-primary hover:underline cursor-pointer">
                               {port.portName}
                             </span>
                           </Link>
                         </TableCell>
-                        <TableCell className="text-muted-foreground" data-testid={`text-port-comment-${port.id}`}>
-                          <div className="flex flex-col gap-0.5">
-                            <span>{port.interfaceComment || "-"}</span>
-                            {port.lastInterfaceUpdate && (
-                              <span className="text-xs text-muted-foreground">
-                                Updated {formatDistanceToNow(new Date(port.lastInterfaceUpdate), { addSuffix: true })}
-                              </span>
-                            )}
-                          </div>
+                        <TableCell className="text-muted-foreground whitespace-nowrap" data-testid={`text-port-comment-${port.id}`}>
+                          {port.interfaceComment || "-"}
                         </TableCell>
-                        <TableCell className="text-muted-foreground font-mono text-xs" data-testid={`text-mac-${port.id}`}>
+                        <TableCell className="text-muted-foreground font-mono text-xs whitespace-nowrap" data-testid={`text-mac-${port.id}`}>
                           {port.interfaceMacAddress || "-"}
                         </TableCell>
-                        <TableCell data-testid={`text-router-name-${port.id}`}>
+                        <TableCell className="text-muted-foreground text-xs whitespace-nowrap" data-testid={`text-last-update-${port.id}`}>
+                          {port.lastInterfaceUpdate ? formatDistanceToNow(new Date(port.lastInterfaceUpdate), { addSuffix: true }) : "-"}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap" data-testid={`text-router-name-${port.id}`}>
                           {port.router.name}
                         </TableCell>
-                        <TableCell className="text-muted-foreground" data-testid={`text-owner-${port.id}`}>
+                        <TableCell className="text-muted-foreground whitespace-nowrap" data-testid={`text-owner-${port.id}`}>
                           {port.ownerUsername || "-"}
                         </TableCell>
-                        <TableCell data-testid={`cell-threshold-${port.id}`}>
+                        <TableCell className="whitespace-nowrap" data-testid={`cell-threshold-${port.id}`}>
                           {isEditing ? (
                             <div className="flex items-center gap-2">
                               <Input
@@ -322,7 +319,7 @@ export default function MonitoredPorts() {
                             </button>
                           )}
                         </TableCell>
-                        <TableCell data-testid={`cell-status-${port.id}`}>
+                        <TableCell className="whitespace-nowrap" data-testid={`cell-status-${port.id}`}>
                           <Badge variant={port.enabled ? "default" : "secondary"}>
                             {port.enabled ? "Enabled" : "Disabled"}
                           </Badge>
