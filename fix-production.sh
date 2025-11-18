@@ -76,11 +76,15 @@ echo ""
 
 print_step "Verifying database volume..."
 
-if docker volume ls | grep -q "postgres_data"; then
-    print_success "Volume 'postgres_data' exists"
+# Auto-detect actual volume name (may be prefixed with project directory)
+VOLUME_NAME=$(docker volume ls --format "{{.Name}}" | grep "postgres_data" | head -n 1)
+
+if [ -n "$VOLUME_NAME" ]; then
+    VOLUME_SIZE=$(docker volume inspect "$VOLUME_NAME" --format '{{.Mountpoint}}' | xargs du -sh 2>/dev/null | awk '{print $1}' || echo "unknown")
+    print_success "Volume '$VOLUME_NAME' exists (Size: $VOLUME_SIZE)"
 else
-    print_error "Volume 'postgres_data' NOT found!"
-    print_info "This will be created when database container starts"
+    print_error "No postgres_data volume found!"
+    print_info "Volume will be created when database container starts"
 fi
 
 echo ""

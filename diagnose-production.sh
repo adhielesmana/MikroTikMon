@@ -107,14 +107,20 @@ echo ""
 print_step "Checking Docker volume..."
 echo ""
 
-if docker volume ls | grep -q "postgres_data"; then
-    VOLUME_SIZE=$(docker system df -v | grep "postgres_data" | awk '{print $3}')
-    print_success "Volume 'postgres_data' exists (Size: $VOLUME_SIZE)"
+# Auto-detect actual volume name (may be prefixed with project directory)
+VOLUME_NAME=$(docker volume ls --format "{{.Name}}" | grep "postgres_data" | head -n 1)
+
+if [ -n "$VOLUME_NAME" ]; then
+    VOLUME_SIZE=$(docker volume inspect "$VOLUME_NAME" --format '{{.Mountpoint}}' | xargs du -sh 2>/dev/null | awk '{print $1}' || echo "unknown")
+    print_success "Volume '$VOLUME_NAME' exists (Size: $VOLUME_SIZE)"
     
     # Show volume details
-    docker volume inspect postgres_data | grep -E "CreatedAt|Mountpoint"
+    print_info "Volume details:"
+    docker volume inspect "$VOLUME_NAME" | grep -E "CreatedAt|Mountpoint"
 else
-    print_error "Volume 'postgres_data' NOT found!"
+    print_error "No postgres_data volume found!"
+    print_info "Available volumes:"
+    docker volume ls
 fi
 
 echo ""
