@@ -1080,12 +1080,13 @@ async function pollSingleRouterRealtime(routerId: string) {
         return;
       }
       
-      // Get last 50 points PER INTERFACE (not total) to ensure all interfaces are represented
-      const trafficData = getRealtimeTrafficPerInterface(routerId, 50);
+      // Send only the latest data point per interface (not 50) for optimal performance
+      // Frontend only uses the most recent sample anyway, so sending 50 wastes bandwidth
+      const trafficData = getRealtimeTrafficPerInterface(routerId, 1);
       const message = JSON.stringify({
         type: "realtime_traffic",
         routerId,
-        data: trafficData, // Already limited to 50 points per interface
+        data: trafficData, // Latest sample per interface (~98% smaller payload)
         pollCount: pollingState.pollCount, // Send current poll count to frontend
       });
       

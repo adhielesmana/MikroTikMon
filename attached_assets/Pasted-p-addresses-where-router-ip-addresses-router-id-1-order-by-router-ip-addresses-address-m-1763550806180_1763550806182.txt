@@ -1,0 +1,15 @@
+p_addresses" where "router_ip_addresses"."router_id" = $1 order by "router_ip_addresses"."address"
+mikrotik-monitor-db   | 2025-11-18 13:53:10.517 UTC [73736] ERROR:  relation "router_ip_addresses" does not exist at character 124
+mikrotik-monitor-db   | 2025-11-18 13:53:10.517 UTC [73736] STATEMENT:  select "id", "router_id", "address", "network", "interface_name", "disabled", "last_seen", "created_at", "updated_at" from "router_ip_addresses" where "router_ip_addresses"."router_id" = $1 order by "router_ip_addresses"."address"
+mikrotik-monitor-db   | 2025-11-18 13:53:21.672 UTC [73757] ERROR:  relation "router_routes" does not exist at character 168
+mikrotik-monitor-db   | 2025-11-18 13:53:21.672 UTC [73757] STATEMENT:  select "id", "router_id", "dst_address", "gateway", "distance", "scope", "target_scope", "disabled", "dynamic", "active", "last_seen", "created_at", "updated_at" from "router_routes" where "router_routes"."router_id" = $1 order by "router_routes"."dst_address"
+mikrotik-monitor-app  | [LogsSSE] Error streaming logs: Error: ENOENT: no such file or directory, scandir '/tmp/logs'
+mikrotik-monitor-app  |     at async Object.readdir (node:internal/fs/promises:952:18)
+mikrotik-monitor-app  |     at async Timeout.streamLogs [as _onTimeout] (file:///app/dist/index.js:5390:23) {
+mikrotik-monitor-db   | 2025-11-18 13:53:21.673 UTC [73759] ERROR:  relation "router_routes" does not exist at character 168
+mikrotik-monitor-db   | 2025-11-18 13:53:21.673 UTC [73759] STATEMENT:  select "id", "router_id", "dst_address", "gateway", "distance", "scope", "target_scope", "disabled", "dynamic", "active", "last_seen", "created_at", "updated_at" from "router_routes" where "router_routes"."router_id" = $1 order by "router_routes"."dst_address"
+mikrotik-monitor-db   | 2025-11-18 13:53:21.673 UTC [73754] ERROR:  relation "router_ip_addresses" does not exist at character 124
+mikrotik-monitor-db   | 2025-11-18 13:53:21.673 UTC [73754] STATEMENT:  select "id", "router_id", "address", "network", "interface_name", "disabled", "last_seen", "created_at", "updated_at" from "router_ip_addresses" where "router_ip_addresses"."router_id" = $1 order by "router_ip_addresses"."address"
+mikrotik-monitor-db   | 2025-11-18 13:53:21.673 UTC [73755] ERROR:  relation "router_ip_addresses" does not exist at character 124
+mikrotik-monitor-db   | 2025-11-18 13:53:21.673 UTC [73755] STATEMENT:  select "id", "router_id", "address", "network", "interface_name", "disabled", "last_seen", "created_at", "updated_at" from "router_ip_addresses" where "router_ip_addresses"."router_id" = $1 order by "router_ip_addresses"."address"
+mikrotik-monitor-db   | 2025-11-18 13:53:21.673 UTC [73756] ERROR:  relation "router_ip_addresses" does not exist at character 124

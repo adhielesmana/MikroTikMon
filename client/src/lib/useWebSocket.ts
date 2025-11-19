@@ -78,7 +78,17 @@ export function useWebSocket(userId: string | null) {
             handleNotification(notification);
             break;
 
+          case "realtime_traffic":
+          case "realtime_polling_started":
+          case "realtime_polling_paused":
+          case "realtime_polling_restarted":
+          case "error":
+            // These messages are handled by RouterDetails page's own WebSocket listener
+            // Silently ignore them here to avoid console spam
+            break;
+
           default:
+            // Only log truly unknown message types
             console.log("[WebSocket] Unknown message type:", message.type);
         }
       } catch (error) {
