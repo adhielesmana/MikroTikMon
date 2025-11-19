@@ -637,12 +637,16 @@ export default function RouterDetails() {
   });
 
   // Dynamic gauge scale based on current traffic (use real currentSpeed, not animated)
-  // < 100 Mbps → 0-100 scale
-  // 100-1000 Mbps → 0-1000 scale
-  // > 1000 Mbps → 0-10000 scale
+  // 100-999 Kbps (0.1-0.999 Mbps) → 0-1 Mbps scale (for better visibility)
+  // 1-99 Mbps → 0-100 Mbps scale
+  // 100-999 Mbps → 0-1000 Mbps scale
+  // >= 1000 Mbps → 0-10000 Mbps scale
   const maxSpeed = useMemo(() => {
     const maxTraffic = Math.max(currentSpeed.rx, currentSpeed.tx);
-    if (maxTraffic < 100) {
+    if (maxTraffic < 1) {
+      // 100-999 Kbps range: display as 0.1-0.999 Mbps with 0-1 scale
+      return 1;
+    } else if (maxTraffic < 100) {
       return 100;
     } else if (maxTraffic < 1000) {
       return 1000;
