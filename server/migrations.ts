@@ -205,17 +205,26 @@ export async function runMigrations() {
     `);
     
     // Composite indexes for alerts table to optimize /api/alerts endpoint
+    // Primary index for superadmin query (ORDER BY created_at DESC LIMIT 200)
     await db.execute(sql`
-      CREATE INDEX IF NOT EXISTS idx_alerts_router_ack_created 
-      ON alerts(router_id, acknowledged, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_alerts_created_at 
+      ON alerts(created_at DESC);
     `);
     
+    // Index for normal user queries filtering by router_id and ordering by created_at
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_alerts_router_created 
+      ON alerts(router_id, created_at DESC);
+    `);
+    
+    // Index for port-specific queries
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS idx_alerts_port_created 
       ON alerts(port_id, created_at DESC) 
       WHERE port_id IS NOT NULL;
     `);
     
+    // Index for user-specific queries
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS idx_alerts_user_created 
       ON alerts(user_id, created_at DESC) 

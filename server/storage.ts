@@ -818,7 +818,9 @@ export class DatabaseStorage implements IStorage {
     }
     
     // Normal users: Get alerts for owned + assigned routers (limited to last 200 for performance)
-    // Using subquery to avoid duplicates from JOIN
+    // Split into two queries to allow index usage, then merge and sort
+    
+    // Get assigned router IDs
     const assignedRouterIds = await db
       .select({ routerId: userRouters.routerId })
       .from(userRouters)
@@ -826,23 +828,44 @@ export class DatabaseStorage implements IStorage {
     
     const assignedIds = assignedRouterIds.map(r => r.routerId);
     
-    const results = await db
+    // Query 1: Alerts for owned routers (uses idx_alerts_user_created)
+    const ownedAlerts = await db
       .select({
         alert: alerts,
         routerName: routers.name,
       })
       .from(alerts)
       .leftJoin(routers, eq(alerts.routerId, routers.id))
-      .where(
-        or(
-          eq(alerts.userId, userId),                              // Owned routers
-          assignedIds.length > 0 ? inArray(alerts.routerId, assignedIds) : sql`false`  // Assigned routers
-        )
-      )
+      .where(eq(alerts.userId, userId))
       .orderBy(desc(alerts.createdAt))
-      .limit(200); // Limit to last 200 alerts for performance
+      .limit(200);
     
-    return results.map(r => ({
+    // Query 2: Alerts for assigned routers (uses idx_alerts_router_created)
+    const assignedAlerts = assignedIds.length > 0
+      ? await db
+          .select({
+            alert: alerts,
+            routerName: routers.name,
+          })
+          .from(alerts)
+          .leftJoin(routers, eq(alerts.routerId, routers.id))
+          .where(inArray(alerts.routerId, assignedIds))
+          .orderBy(desc(alerts.createdAt))
+          .limit(200)
+      : [];
+    
+    // Merge results, remove duplicates, sort, and limit
+    const allAlerts = [...ownedAlerts, ...assignedAlerts];
+    const uniqueAlerts = Array.from(
+      new Map(allAlerts.map(r => [r.alert.id, r])).values()
+    );
+    
+    // Sort by created_at DESC and limit to 200
+    const sortedAlerts = uniqueAlerts
+      .sort((a, b) => b.alert.createdAt.getTime() - a.alert.createdAt.getTime())
+      .slice(0, 200);
+    
+    return sortedAlerts.map(r => ({
       ...r.alert,
       routerName: r.routerName || "Unknown Router",
     }));
