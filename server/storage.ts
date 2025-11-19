@@ -799,7 +799,7 @@ export class DatabaseStorage implements IStorage {
     // Check if user is superadmin
     const user = await this.getUser(userId);
     
-    // Superadmins see ALL alerts
+    // Superadmins see ALL alerts (limited to last 200 for performance)
     if (user?.isSuperadmin) {
       const results = await db
         .select({
@@ -808,7 +808,8 @@ export class DatabaseStorage implements IStorage {
         })
         .from(alerts)
         .leftJoin(routers, eq(alerts.routerId, routers.id))
-        .orderBy(desc(alerts.createdAt));
+        .orderBy(desc(alerts.createdAt))
+        .limit(200); // Limit to last 200 alerts for performance
       
       return results.map(r => ({
         ...r.alert,
@@ -816,7 +817,7 @@ export class DatabaseStorage implements IStorage {
       }));
     }
     
-    // Normal users: Get alerts for owned + assigned routers
+    // Normal users: Get alerts for owned + assigned routers (limited to last 200 for performance)
     // Using subquery to avoid duplicates from JOIN
     const assignedRouterIds = await db
       .select({ routerId: userRouters.routerId })
@@ -838,7 +839,8 @@ export class DatabaseStorage implements IStorage {
           assignedIds.length > 0 ? inArray(alerts.routerId, assignedIds) : sql`false`  // Assigned routers
         )
       )
-      .orderBy(desc(alerts.createdAt));
+      .orderBy(desc(alerts.createdAt))
+      .limit(200); // Limit to last 200 alerts for performance
     
     return results.map(r => ({
       ...r.alert,

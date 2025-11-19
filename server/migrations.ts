@@ -204,6 +204,24 @@ export async function runMigrations() {
       WHERE port_id IS NOT NULL;
     `);
     
+    // Composite indexes for alerts table to optimize /api/alerts endpoint
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_alerts_router_ack_created 
+      ON alerts(router_id, acknowledged, created_at DESC);
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_alerts_port_created 
+      ON alerts(port_id, created_at DESC) 
+      WHERE port_id IS NOT NULL;
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_alerts_user_created 
+      ON alerts(user_id, created_at DESC) 
+      WHERE user_id IS NOT NULL;
+    `);
+    
     console.log("[Migrations] ✓ Performance indexes verified");
 
     console.log("[Migrations] ✓ Database schema is up-to-date");
