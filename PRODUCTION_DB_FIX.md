@@ -5,12 +5,43 @@ Your production Docker database is missing schema elements:
 - ✗ Missing table: `router_routes`
 - ✗ Missing table: `router_ip_addresses`
 - ✗ Missing column: `alerts.acknowledged_by`
+- ✗ Missing performance indexes for alerts (causing slow `/api/alerts` endpoint)
 - ✗ Missing TimescaleDB extension (causing `time_bucket` function error)
 
 ## Solution
-Run the `production-schema-fix.sql` script on your production database.
+The schema fix is now **automatically integrated** into the `intelligent-deploy.sh` script!
 
-## Instructions
+## ⚡ RECOMMENDED: Automated Deployment (Easiest)
+
+Simply run the intelligent deployment script:
+
+```bash
+./intelligent-deploy.sh
+```
+
+This will:
+1. ✅ Rebuild and deploy your application
+2. ✅ **Automatically apply production-schema-fix.sql**
+3. ✅ Verify all tables and indexes exist
+4. ✅ Preserve your database data (safe deployment)
+5. ✅ Show detailed verification results
+
+### What You'll See
+
+```
+▶ Checking production database schema...
+ℹ Applying production schema fixes...
+NOTICE:  relation "router_ip_addresses" already exists, skipping
+NOTICE:  relation "router_routes" already exists, skipping
+ℹ Verifying database schema...
+✓ router_ip_addresses table exists
+✓ router_routes table exists
+✓ alerts.acknowledged_by column exists
+✓ Alerts performance indexes created (4 indexes)
+✓ Production schema updates completed!
+```
+
+## 🔧 Manual Options (If Needed)
 
 ### Option 1: Direct psql Connection
 ```bash
@@ -18,19 +49,16 @@ psql -h your-production-host -U your-username -d your-database -f production-sch
 ```
 
 ### Option 2: From Docker Container
-If your database is in a Docker container named `mikrotik-postgres`:
+If your database is in a Docker container named `mikrotik-monitor-db`:
 
 ```bash
-# Copy the SQL file to the container
-docker cp production-schema-fix.sql mikrotik-postgres:/tmp/
-
-# Execute the script
-docker exec -i mikrotik-postgres psql -U postgres -d mikrotik_monitor < /tmp/production-schema-fix.sql
+# Execute the script directly
+docker exec -i mikrotik-monitor-db psql -U postgres -d mikrotik_monitor < production-schema-fix.sql
 ```
 
 ### Option 3: Using docker-compose
 ```bash
-docker-compose exec -T postgres psql -U postgres -d mikrotik_monitor < production-schema-fix.sql
+docker-compose exec -T mikrotik-monitor-db psql -U postgres -d mikrotik_monitor < production-schema-fix.sql
 ```
 
 ## What the Script Does
@@ -106,4 +134,18 @@ The script automatically verifies:
 - ✅ **Idempotent** - Running twice won't cause issues
 
 ## Future Deployments
-After this fix, the auto-migration system in `server/migrations.ts` will keep your schema up-to-date automatically on each deployment. This manual fix is only needed once to bring the production database up to the current schema version.
+The `intelligent-deploy.sh` script now automatically applies schema fixes on **every deployment**, ensuring your production database stays in sync with the application. You'll never need to manually run SQL scripts again!
+
+### How It Works
+1. **Developer pushes code** → GitHub repository updated
+2. **Auto-deploy triggers** (every 5 minutes via polling)
+3. **intelligent-deploy.sh runs** → Rebuilds app container
+4. **Schema fix auto-applies** → production-schema-fix.sql runs automatically
+5. **Verification checks** → Confirms all tables/columns/indexes exist
+6. **App restarts** → With updated schema, zero downtime
+
+### Safety Features
+- ✅ **Idempotent** - Safe to run multiple times (uses `IF NOT EXISTS`)
+- ✅ **Database preserved** - Only app container rebuilds, DB data untouched
+- ✅ **Auto-verification** - Checks confirm schema is correct
+- ✅ **Zero manual intervention** - Everything automated

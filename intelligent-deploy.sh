@@ -444,13 +444,71 @@ else
 fi
 
 # ========================================
-# Run Database Migrations
+# Run Production Schema Fix (Auto-Migration)
 # ========================================
 
-print_step "Running database migrations..."
+print_step "Checking production database schema..."
 
 # Wait for database to be fully ready
 sleep 3
+
+# Check if production-schema-fix.sql exists
+if [ -f "production-schema-fix.sql" ]; then
+    print_info "Applying production schema fixes..."
+    
+    # Execute the schema fix script
+    docker exec -i mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" < production-schema-fix.sql 2>&1 | \
+        grep -v "already exists" | \
+        grep -E "NOTICE|ERROR|CREATE|ALTER|^✓|^✗" || true
+    
+    # Verify critical tables exist
+    print_info "Verifying database schema..."
+    
+    # Check router_ip_addresses
+    if docker exec mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" -tA -c \
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'router_ip_addresses');" 2>/dev/null | grep -q "t"; then
+        print_success "✓ router_ip_addresses table exists"
+    else
+        print_error "✗ router_ip_addresses table missing"
+    fi
+    
+    # Check router_routes
+    if docker exec mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" -tA -c \
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'router_routes');" 2>/dev/null | grep -q "t"; then
+        print_success "✓ router_routes table exists"
+    else
+        print_error "✗ router_routes table missing"
+    fi
+    
+    # Check acknowledged_by column
+    if docker exec mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" -tA -c \
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'alerts' AND column_name = 'acknowledged_by');" 2>/dev/null | grep -q "t"; then
+        print_success "✓ alerts.acknowledged_by column exists"
+    else
+        print_error "✗ alerts.acknowledged_by column missing"
+    fi
+    
+    # Check alerts indexes
+    INDEX_COUNT=$(docker exec mikrotik-monitor-db psql -U "$PGUSER" -d "$PGDATABASE" -tA -c \
+        "SELECT COUNT(*) FROM pg_indexes WHERE tablename = 'alerts' AND indexname LIKE 'idx_alerts_%';" 2>/dev/null | tr -d '[:space:]')
+    
+    if [ "$INDEX_COUNT" -ge 4 ]; then
+        print_success "✓ Alerts performance indexes created ($INDEX_COUNT indexes)"
+    else
+        print_warning "⚠ Alerts indexes incomplete (found $INDEX_COUNT, expected 4+)"
+    fi
+    
+    print_success "Production schema updates completed!"
+else
+    print_warning "production-schema-fix.sql not found - skipping schema fixes"
+    print_info "Auto-migrations will still run via application startup"
+fi
+
+# ========================================
+# Run Database Migrations
+# ========================================
+
+print_step "Running additional database migrations..."
 
 # Check if migrations directory exists
 if [ -d "migrations" ] && [ "$(ls -A migrations/*.sql 2>/dev/null)" ]; then
@@ -471,7 +529,7 @@ if [ -d "migrations" ] && [ "$(ls -A migrations/*.sql 2>/dev/null)" ]; then
     
     print_success "Database migrations completed!"
 else
-    print_info "No migrations to run"
+    print_info "No additional migrations to run"
 fi
 
 
