@@ -124,6 +124,25 @@ CREATE INDEX IF NOT EXISTS idx_traffic_port_timestamp
 ON traffic_data(port_id, timestamp DESC) 
 WHERE port_id IS NOT NULL;
 
+-- Add composite indexes for alerts table to optimize /api/alerts endpoint
+-- Primary index for superadmin query (ORDER BY created_at DESC LIMIT 200)
+CREATE INDEX IF NOT EXISTS idx_alerts_created_at 
+ON alerts(created_at DESC);
+
+-- Index for normal user queries filtering by router_id and ordering by created_at
+CREATE INDEX IF NOT EXISTS idx_alerts_router_created 
+ON alerts(router_id, created_at DESC);
+
+-- Index for port-specific queries
+CREATE INDEX IF NOT EXISTS idx_alerts_port_created 
+ON alerts(port_id, created_at DESC) 
+WHERE port_id IS NOT NULL;
+
+-- Index for user-specific queries
+CREATE INDEX IF NOT EXISTS idx_alerts_user_created 
+ON alerts(user_id, created_at DESC) 
+WHERE user_id IS NOT NULL;
+
 -- Convert traffic_data to hypertable if not already (TimescaleDB)
 DO $$ 
 BEGIN
